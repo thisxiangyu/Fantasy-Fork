@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using Fantasy.Entitas.Interface;
+using Fantasy.Entitas.TypeMeta;
 using Fantasy.IdFactory;
 using Fantasy.Pool;
 using MongoDB.Bson.Serialization.Attributes;
@@ -48,6 +49,7 @@ namespace Fantasy.Entitas
         [BsonIgnore]
         [IgnoreDataMember]
         [ProtoIgnore]
+        [NotMapped]
         public long RuntimeId { get; protected set; }
         /// <summary>
         /// 当前实体是否已经被销毁
@@ -91,6 +93,7 @@ namespace Fantasy.Entitas
         [JsonIgnore]
         [IgnoreDataMember]
         [ProtoIgnore]
+        [NotMapped]
         public long TypeHashCode { get; private set; }
 #if FANTASY_NET
         [BsonElement("t")] [BsonIgnoreIfNull] private EntityList<Entity> _treeDb;
@@ -145,7 +148,7 @@ namespace Fantasy.Entitas
         {
             if (!typeof(Entity).IsAssignableFrom(type))
             {
-                throw new NotSupportedException($"Type:{type.FullName} must inherit from Entity");
+                throw new NotSupportedException($"Type:{type.FullName} must inherit from JustLinking");
             }
             
             Entity entity = null;
@@ -232,18 +235,19 @@ namespace Fantasy.Entitas
         }
 
         #endregion
-        
-        #region AddComponent
+
+        #region Append
 
         /// <summary>
-        /// 添加一个组件到当前实体上
+        /// 添加一个子实体到当前实体上
         /// </summary>
         /// <param name="isPool">是否从对象池里创建</param>
-        /// <typeparam name="T">要添加组件的泛型类型</typeparam>
-        /// <returns>返回添加到实体上组件的实例</returns>
+        /// <typeparam name="T">要添加子实体的泛型类型</typeparam>
+        /// <returns>返回添加到实体上子实体的实例</returns>
         public T AddComponent<T>(bool isPool = true) where T : Entity, new()
         {
-            var id = EntitySupportedChecker<T>.IsMulti ? Scene.EntityIdFactory.Create : Id;
+            // 为 MultiAppended 的子实体生成新Id , 非 MultiAppended 的子实体复用父级Id
+            var id = TypeSupportedChecker<T>.IsMulti ? Scene.EntityIdFactory.Create : Id;
             var entity = Create<T>(Scene, id, isPool, false);
             AddComponent(entity);
             Scene.EntityComponent.Awake(entity);
@@ -255,12 +259,12 @@ namespace Fantasy.Entitas
         }
 
         /// <summary>
-        /// 添加一个组件到当前实体上
+        /// 添加一个子实体到当前实体上
         /// </summary>
-        /// <param name="id">要添加组件的Id</param>
+        /// <param name="id">要添加子实体的Id</param>
         /// <param name="isPool">是否从对象池里创建</param>
-        /// <typeparam name="T">要添加组件的泛型类型</typeparam>
-        /// <returns>返回添加到实体上组件的实例</returns>
+        /// <typeparam name="T">要添加子实体的泛型类型</typeparam>
+        /// <returns>返回添加到实体上子实体的实例</returns>
         public T AddComponent<T>(long id, bool isPool = true) where T : Entity, new()
         {
             var entity = Create<T>(Scene, id, isPool, false);
@@ -274,41 +278,41 @@ namespace Fantasy.Entitas
         }
 
         /// <summary>
-        /// 添加一个组件到当前实体上
+        /// 添加一个子实体到当前实体上
         /// </summary>
-        /// <param name="component">要添加的实体实例</param>
-        public void AddComponent(Entity component)
+        /// <param name="subEntity">要添加的实体实例</param>
+        public void AddComponent(Entity subEntity)
         {
-            if (this == component)
+            if (this == subEntity)
             {
-                Log.Error("Cannot add oneself to one's own components");
+                Log.Error("Cannot add oneself to one's own Sub-JustLinking");
                 return;
             }
 
-            if (component.IsDisposed)
+            if (subEntity.IsDisposed)
             {
-                Log.Error($"component is Disposed {component.Type.FullName}");
+                Log.Error($"Sub-JustLinking is Disposed {subEntity.Type.FullName}");
                 return;
             }
 
-            var type = component.Type;
-            component.Parent?.RemoveComponent(component, false);
+            var type = subEntity.Type;
+            subEntity.Parent?.RemoveComponent(subEntity, false);
 
-            if (component is ISupportedMultiEntity)
+            if (subEntity is IMultiAppended)
             {
                 _multi ??= Scene.EntitySortedDictionaryPool.Rent();
-                _multi.Add(component.Id, component);
+                _multi.Add(subEntity.Id, subEntity);
 #if FANTASY_NET
-                if (component is ISupportedDataBase)
+                if (subEntity is IFollowCRUD)
                 {
                     _multiDb ??= Scene.EntityListPool.Rent();
-                    _multiDb.Add(component);
+                    _multiDb.Add(subEntity);
                 }
 #endif
             }
             else
             {
-                var typeHashCode = component.TypeHashCode;
+                var typeHashCode = subEntity.TypeHashCode;
                 
                 if (_tree == null)
                 {
@@ -316,60 +320,60 @@ namespace Fantasy.Entitas
                 }
                 else if (_tree.ContainsKey(typeHashCode))
                 {
-                    Log.Error($"type:{type.FullName} If you want to add multiple components of the same type, please implement IMultiEntity");
+                    Log.Error($"type:{type.FullName} If you want to append multiple entites of the same type, please implement IMultiAppended");
                     return;
                 }
                 
-                _tree.Add(typeHashCode, component);
+                _tree.Add(typeHashCode, subEntity);
 #if FANTASY_NET
-                if (component is ISupportedDataBase)
+                if (subEntity is IFollowCRUD)
                 {
                     _treeDb ??= Scene.EntityListPool.Rent();
-                    _treeDb.Add(component);
+                    _treeDb.Add(subEntity);
                 } 
 #endif
             }
             
-            component.Parent = this;
-            component.Scene = Scene;
+            subEntity.Parent = this;
+            subEntity.Scene = Scene;
         }
 
         /// <summary>
-        /// 添加一个组件到当前实体上
+        /// 添加一个子实体到当前实体上
         /// </summary>
-        /// <param name="component">要添加的实体实例</param>
-        /// <typeparam name="T">要添加组件的泛型类型</typeparam>
-        public void AddComponent<T>(T component) where T : Entity
+        /// <param name="subEntity">要添加的实体实例</param>
+        /// <typeparam name="T">要添加子实体的泛型类型</typeparam>
+        public void AddComponent<T>(T subEntity) where T : Entity
         {
-            if (this == component)
+            if (this == subEntity)
             {
-                Log.Error("Cannot add oneself to one's own components");
+                Log.Error("Cannot add oneself to one's own subEntitys");
                 return;
             }
 
-            if (component.IsDisposed)
+            if (subEntity.IsDisposed)
             {
-                Log.Error($"component is Disposed {typeof(T).FullName}");
+                Log.Error($"subEntity is Disposed {typeof(T).FullName}");
                 return;
             }
             
-            component.Parent?.RemoveComponent(component, false);
+            subEntity.Parent?.RemoveComponent(subEntity, false);
             
-            if (EntitySupportedChecker<T>.IsMulti)
+            if (TypeSupportedChecker<T>.IsMulti)
             {
                 _multi ??= Scene.EntitySortedDictionaryPool.Rent();
-                _multi.Add(component.Id, component);
+                _multi.Add(subEntity.Id, subEntity);
 #if FANTASY_NET
-                if (EntitySupportedChecker<T>.IsDataBase)
+                if (TypeSupportedChecker<T>.ShouldFollowSerialization)
                 {
                     _multiDb ??= Scene.EntityListPool.Rent();
-                    _multiDb.Add(component);
+                    _multiDb.Add(subEntity);
                 }
 #endif
             }
             else
             {
-                var typeHashCode = component.TypeHashCode;
+                var typeHashCode = subEntity.TypeHashCode;
                 
                 if (_tree == null)
                 {
@@ -377,33 +381,33 @@ namespace Fantasy.Entitas
                 }
                 else if (_tree.ContainsKey(typeHashCode))
                 {
-                    Log.Error($"type:{typeof(T).FullName} If you want to add multiple components of the same type, please implement IMultiEntity");
+                    Log.Error($"type:{typeof(T).FullName} If you want to append multiple entites of the same type, please implement IMultiAppended");
                     return;
                 }
                 
-                _tree.Add(typeHashCode, component);
+                _tree.Add(typeHashCode, subEntity);
 #if FANTASY_NET
-                if (EntitySupportedChecker<T>.IsDataBase)
+                if (TypeSupportedChecker<T>.ShouldFollowSerialization)
                 {
                     _treeDb ??= Scene.EntityListPool.Rent();
-                    _treeDb.Add(component);
+                    _treeDb.Add(subEntity);
                 } 
 #endif
             }
             
-            component.Parent = this;
-            component.Scene = Scene;
+            subEntity.Parent = this;
+            subEntity.Scene = Scene;
         }
 
         /// <summary>
-        /// 添加一个组件到当前实体上
+        /// 添加一个子实体到当前实体上
         /// </summary>
-        /// <param name="type">组件的类型</param>
+        /// <param name="type">子实体的类型</param>
         /// <param name="isPool">是否在对象池创建</param>
         /// <returns></returns>
         public Entity AddComponent(Type type, bool isPool = true)
         {
-            var id = typeof(ISupportedMultiEntity).IsAssignableFrom(type) ? Scene.EntityIdFactory.Create : Id;
+            var id = typeof(IMultiAppended).IsAssignableFrom(type) ? Scene.EntityIdFactory.Create : Id;
             var entity = Entity.Create(Scene, type, id, isPool, false);
             AddComponent(entity);
             Scene.EntityComponent.Awake(entity);
@@ -416,10 +420,10 @@ namespace Fantasy.Entitas
 
         #endregion
 
-        #region HasComponent
+        #region HasSubEntity
 
         /// <summary>
-        /// 当前实体上是否有指定类型的组件
+        /// 当前实体上是否有指定类型的子实体
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <returns></returns>
@@ -435,7 +439,7 @@ namespace Fantasy.Entitas
         }
 
         /// <summary>
-        /// 当前实体上是否有指定类型的组件
+        /// 当前实体上是否有指定类型的子实体
         /// </summary>
         /// <param name="type"></param>
         /// <returns></returns>
@@ -451,13 +455,13 @@ namespace Fantasy.Entitas
         }
 
         /// <summary>
-        /// 当前实体上是否有指定类型的组件
+        /// 当前实体上是否有指定类型的子实体
         /// </summary>
         /// <param name="id"></param>
         /// <typeparam name="T"></typeparam>
         /// <returns></returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool HasComponent<T>(long id) where T : Entity, ISupportedMultiEntity, new()
+        public bool HasComponent<T>(long id) where T : Entity, IMultiAppended, new()
         {
             if (_multi == null)
             {
@@ -469,7 +473,7 @@ namespace Fantasy.Entitas
 
         #endregion
 
-        #region GetComponent
+        #region GetSubEntity
 
         /// <summary>
         /// 当前实体上查找一个子实体
@@ -484,7 +488,7 @@ namespace Fantasy.Entitas
                 return null;
             }
             
-            return _tree.TryGetValue(TypeHashCache<T>.HashCode, out var component) ? (T)component : null;
+            return _tree.TryGetValue(TypeHashCache<T>.HashCode, out var subEntity) ? (T)subEntity : null;
         }
 
         /// <summary>
@@ -510,7 +514,7 @@ namespace Fantasy.Entitas
         /// <typeparam name="T">要查找实体泛型类型</typeparam>
         /// <returns>查找的实体实例</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public T GetComponent<T>(long id) where T : Entity, ISupportedMultiEntity, new()
+        public T GetComponent<T>(long id) where T : Entity, IMultiAppended, new()
         {
             if (_multi == null)
             {
@@ -533,19 +537,19 @@ namespace Fantasy.Entitas
 
         #endregion
 
-        #region RemoveComponent
+        #region RemoveSubEntity
         
         /// <summary>
-        /// 当前实体下删除一个实体
+        /// 当前实体下删除一个子实体
         /// </summary>
         /// <param name="isDispose">是否执行删除实体的Dispose方法</param>
         /// <typeparam name="T">实体的泛型类型</typeparam>
         /// <exception cref="NotSupportedException"></exception>
         public void RemoveComponent<T>(bool isDispose = true) where T : Entity, new()
         {
-            if (EntitySupportedChecker<T>.IsMulti)
+            if (TypeSupportedChecker<T>.IsMulti)
             {
-                throw new NotSupportedException($"{typeof(T).FullName} message:Cannot delete components that implement the ISupportedMultiEntity interface");
+                throw new NotSupportedException($"{typeof(T).FullName} message:Cannot delete entity that implement the IMultiAppended interface");
             }
             
             if (_tree == null)
@@ -554,14 +558,14 @@ namespace Fantasy.Entitas
             }
             
             var typeHashCode = TypeHashCache<T>.HashCode;
-            if (!_tree.TryGetValue(typeHashCode, out var component))
+            if (!_tree.TryGetValue(typeHashCode, out var subEntity))
             {
                 return;
             }
 #if FANTASY_NET
-            if (_treeDb != null && EntitySupportedChecker<T>.IsDataBase)
+            if (_treeDb != null && TypeSupportedChecker<T>.ShouldFollowSerialization)
             {
-                _treeDb.Remove(component);
+                _treeDb.Remove(subEntity);
 
                 if (_treeDb.Count == 0)
                 {
@@ -580,7 +584,7 @@ namespace Fantasy.Entitas
             
             if (isDispose)
             {
-                component.Dispose();
+                subEntity.Dispose();
             }
         }
 
@@ -590,21 +594,21 @@ namespace Fantasy.Entitas
         /// <param name="id">要删除的实体Id</param>
         /// <param name="isDispose">是否执行删除实体的Dispose方法</param>
         /// <typeparam name="T">实体的泛型类型</typeparam>
-        public void RemoveComponent<T>(long id, bool isDispose = true) where T : Entity, ISupportedMultiEntity, new()
+        public void RemoveComponent<T>(long id, bool isDispose = true) where T : Entity, IMultiAppended, new()
         {
             if (_multi == null)
             {
                 return;
             }
 
-            if (!_multi.TryGetValue(id, out var component))
+            if (!_multi.TryGetValue(id, out var subEntity))
             {
                 return;
             }
 #if FANTASY_NET
-            if (_multiDb != null && EntitySupportedChecker<T>.IsDataBase)
+            if (_multiDb != null && TypeSupportedChecker<T>.ShouldFollowSerialization)
             {
-                _multiDb.Remove(component);
+                _multiDb.Remove(subEntity);
                 if (_multiDb.Count == 0)
                 {
                     Scene.EntityListPool.Return(_multiDb);
@@ -612,7 +616,7 @@ namespace Fantasy.Entitas
                 }
             }
 #endif
-            _multi.Remove(component.Id);
+            _multi.Remove(subEntity.Id);
             if (_multi.Count == 0)
             {
                 Scene.EntitySortedDictionaryPool.Return(_multi);
@@ -621,34 +625,34 @@ namespace Fantasy.Entitas
             
             if (isDispose)
             {
-                component.Dispose();
+                subEntity.Dispose();
             }
         }
 
         /// <summary>
         /// 当前实体下删除一个实体
         /// </summary>
-        /// <param name="component">要删除的实体实例</param>
+        /// <param name="subEntity">要删除的实体实例</param>
         /// <param name="isDispose">是否执行删除实体的Dispose方法</param>
-        public void RemoveComponent(Entity component, bool isDispose = true)
+        public void RemoveComponent(Entity subEntity, bool isDispose = true)
         {
-            if (this == component)
+            if (this == subEntity)
             {
                 return;
             }
             
-            if (component is ISupportedMultiEntity)
+            if (subEntity is IMultiAppended)
             {
                 if (_multi != null)
                 {
-                    if (!_multi.ContainsKey(component.Id))
+                    if (!_multi.ContainsKey(subEntity.Id))
                     {
                         return;
                     }
 #if FANTASY_NET
-                    if (component is ISupportedDataBase)
+                    if (subEntity is IFollowCRUD)
                     {
-                        _multiDb.Remove(component);
+                        _multiDb.Remove(subEntity);
                         if (_multiDb.Count == 0)
                         {
                             Scene.EntityListPool.Return(_multiDb);
@@ -656,7 +660,7 @@ namespace Fantasy.Entitas
                         }
                     }
 #endif
-                    _multi.Remove(component.Id);
+                    _multi.Remove(subEntity.Id);
                     if (_multi.Count == 0)
                     {
                         Scene.EntitySortedDictionaryPool.Return(_multi);
@@ -666,15 +670,15 @@ namespace Fantasy.Entitas
             }
             else if (_tree != null)
             {
-                var typeHashCode = component.TypeHashCode;
+                var typeHashCode = subEntity.TypeHashCode;
                 if (!_tree.ContainsKey(typeHashCode))
                 {
                     return;
                 }
 #if FANTASY_NET
-                if (_treeDb != null && component is ISupportedDataBase)
+                if (_treeDb != null && subEntity is IFollowCRUD)
                 {
-                    _treeDb.Remove(component);
+                    _treeDb.Remove(subEntity);
 
                     if (_treeDb.Count == 0)
                     {
@@ -694,35 +698,35 @@ namespace Fantasy.Entitas
             
             if (isDispose)
             {
-                component.Dispose();
+                subEntity.Dispose();
             }
         }
 
         /// <summary>
         /// 当前实体下删除一个实体
         /// </summary>
-        /// <param name="component">要删除的实体实例</param>
+        /// <param name="subEntity">要删除的实体实例</param>
         /// <param name="isDispose">是否执行删除实体的Dispose方法</param>
         /// <typeparam name="T">实体的泛型类型</typeparam>
-        public void RemoveComponent<T>(T component, bool isDispose = true) where T : Entity
+        public void RemoveComponent<T>(T subEntity, bool isDispose = true) where T : Entity
         {
-            if (this == component)
+            if (this == subEntity)
             {
                 return;
             }
             
-            if (EntitySupportedChecker<T>.IsMulti)
+            if (TypeSupportedChecker<T>.IsMulti)
             {
                 if (_multi != null)
                 {
-                    if (!_multi.ContainsKey(component.Id))
+                    if (!_multi.ContainsKey(subEntity.Id))
                     {
                         return;
                     }
 #if FANTASY_NET
-                    if (EntitySupportedChecker<T>.IsDataBase)
+                    if (TypeSupportedChecker<T>.ShouldFollowSerialization)
                     {
-                        _multiDb.Remove(component);
+                        _multiDb.Remove(subEntity);
                         if (_multiDb.Count == 0)
                         {
                             Scene.EntityListPool.Return(_multiDb);
@@ -730,7 +734,7 @@ namespace Fantasy.Entitas
                         }
                     }
 #endif
-                    _multi.Remove(component.Id);
+                    _multi.Remove(subEntity.Id);
                     if (_multi.Count == 0)
                     {
                         Scene.EntitySortedDictionaryPool.Return(_multi);
@@ -746,9 +750,9 @@ namespace Fantasy.Entitas
                     return;
                 }
 #if FANTASY_NET
-                if (_treeDb != null && EntitySupportedChecker<T>.IsDataBase)
+                if (_treeDb != null && TypeSupportedChecker<T>.ShouldFollowSerialization)
                 {
-                    _treeDb.Remove(component);
+                    _treeDb.Remove(subEntity);
 
                     if (_treeDb.Count == 0)
                     {
@@ -768,7 +772,7 @@ namespace Fantasy.Entitas
             
             if (isDispose)
             {
-                component.Dispose();
+                subEntity.Dispose();
             }
         }
 

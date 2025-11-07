@@ -25,7 +25,7 @@ namespace Fantasy.Database
 {
     /// <summary>
     /// 这里是 Fantasy框架使用 Mongo 数据库的实现。
-    /// ( 请注意"b"的小写性质, 容易与大写"B"的MongoDB命名空间产生混淆, 特此提醒。)
+    /// ( 请注意"b"的小写性质, 很容易与大写"B"的MongoDB命名空间产生混淆, 特此提醒。)
     /// </summary>
     public sealed partial class MongoDb : IDatabase, IRawHandler<IMongoDatabase>
     {
@@ -95,6 +95,9 @@ namespace Fantasy.Database
             {
                 RawHandler = _mongoClient.GetDatabase(dbName);
                 _dbSession = new MongoSession(this);
+                //var optionsBuilder = new DbContextOptionsBuilder<PgSession>();
+                //optionsBuilder.UseNpgsql(RawHandler);
+
 
                 long mongoDbTypeHash = GetType().TypeHandle.Value.ToInt64();
 
@@ -185,10 +188,10 @@ namespace Fantasy.Database
         /// <returns></returns>
         public async FTask FastDeploy()
         {
-            await DbAttrHelper.ScanFantasyDbSetTypesAsync(async (type, tableName, attr) => {
+            await DbSetMetadataHelper.ScanDbSetEntityTypesAsync(async (type, tableName, attr) => {
                 if (attr.IfSelectionContainsDbType(DatabaseType.MongoDB) == false)
                 { 
-                    Log.Error($"Failed to operated a FantasyDbSet which`s Attr Info had not contained DbSelection of {DatabaseType.MongoDB}");
+                    Log.Error($"Failed to operated a FantasyDbSet which`s Attr _info had not contained DbSelection of {DatabaseType.MongoDB}");
                     return;
                 }
                 await CreateCollection(type, tableName);

@@ -58,6 +58,7 @@ namespace Fantasy.SourceGenerator.Generators
                 "System.Collections.Generic",
                 "Fantasy.Assembly",
                 "Fantasy.DataStructure.Collection",
+                "Fantasy.Entitas.TypeMeta",
                 "Fantasy.Entitas.Interface"
             );
             builder.AppendLine();

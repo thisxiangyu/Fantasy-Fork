@@ -44,6 +44,10 @@
       <PackageReference Include="CommandLineParser" Version="2.9.1" />
       <FrameworkReference Include="Microsoft.AspNetCore.App" />
       <PackageReference Include="Dapper" Version="2.1.66" />
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.1">
+        <PrivateAssets>all</PrivateAssets>
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      </PackageReference>
       <PackageReference Include="MongoDB.Bson" Version="3.4.3" />
       <PackageReference Include="MongoDB.Driver" Version="3.4.3" />
       <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
@@ -60,7 +64,7 @@
     </ItemGroup>
 
     <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
-      <PackageReference Include="System.IO.Pipelines" Version="9.0.8" />
+      <PackageReference Include="System.IO.Pipelines" Version="9.0.10" />
     </ItemGroup>
 
     <!-- Source Generator Reference -->
@@ -76,19 +80,16 @@
 
     <!-- Source Generator Reference -->
     <ItemGroup>
-      <ProjectReference Include="..\Fantasy.SourceGenerator\Fantasy.SourceGenerator.csproj"
-                        OutputItemType="Analyzer"
-                        ReferenceOutputAssembly="false"
-                        SetTargetFramework="TargetFramework=netstandard2.0" />
+      <ProjectReference Include="..\Fantasy.SourceGenerator\Fantasy.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" SetTargetFramework="TargetFramework=netstandard2.0" />
     </ItemGroup>
 
     <!-- 将 Source Generator 打包到 NuGet -->
     <ItemGroup>
         <!-- 获取 Fantasy.SourceGenerator 的输出 DLL -->
-        <None Include="..\Fantasy.SourceGenerator\bin\$(Configuration)\netstandard2.0\Fantasy.SourceGenerator.dll"
-              Pack="true"
-              PackagePath="analyzers/dotnet/cs"
-              Visible="false" />
+        <None Include="..\Fantasy.SourceGenerator\bin\$(Configuration)\netstandard2.0\Fantasy.SourceGenerator.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    </ItemGroup>
+    <ItemGroup>
+      <Folder Include="Migrations\" />
     </ItemGroup>
 
 </Project>

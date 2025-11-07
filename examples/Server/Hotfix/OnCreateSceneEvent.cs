@@ -4,12 +4,7 @@ using Fantasy.Database;
 using Fantasy.Entitas;
 using Fantasy.Entitas.Interface;
 using Fantasy.Event;
-using Fantasy.Helper;
-using Fantasy.SeparateTable;
-using Fantasy.Serialize;
-using Fantasy.SourceGenerator;
-using Fantasy.Sphere;
-using ProtoBuf;
+using static Fantasy.ExampleRoot;
 
 namespace Fantasy;
 
@@ -34,12 +29,6 @@ public sealed class SubSceneTestComponent : Entity
         Log.Debug("销毁SubScene下的SubSceneTestComponent");
         base.Dispose();
     }
-}
-
-[SeparateTable(typeof(SubSceneTestComponent),"TestEntity123")]
-public sealed class TestEntity : Entity
-{
-    
 }
 
 public sealed class SubSceneTestComponentAwakeSystem : AwakeSystem<SubSceneTestComponent>
@@ -140,10 +129,12 @@ public sealed class OnCreateSceneEvent : AsyncEventSystem<OnCreateScene>
         //测试FantasyDbSet
         if (scene.SceneConfigId == 1001)
         {
-            var TestFantasyDbSetRoot =  scene.AddComponent<FantasyDbSetExampleRoot>();
-            //TestFantasyDbSetRoot.StartTest<PostgreSQL>(TestWhat.FastDeploy, dutyId: 0).Coroutine();
+            var TestFantasyDbSetRoot =  scene.AddComponent<ExampleRoot>();
+            await TestFantasyDbSetRoot.StartTest<PostgreSQL>(TestWhat.FastDeploy, dutyId: 0);
+            await TestFantasyDbSetRoot.StartTest<PostgreSQL>(TestWhat.Insert, dutyId: 0);
             //TestFantasyDbSetRoot.StartTest<MongoDb>(TestWhat.FastDeploy, dutyId: 2).Coroutine();
             //TestFantasyDbSetRoot.StartTest<MongoDb>(TestWhat.Insert, dutyId: 2).Coroutine();
+            //TestFantasyDbSetRoot.TestAPI<MongoDb>(2);
         }       
     }
 }

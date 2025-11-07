@@ -1,5 +1,6 @@
 ﻿using System.Runtime.Loader;
 using Fantasy.Generated;
+using Fantasy.Platform.Net;
 
 namespace Fantasy
 {
@@ -28,10 +29,16 @@ namespace Fantasy
                 _assemblyLoadContext.Unload();
                 System.GC.Collect();
             }
-
+            string baseDirectory = AppContext.BaseDirectory;
+            // 如果是EFCore设计时, 需要对路径进行修正
+            if (Entry.IsEFCoreDesignTime()) 
+            { 
+                Console.WriteLine("EFCore Design Time ...");
+                baseDirectory = "..\\..\\..\\examples\\Bin\\Debug\\net8.0\\";
+            }
             _assemblyLoadContext = new AssemblyLoadContext(HotfixDll, true);
-            var dllBytes = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, $"{HotfixDll}.dll"));
-            var pdbBytes = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, $"{HotfixDll}.pdb"));
+            var dllBytes = File.ReadAllBytes(Path.Combine(baseDirectory, $"{HotfixDll}.dll"));
+            var pdbBytes = File.ReadAllBytes(Path.Combine(baseDirectory, $"{HotfixDll}.pdb"));
             var assembly = _assemblyLoadContext.LoadFromStream(new MemoryStream(dllBytes), new MemoryStream(pdbBytes));
             // 强制触发 ModuleInitializer 执行
             // AssemblyLoadContext.LoadFromStream 只加载程序集到内存，不会自动触发 ModuleInitializer

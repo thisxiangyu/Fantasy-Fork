@@ -1,9 +1,12 @@
 ﻿#if FANTASY_NET
+using Fantasy.Assembly;
 using Fantasy.Async;
 using Fantasy.DataStructure.Collection;
 using Fantasy.Entitas;
+using Microsoft.EntityFrameworkCore;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using System.Collections.Frozen;
 using System.Linq.Expressions;
 
 #pragma warning disable CS8602 // Dereference of a possibly null reference.
@@ -16,7 +19,7 @@ namespace Fantasy.Database
     /// <summary>
     /// MongoDB的会话,适用于数据库基本CRUD操作
     /// </summary>
-    public sealed partial class MongoSession :IDbSession, IDisposable
+    public sealed partial class MongoSession : DbContext, IDbSession, IDisposable
     {
         private MongoDb mongo;
 
@@ -29,21 +32,62 @@ namespace Fantasy.Database
         }
 
         /// <summary>
+        /// 构造函数, 就这样继承就可以了 
+        /// </summary>
+        /// <param name="options"></param>
+        public MongoSession(DbContextOptions options) : base(options)
+        {
+
+        }
+
+        /// <summary>
+        ///  " EntityTable" 映射模型构建阶段。
+        ///  在 DbContext 首次实例化的时候会自动检查是否建构过模型，如果检测到从未建构过，OnModelCreating 就会生效。  
+        /// </summary>
+        /// <param name="modelBuilder"></param>
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            DbSetMetadataHelper.ScanDbSetEntityTypes((type, tableName, attr) => {
+                if (attr.IfSelectionContainsDbType(DatabaseType.MongoDB))
+                {
+                    Log.Debug($"MongoDb ORM-Model Registering entity: {type.FullName} -> table {tableName}");
+                    modelBuilder.Entity(type).ToTable(tableName);
+                }
+            });
+
+            // 剔除属性导航
+            //modelBuilder.Model.GetEntityTypes()
+            //    .Where(t => !t.ClrType.GetCustomAttributes(typeof(TableAttribute), true).Any() &&
+            //                !t.ClrType.GetCustomAttributes(typeof(FantasyTableAttribute), true).Any())
+            //    .ToList()
+            //    .ForEach(t => modelBuilder.Ignore(t.ClrType));
+
+            //foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+            //{
+            //    Log.Warning($"EFCore 全部注册的实体: {entityType.ClrType.FullName}");
+            //}
+
+            base.OnModelCreating(modelBuilder);
+        }
+
+        /// <summary>
         /// 销毁
         /// </summary>
-        public void Dispose()
+        public override void Dispose()
         {
             mongo = null;
+            base.Dispose();
         }
 
         /// <summary>
         /// 异步销毁
         /// </summary>
         /// <returns></returns>
-        public async ValueTask DisposeAsync()
+        public override async ValueTask DisposeAsync()
         {
             mongo = null;
             await FTask.CompletedTask;
+            await base.DisposeAsync();
         }
           
         #region GetCollection
@@ -60,7 +104,7 @@ namespace Fantasy.Database
         }
 
         /// <summary>
-        /// 获取指定集合中的 MongoDB 文档的 IMongoCollection 对象，其中实体类型为 Entity。
+        /// 获取指定集合中的 MongoDB 文档的 IMongoCollection 对象，其中实体类型为 ToParentIs。
         /// </summary>
         /// <param name="name">集合名称。</param>
         /// <returns>IMongoCollection 对象。</returns>
@@ -782,7 +826,7 @@ namespace Fantasy.Database
                     }
                     catch (Exception e)
                     {
-                        Log.Error($"Save List Entity Error: {clone.GetType().Name} {clone}\n{e}");
+                        Log.Error($"Save List ToParentIs Error: {clone.GetType().Name} {clone}\n{e}");
                     }
                 }
             }

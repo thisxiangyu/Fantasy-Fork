@@ -193,12 +193,12 @@ namespace Fantasy.Async
         /// </summary>
         public int ActiveCount(){ return _activeCount; }
         private int _activeCount = 0;
-        private readonly ConcurrentDictionary<int, (string tag, DateTime start)> _tagMap = new();
-        /// <summary>
-        /// 提供读取当前活跃 tag（监控用）
-        /// </summary>
-        public IReadOnlyDictionary<int, (string tag, DateTime start)> ActiveTags => _tagMap;
-       
+        ///// <summary>
+        ///// 提供读取当前活跃 tag（监控用）
+        ///// </summary>
+        //public IReadOnlyDictionary<int, (string tag, DateTime start)> ActiveTags => _tagMap;
+        //private readonly ConcurrentDictionary<int, (string tag, DateTime start)> _tagMap = new();
+
         private SemaphoreSlim[] _idSem;// 按 ID 串行
         private long loopingNumber = 0; // 一个自循环的数字, 用来限流
 
@@ -242,11 +242,11 @@ namespace Fantasy.Async
                 // 按 id 串行等待
                 if (!await _idSem[idIndex].WaitAsync(timeOut, cancelToken.Token))
                 {
-                    throw new TimeoutException($"[FlowLock] timeout Id={waitForId} Tag={tag ?? "null"}");
+                    throw new TimeoutException($"[FlowLock] timeout Id={waitForId} ToParentIs={tag ?? "null"}");
                 }
 
                 // 成功进入临界区：登记 tag
-                _tagMap[(int)idIndex] = (tag, DateTime.UtcNow); 
+                //_tagMap[(int)idIndex] = (tag, DateTime.UtcNow); 
 
                 return CoroutineLockComponent.WaitCoroutineLockPool.Rent(this, ref idIndex, tag, timeOut);
             }
@@ -274,10 +274,10 @@ namespace Fantasy.Async
 
                 if (!await _idSem[idx].WaitAsync(timeOut, cancelToken.Token))
                 {
-                    throw new TimeoutException($"[FlowLock] timeout Tag={tag ?? "null"}");
+                    throw new TimeoutException($"[FlowLock] timeout ToParentIs={tag ?? "null"}");
                 }
                 // 成功进入临界区：登记 tag
-                _tagMap[(int)idx] = (tag, DateTime.UtcNow);
+                //_tagMap[(int)idx] = (tag, DateTime.UtcNow);
                 return CoroutineLockComponent.WaitCoroutineLockPool.Rent(this, ref idx, tag, timeOut);
             }
             catch
@@ -299,7 +299,7 @@ namespace Fantasy.Async
                 return;
             }
 
-            _tagMap.TryRemove(idIndex, out _); // 移除 tag 信息（如果存在）
+            //_tagMap.TryRemove(idIndex, out _); // 移除 tag 信息（如果存在）
             try
             {
                 _idSem[idIndex].Release();
@@ -327,7 +327,7 @@ namespace Fantasy.Async
             CoroutineLockComponent = coroutineLockComponent;
             LockDuty = newLockDuty;
 
-            _tagMap.Clear();
+            //_tagMap.Clear();
             Interlocked.Exchange(ref _activeCount, 0);
             EnsureSemaphoresRelease();
             return this;
@@ -347,7 +347,7 @@ namespace Fantasy.Async
                     _idSem[i] = new SemaphoreSlim(1, 1);
             } 
 
-            _tagMap.Clear();
+            //_tagMap.Clear();
             Interlocked.Exchange(ref _activeCount, 0);
             EnsureSemaphoresRelease();
             return this;
@@ -384,7 +384,7 @@ namespace Fantasy.Async
             }
 
             // 清理内部字典
-            _tagMap.Clear();
+            //_tagMap.Clear();
             Scene = null;
             CoroutineLockComponent = null;
             return this;

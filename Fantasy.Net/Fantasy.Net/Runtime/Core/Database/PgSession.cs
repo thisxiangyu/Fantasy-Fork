@@ -1,17 +1,19 @@
 ﻿#if FANTASY_NET
+using System.Collections.Frozen;
+using System.Data;
+using System.Data.Common;
+using System.Linq.Expressions;
 using Fantasy.Assembly;
 using Fantasy.Async;
 using Fantasy.Database.Attributes;
 using Fantasy.Entitas;
+using Fantasy.Entitas.Interface;
+using Fantasy.Entitas.TypeMeta;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using Npgsql;
-using System.ComponentModel.DataAnnotations.Schema;
-using System.Data;
-using System.Data.Common;
-using System.Linq.Expressions;
-using System.Reflection;
 
 #pragma warning disable CS8602 // Dereference of a possibly null reference.
 #pragma warning disable CS8603 // Possible null reference return.
@@ -43,7 +45,7 @@ namespace Fantasy.Database
     ///  模型初始化时自动构建, 构建后无法运行时变动! 无法HotUpdate！无法检测到动态新建的表、无法感知热更新建的字段！ 
     ///  因此，对于已上线的业务，如果需要无感更新业务数据, (典型的情况是中途给实体新增字段 )，
     ///  请务必考虑采用【蓝绿部署】结合"数据库迁移策略"；
-    ///  另一种可能有效的运行时让服务无感交接的解决办法是：继承并实现额外的DbContext，比如实现一组临时的 TempSession 与 TempSessionUnPooled ，专门用于“Entity - Table”模型的热交接（但即便如此, 等到合适的时机依然需要重启服务器，构建新的模型）。
+    ///  另一种可能有效的运行时让服务无感交接的解决办法是：继承并实现额外的DbContext，比如实现一组临时的 TempSession 与 TempSessionUnPooled ，专门用于“EntityTable”模型的热交接（但即便如此, 等到合适的时机依然需要重启服务器，构建新的模型）。
     ///  
     /// 【关于 PgSession 的池化机制】 由ServiceProvider依赖注入进行池化，
     /// 具体详情请见 PostgreSQL 初始化时调用的 ServiceCollection.AddDbContextPool() 方法，
@@ -98,21 +100,87 @@ namespace Fantasy.Database
         }
 
         /// <summary>
-        ///  " Entity - Table" 映射模型构建阶段。
+        ///  " EntityTable" 映射模型构建阶段。
         ///  在 DbContext 首次实例化的时候会自动检查是否建构过模型，如果检测到从未建构过，OnModelCreating 就会生效。  
         /// </summary>
         /// <param name="modelBuilder"></param>
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            //Log.Info("\" Entity - Table\" Model is Creating...");
-
-            DbAttrHelper.ScanFantasyDbSetTypes((type, tableName,attr) => {
+            //处理DbSet注册
+            List<EntityTypeBuilder> allBuilders = new ();
+            List<Type> allTypes = new();
+            DbSetMetadataHelper.ScanDbSetEntityTypes((type, tableName,attr) => {
                 if (attr.IfSelectionContainsDbType(DatabaseType.PostgreSQL))
                 {
-                    Log.Debug($"Registering entity: {type.FullName} -> table {tableName}");
-                    modelBuilder.Entity(type).ToTable(tableName);
+                    Log.Debug($"PgSQL ORM-Model Registering entity: {type.FullName} -> table {tableName}");
+
+                    string schemaStr = "public";//PgSQL默认命名空间
+                    if (attr.WithNamespace == true && !string.IsNullOrWhiteSpace(type.Namespace))
+                        schemaStr = type.Namespace;
+                    EntityTypeBuilder entityBuilder = modelBuilder.Entity(type).ToTable(tableName, schemaStr);
+                    allBuilders.Add(entityBuilder);
+                    allTypes.Add(type);
                 }
             });
+
+            //处理DbSet与父级的关系
+            for (int i = 0; i< allBuilders.Count;i++) {
+
+                var builder = allBuilders[i];
+                var type = allTypes[i];
+                TypeDbSetCache TypeDbSetCache = TypeDbSetInfos.GetInfo(type);
+                var DbSetParents = TypeDbSetCache.DbSetParents;
+
+                //添加RefType + RefId 联合索引
+                if (TypeDbSetCache.HasDbSetRef)
+                {
+                    builder.Property<long>(DbSetProperty.RefType);
+                    builder.Property<long>(DbSetProperty.RefId);
+                    builder.HasIndex(DbSetProperty.RefType, DbSetProperty.RefId).IsUnique(false); ;
+                }
+
+                if (DbSetParents == null || DbSetParents.Count == 0) 
+                {
+                    // --- 默认行为 : 将子实体存储集彻底嵌入父级实体 ---
+                    // --- 处理嵌入式存储集 ---
+
+                }
+                else
+                {
+                    // 构建实体与父级DbSet的引用关联
+                    //foreach(var parent in DbSetParents)
+                    //{
+                    //    string FK = TypeDbSetCache.ForeignKeyByParentHash[TypeHashCache.GetHashCode(parent)];
+
+                    //    builder.Property<long>(FK);
+                    //    builder.HasOne(parent)
+                    //           .WithMany()
+                    //           .HasForeignKey($"{FK}");
+                        
+                    //    Log.Debug($"    Configured {type.Name} HasOne<{parent.Name}> with FK: {FK}");                       
+                    //}
+
+                    // 添加 CHECK 约束 (用于强制多选一的业务规则)
+                    // 这是一个高级操作，并且需要根据具体的数据库类型编写 SQL 检查语句。
+                    // 示例 (仅用于概念说明，可能需要调整 SQL 语法)：
+
+                    //var checkSql = string.Join(" AND ",
+                    //    Enumerable.Range(0, parentTypes.Count)
+                    //              .Select(i => $"[ForeignKey{i}] IS NULL")
+                    //              .Take(parentTypes.Count - 1));
+
+                    //// 逻辑: (FK0 IS NOT NULL AND FK1 IS NULL AND FK2 IS NULL...) OR (FK0 IS NULL AND FK1 IS NOT NULL AND FK2 IS NULL...) OR (FK0 IS NULL AND FK1 IS NULL AND FK2 IS NULL)
+                    //// 这个逻辑用 SQL 编写很复杂，通常会用一个计算列或数据库触发器实现。
+                    //// 简单化，只在应用层或迁移脚本中添加最关键的 CHECK 约束。
+
+                    //// 示例：确保至少有一个是 NULL（仅用于演示，实际约束更复杂）
+                    //entityBuilder.ToTable(tb => tb.HasCheckConstraint(
+                    //    $"CK_{tableName}_SingleParent",
+                    //    string.Join(" + ", parentTypes.Select((t, i) => $"CAST({FK} IS NOT NULL AS INT)")) + " <= 1"
+                    //));
+
+                }
+            }
 
             // 剔除属性导航
             //modelBuilder.Model.GetEntityTypes()
@@ -125,6 +193,11 @@ namespace Fantasy.Database
             //{
             //    Log.Warning($"EFCore 全部注册的实体: {entityType.ClrType.FullName}");
             //}
+
+            if (!modelBuilder.Model.GetEntityTypes().Any())
+            {
+                Log.Warning("❌ No entities were detected during the EF Core model-building phase. Please verify!");
+            }
 
             base.OnModelCreating(modelBuilder);
         }
@@ -233,7 +306,7 @@ namespace Fantasy.Database
         ///// <param name="table">表名称，可选。如果未指定，将使用实体类型的名称。</param>
         ///// <param name="dbContext">上下文，可选。</param>
         ///// <returns>总行数。</returns>
-        //public async FTask<long> Count<T>(string table = null,DbContext dbContext = null) where T : Entity
+        //public async FTask<long> Count<T>(string table = null,DbContext dbContext = null) where T : ToParentIs
         //{
         //    var tableName = GetTableName<T>(table);
         //    var connection = Handler.CreateConnection();
@@ -872,9 +945,9 @@ namespace Fantasy.Database
             //                 {
             //                     var bsonDocument = GetBsonDocumentFromReader(reader);
             //                     var entityType = Type.GetType($"Fantasy.Entities.{tableName}, Fantasy");
-            //                     if (entityType != null && typeof(Entity).IsAssignableFrom(entityType))
+            //                     if (entityType != null && typeof(ToParentIs).IsAssignableFrom(entityType))
             //                     {
-            //                         var entity = _serializer.Deserialize(entityType, bsonDocument) as Entity;
+            //                         var entity = _serializer.Deserialize(entityType, bsonDocument) as ToParentIs;
             //                         if (isDeserialize && entity != null)
             //                         {
             //                             entity.Deserialize(_scene);
@@ -1289,7 +1362,7 @@ namespace Fantasy.Database
             //     return;
             // }
             // 
-            // using var listPool = ListPool<Entity>.Create();
+            // using var listPool = ListPool<ToParentIs>.Create();
             // 
             // foreach (var entity in entities)
             // {
@@ -1335,7 +1408,7 @@ namespace Fantasy.Database
             //         }
             //         catch (Exception e)
             //         {
-            //             Log.Error($"Save List Entity Error: {clone.GetType().Name} {clone}\n{e}");
+            //             Log.Error($"Save List ToParentIs Error: {clone.GetType().Name} {clone}\n{e}");
             //         }
             //     }
             //     await _connection.CloseAsync();
@@ -1355,32 +1428,42 @@ namespace Fantasy.Database
         /// <param name="table">表名称。</param>
         public async FTask Insert<T>(T? entity, string table = null) where T : Entity, new()
         {
-            // if (entity == null)
-            // {
-            //     Log.Error($"insert entity is null: {typeof(T).Name}");
-            //     return;
-            // }
-            // 
-            // var clone = _serializer.Clone(entity);
-            // var tableName = GetTableName<T>(table);
-            // 
-            // using (await _dataBaseLock.Wait(entity.Id))
-            // {
-            //     await _connection.OpenAsync();
-            //     using (var cmd = _connection.CreateCommand())
-            //     {
-            //         var columns = GetColumnsForEntity(clone);
-            //         var columnList = string.Join(", ", columns.Select(c => $"\"{c}\""));
-            //         var valueList = string.Join(", ", columns.Select(c => $"@{c}"));
-            //         
-            //         cmd.CommandText = $"INSERT INTO \"{tableName}\" ({columnList}) VALUES ({valueList})";
-            //         AddParametersForEntity(cmd, clone, columns);
-            //         
-            //         await cmd.ExecuteNonQueryAsync();
-            //         await _connection.CloseAsync();
-            //     }
-            // }
-            await FTask.CompletedTask;
+            if (entity == null)
+                return;
+            try
+            {
+                Set<T>().Add(entity);
+                Log.Debug("当前试图存储类型:" + entity.Type.Name);
+                if (entity is IDbSetRef)
+                {
+                    var parent = entity.Parent;
+                    Log.Debug("父级DbSet所存类型:" + parent.Type.Name);
+
+                    //设置联合索引
+                    Entry(entity).Property(DbSetProperty.RefType).CurrentValue = TypeHashCache.GetHashCode(parent.Type);
+                    Entry(entity).Property(DbSetProperty.RefId).CurrentValue = parent.Id;
+
+                    //TODO 判断父级是否是受到 IDbSetRef 关系型约束的类型, 如果在约束之外, 那么意味着关系引用退化成了纯引用(思考这里要不要用桥接表)
+
+                    //根据Parent类型更新所有影子外键的值
+                    //FrozenDictionary<long, string>? FK = TypeDbSetChecker<T>.ForeignKeyByTypeHash;
+                    //if(FK!=null)
+                    //{
+                    //    long parentTypeHash = TypeHashCache.GetHashCode(parent.Type);
+                    //    foreach (var fk in FK)
+                    //    {
+                    //        //if (fk.Key == parentTypeHash)
+                    //            Entry(entity).Property(fk.Value).CurrentValue = parent.Id;
+                    //        //else 
+                    //        //    Entry(entity).Property(fk.Value).CurrentValue = null; //非Parent的影子外键直接设为null
+                    //    }
+                    //}
+                }
+                var count = await SaveChangesAsync();
+            }
+            catch (Exception ex) { 
+                Log.Error($"{pg.GetDatabaseType} Insert-Err ({entity.Type}:{entity.Id}) !\n {ex} ",ErrType.CriticalEmergency);
+            }
         }
 
         /// <summary>

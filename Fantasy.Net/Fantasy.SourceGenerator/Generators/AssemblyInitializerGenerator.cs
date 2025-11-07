@@ -186,8 +186,6 @@ namespace Fantasy.SourceGenerator.Generators
                 "Fantasy.Assembly.INetworkProtocolResponseTypeResolver? networkProtocolResponseTypeResolverRegistrar = null;");
             builder.AppendLine("#if FANTASY_NET", false);
             builder.AppendLine(
-                "Fantasy.Assembly.ISeparateTableRegistrar? separateTableRegistrar = null;");
-            builder.AppendLine(
                 "Fantasy.Assembly.ISphereEventRegistrar? sphereEventRegistrar = null;");
             builder.AppendLine("#endif", false);
             builder.AppendLine(
@@ -204,7 +202,6 @@ namespace Fantasy.SourceGenerator.Generators
             GenerateTryCreateRegistrar(builder, "NetworkProtocolOpCodeResolver", "networkProtocolOpCodeResolverRegistrar");
             GenerateTryCreateRegistrar(builder, "NetworkProtocolResponseTypeResolver", "networkProtocolResponseTypeResolverRegistrar");
             builder.AppendLine("#if FANTASY_NET", false);
-            GenerateTryCreateRegistrar(builder, "SeparateTable", "separateTableRegistrar");
             GenerateTryCreateRegistrar(builder, "SphereEvent", "sphereEventRegistrar");
             builder.AppendLine("#endif", false);
             GenerateTryCreateRegistrar(builder, "CustomInterface", "customInterfaceRegistrar");
@@ -223,7 +220,6 @@ namespace Fantasy.SourceGenerator.Generators
             builder.AppendLine("entitySystemRegistrar,");
             builder.AppendLine("messageHandlerResolverRegistrar,");
             builder.AppendLine("entityTypeCollectionRegistrar,");
-            builder.AppendLine("separateTableRegistrar,");
             builder.AppendLine("networkProtocolOpCodeResolverRegistrar,");
             builder.AppendLine("networkProtocolResponseTypeResolverRegistrar,");
             builder.AppendLine("sphereEventRegistrar,");

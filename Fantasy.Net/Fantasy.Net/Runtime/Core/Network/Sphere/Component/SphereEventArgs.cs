@@ -1,6 +1,7 @@
 #if FANTASY_NET
 using System.Runtime.Serialization;
 using Fantasy.Entitas.Interface;
+using Fantasy.Entitas.TypeMeta;
 using Fantasy.Pool;
 using MongoDB.Bson.Serialization.Attributes;
 using Newtonsoft.Json;

@@ -171,20 +171,24 @@ public static class ConfigLoader
         ProcessConfigData.Initialize(processList);
     }
 
-    private static void LoadWorldConfig(XmlNode serverNode, XmlNamespaceManager nsManager)
+    /// <summary>
+    /// 加载World配置
+    /// </summary>
+    public static List<WorldConfig> LoadWorldConfig(XmlNode serverNode, XmlNamespaceManager nsManager)
     {
+  
         var worldsNode = serverNode.SelectSingleNode("f:worlds", nsManager);
         if (worldsNode == null)
         {
             throw new InvalidOperationException("Missing worlds configuration - at least one world must be configured");
         }
-        
+
         var worldNodes = worldsNode.SelectNodes("f:world", nsManager);
         if (worldNodes == null || worldNodes.Count == 0)
         {
             throw new InvalidOperationException("No world configurations found - at least one world must be configured");
         }
-        
+
         var worldList = new List<WorldConfig>();
 
         // 解析world和所有database
@@ -209,7 +213,7 @@ public static class ConfigLoader
                 if (string.IsNullOrWhiteSpace(dbConnection))
                 {
                     Log.Warning($"(Fantasy.config) \"DbConnection\" is empty, thus the database-config \"{dbName}({dbType})\" in {worldName} (World Id: {id}) will be ignoured.");
-                    dbConnection = string.Empty; 
+                    dbConnection = string.Empty;
                 }
 
                 dbDuties.Add(dbDuty);
@@ -217,7 +221,6 @@ public static class ConfigLoader
                 dbNames.Add(dbName);
                 dbConnections.Add(dbConnection);
             }
-
             // 创建 WorldConfig
             var worldConfig = new WorldConfig
             {
@@ -232,6 +235,7 @@ public static class ConfigLoader
         }
 
         WorldConfigData.Initialize(worldList);
+        return worldList;
     }
 
     private static void LoadSceneConfig(XmlNode serverNode, XmlNamespaceManager nsManager)

@@ -28,17 +28,25 @@ namespace Fantasy
         /// 本世界所有数据库, 按照工作职责号存取。
         /// </summary>
         private Dictionary<int, IDatabase> AllDatabases { get; init; }
+        /// <summary>
+        /// 本世界当前聚焦的数据库。
+        /// </summary>
+        public IDatabase? CurrentDb { get; set; }
 
         /// <summary>
         /// 根据工作职责号获取某个类型的数据库。
         /// </summary>
         /// <typeparam name="T">数据库类型</typeparam>
         /// <param name="duty">数据库工作职责号</param>
+        /// <param name="shallSetAsFocused">是否同时设置为当前聚焦</param>
         /// <returns></returns>
-        public T? GetDatabase<T>(int duty) where T : class, IDatabase
+        public T? GetDatabase<T>(int duty, bool shallSetAsFocused = true) where T : class, IDatabase
         {
             if(!AllDatabases.TryGetValue(duty, out IDatabase? database))
                 return null;
+
+            if(shallSetAsFocused)
+                CurrentDb = database;
 
             var res = database as T;
             return res;
@@ -51,11 +59,15 @@ namespace Fantasy
         /// 2. 弱类型用法，直接使用IDatabase接口, 调用其中 DbSession 内部的通用方法，适合简单CRUD。
         /// </summary>
         /// <param name="duty">数据库工作职责号</param>
+        /// <param name="shallSetAsFocused">是否同时设置为当前聚焦</param>
         /// <returns></returns>
-        public IDatabase? GetDatabase(int duty)
+        public IDatabase? GetDatabase(int duty, bool shallSetAsFocused = true)
         {
             if (!AllDatabases.TryGetValue(duty, out IDatabase? database))
                 return null;
+
+            if (shallSetAsFocused)
+                CurrentDb = database;
 
             var res = database;
             return res;
@@ -94,7 +106,7 @@ namespace Fantasy
                     case "pg":
                         {
                             if (AllDatabases.ContainsKey(worldConfig.DbDuty[i]))
-                                throw new Exception($"Database {worldConfig.DbName[i]} Duty({worldConfig.DbDuty[i]}) is duplicated. Please verify your configuration.");
+                                throw new Exception($"CurrentDb {worldConfig.DbName[i]} Duty({worldConfig.DbDuty[i]}) is duplicated. Please verify your configuration.");
                             
                             var pg = new PgSQL();
                             pg.Initialize(scene,ref services, worldConfig.DbDuty[i], worldConfig.DbConnection[i], worldConfig.DbName[i]);
@@ -105,7 +117,7 @@ namespace Fantasy
                     case "mongo":
                         {
                             if (AllDatabases.ContainsKey(worldConfig.DbDuty[i]))
-                                throw new Exception($"Database {worldConfig.DbName[i]} Duty({worldConfig.DbDuty[i]}) is duplicated. Please verify your configuration.");
+                                throw new Exception($"CurrentDb {worldConfig.DbName[i]} Duty({worldConfig.DbDuty[i]}) is duplicated. Please verify your configuration.");
                             
                             var mongo = new Mongo();
                             mongo.Initialize(scene, ref services, worldConfig.DbDuty[i], worldConfig.DbConnection[i], worldConfig.DbName[i]);

@@ -1,6 +1,7 @@
 ﻿#if FANTASY_NET
 using Fantasy.Async;
 using Fantasy.Entitas;
+using Fantasy.InnerMessage;
 using Fantasy.Serialize;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -86,35 +87,29 @@ namespace Fantasy.Database
             // 详情 请阅读 AddDbContextPool 微软官方的注释以获得更多理解。
             worldServices.AddDbContextPool<PgSession>(contextOptionsBuilder =>
             {
-                contextOptionsBuilder.UseNpgsql(RawHandler).UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking); // 默认关闭 ChangeTracking，让 EFCore 不跟踪实体
-#if DEBUG
-                contextOptionsBuilder.EnableSensitiveDataLogging(true);
-#endif
+                ConfigurePgSession(contextOptionsBuilder, RawHandler);
             }, poolSize: FTaskCountLimit);
 
             //为World服务 注册非池化版本的PgSession。
             worldServices.AddDbContext<PgSessionUnPooled>(contextOptionsBuilder =>
             {
-                contextOptionsBuilder.UseNpgsql(RawHandler).UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking); // 默认关闭 ChangeTracking，让 EFCore 不跟踪实体
-#if DEBUG
-                contextOptionsBuilder.EnableSensitiveDataLogging(true);
-#endif
+                ConfigurePgSession(contextOptionsBuilder, RawHandler);
             });
 
-            //分别初始化池化Session和非池化Session连接( 这一步同时也会构建 Entity - Table映射模型 )
+            //分别初始化池化Session和非池化Session连接( 这一步同时也会构建 EntityTable映射模型 )
             try
             {
                 var optionsBuilder = new DbContextOptionsBuilder<PgSession>();
                 optionsBuilder.UseNpgsql(RawHandler);
-                var pgSessionTest = new PgSession(optionsBuilder.Options);
-                pgSessionTest.Database.OpenConnection();
-                pgSessionTest.Dispose();
+                var pgSession = new PgSession(optionsBuilder.Options);
+                pgSession.Database.OpenConnection();
+                pgSession.Dispose();
 
                 var optionsBuilderForNonPooled = new DbContextOptionsBuilder<PgSessionUnPooled>();
                 optionsBuilderForNonPooled.UseNpgsql(RawHandler);
-                var pgSessionNonPooledTest = new PgSessionUnPooled(optionsBuilderForNonPooled.Options);
-                pgSessionNonPooledTest.Database.OpenConnection();
-                pgSessionNonPooledTest.Dispose();
+                var pgSessionNonPooled = new PgSessionUnPooled(optionsBuilderForNonPooled.Options);
+                pgSessionNonPooled.Database.OpenConnection();
+                pgSessionNonPooled.Dispose();
             }
             catch (Exception ex) {
                 throw new Exception($"( Failed to init PgSession. \"{GetConnectionInfoWithoutPassword()}\") :\n {ex} ");
@@ -128,6 +123,25 @@ namespace Fantasy.Database
                     : FlowLock.Reset(scene.CoroutineLockComponent, pgDbHash);
 
             return this;
+        }
+
+        /// <summary>
+        /// 配置PgSession
+        /// </summary>
+        public static void ConfigurePgSession(
+            DbContextOptionsBuilder optionsBuilder, 
+            NpgsqlDataSource npgsqlDataSource,
+            System.Reflection.Assembly migrationsAssembly = null)
+        {
+            optionsBuilder.UseNpgsql(npgsqlDataSource, b =>
+            {
+                if(migrationsAssembly == null)
+                    migrationsAssembly = typeof(PgSQL).Assembly;
+                b.MigrationsAssembly(migrationsAssembly); // 迁移生成程序集
+            }).UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
+#if DEBUG
+            optionsBuilder.EnableSensitiveDataLogging(true);
+#endif
         }
 
         /// <summary>
@@ -185,7 +199,7 @@ namespace Fantasy.Database
             catch (Exception ex)
             {
                 Log.Error($"( Critical Emergency! PgSQL failed to get connection! ) \n " +
-            $"{GetConnectionInfoWithoutPassword()}\n", ex);
+                $"{GetConnectionInfoWithoutPassword()}\n", ex);
                 pgSession?.Dispose();
                 session = null;
             }
@@ -328,7 +342,7 @@ namespace Fantasy.Database
             {
                 if (pgSession != null)
                 {
-                    await pgSession.Database.EnsureCreatedAsync();
+                    await pgSession.Database.MigrateAsync();
                 }
                 else
                     Log.Debug(" Failed to connect to pgSession");

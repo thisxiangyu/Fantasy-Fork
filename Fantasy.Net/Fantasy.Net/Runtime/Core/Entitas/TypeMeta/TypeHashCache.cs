@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 using Fantasy.Helper;
 #pragma warning disable CS8604 // Possible null reference argument.
 
-namespace Fantasy.Entitas.Interface
+namespace Fantasy.Entitas.TypeMeta
 {
     /// <summary>
     /// 实体类型哈希码缓存器。

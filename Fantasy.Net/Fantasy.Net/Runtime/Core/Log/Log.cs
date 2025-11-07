@@ -11,6 +11,21 @@ using Fantasy.Platform.Net;
 namespace Fantasy
 {
     /// <summary>
+    /// 报错类型
+    /// </summary>
+    public enum ErrType
+    {
+        /// <summary>
+        /// 未定义
+        /// </summary>
+        UnDefined = 0,
+        /// <summary>
+        /// 紧急情况
+        /// </summary>
+        CriticalEmergency,
+    }
+
+    /// <summary>
     /// 提供日志记录功能的静态类。
     /// </summary>
     public static class Log
@@ -90,10 +105,12 @@ namespace Fantasy
         /// 记录错误级别的日志消息，并附带调用栈信息。
         /// </summary>
         /// <param name="msg">日志消息。</param>
-        public static void Error(string msg)
+        /// <param name="errType">报错类型。</param>
+        public static void Error(string msg,ErrType errType = ErrType.UnDefined)
         {
             var st = new StackTrace(1, true);
-            _logCore.Error($"{msg}\n{st}");
+            string prefix = errType == ErrType.UnDefined ? string.Empty : $" ({errType}!) ";
+            _logCore.Error($"{prefix}{msg}\n{st}");
         }
 
         /// <summary>
@@ -150,6 +167,20 @@ namespace Fantasy
         public static void Debug(string message, params object[] args)
         {
             _logCore.Debug(string.Format(message, args));
+        }
+
+        /// <summary>
+        /// 记录错误级别的格式化日志消息，并附带调用栈信息。
+        /// </summary>
+        /// <param name="message">日志消息模板。</param>
+        /// <param name="errType">报错类型。</param>
+        /// <param name="args">格式化参数。</param>
+        public static void Error(string message, ErrType errType = ErrType.UnDefined, params object[] args)
+        {
+            var st = new StackTrace(1, true);
+            string prefix = errType == ErrType.UnDefined ? string.Empty : $" ({errType}!) ";
+            var s = string.Format($"{prefix}{message}", args) + '\n' + st;
+            _logCore.Error(s);
         }
 
         /// <summary>
