@@ -240,21 +240,13 @@ namespace Fantasy.Database
         /// </summary>
         FTask Save(long id, List<Entity> entities);
         /// <summary>
-        /// 通过事务会话将类型 <typeparamref name="T"/> 实体保存到指定存储集中。
-        /// </summary>
-        FTask Save<T>(object transactionSession, T entity, string name = null) where T : Entity;
-        /// <summary>
         /// 向指定存储集中插入一个类型 <typeparamref name="T"/> 实体。
         /// </summary>
-        FTask Insert<T>(T entity, string name = null) where T : Entity, new();
-        /// <summary>
-        /// 批量插入一组类型 <typeparamref name="T"/> 实体到指定存储集中。
-        /// </summary>
-        FTask InsertBatch<T>(IEnumerable<T> list, string name = null) where T : Entity, new();
+        FTask Insert<T>(T entity, string name = null,object? transaction = null) where T : Entity, new();
         /// <summary>
         /// 通过事务会话，批量插入一组类型 <typeparamref name="T"/> 实体到指定存储集中。
         /// </summary>
-        FTask InsertBatch<T>(object transactionSession, IEnumerable<T> list, string name = null) where T : Entity, new();
+        FTask InsertBatch<T>(IEnumerable<T> list, string name = null, object? transactionSession = null) where T : Entity, new();
         /// <summary>
         /// 通过事务会话，根据指定的 ID 从数据库中删除指定类型 <typeparamref name="T"/> 实体。
         /// </summary>

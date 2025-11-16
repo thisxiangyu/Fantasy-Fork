@@ -198,10 +198,10 @@ namespace Fantasy.Database
             }
             catch (Exception ex)
             {
-                Log.Error($"( Critical Emergency! PgSQL failed to get connection! ) \n " +
-                $"{GetConnectionInfoWithoutPassword()}\n", ex);
                 pgSession?.Dispose();
                 session = null;
+                throw new($"( Critical Emergency! PgSQL failed to get connection! ) \n " +
+                $"{GetConnectionInfoWithoutPassword()}\n ",ex);
             }
             return scope;
         }
@@ -234,10 +234,11 @@ namespace Fantasy.Database
             }
             catch (Exception ex)
             {
-                Log.Error($"( Critical Emergency! PgSQL failed to get connection! ) \n " +
-          $"{GetConnectionInfoWithoutPassword()}\n", ex);
+
                 pgSession?.Dispose();
                 session = null;
+                throw new($"( Critical Emergency! PgSQL failed to get connection! ) \n " +
+                $"{GetConnectionInfoWithoutPassword()}\n ", ex);
             }
             return scope;
         }
@@ -269,9 +270,9 @@ namespace Fantasy.Database
             }
             catch (Exception ex)
             {
-                Log.Error($"( Critical Emergency! PgSQL failed to get connection! ) \n " +
-           $"{GetConnectionInfoWithoutPassword()}\n", ex);
                 await asyncFunc(pgSession);
+                throw new($"( Critical Emergency! PgSQL failed to get connection! ) \n " +
+                $"{GetConnectionInfoWithoutPassword()}\n ", ex);
             }
         }
 
@@ -302,9 +303,9 @@ namespace Fantasy.Database
             }
             catch (Exception ex)
             {
-                Log.Error($"( Critical Emergency! PgSQL failed to get connection! ) \n " +
-               $"{GetConnectionInfoWithoutPassword()}\n", ex);
                 await asyncFunc(pgSession);
+                throw new($"( Critical Emergency! PgSQL failed to get connection! ) \n " +
+                $"{GetConnectionInfoWithoutPassword()}\n ", ex);
             }
         }
 
@@ -435,7 +436,7 @@ namespace Fantasy.Database
             //     return;
             // }
             // 
-            // var tableName = GetTableName<T>(table);
+            // var tableName = GetTableName<P>(table);
             // 
             // using (await _dataBaseLock.Wait(RandomHelper.RandInt64() % DefaultTaskSize))
             // {
@@ -469,7 +470,7 @@ namespace Fantasy.Database
             //     return;
             // }
             // 
-            // var tableName = GetTableName<T>();
+            // var tableName = GetTableName<P>();
             // 
             // using (await _dataBaseLock.Wait(RandomHelper.RandInt64() % DefaultTaskSize))
             // {

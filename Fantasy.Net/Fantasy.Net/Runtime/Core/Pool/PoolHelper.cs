@@ -67,14 +67,14 @@ namespace Fantasy.Pool
     // /// <summary>
     // /// 利用泛型的特性来减少反射的使用。
     // /// </summary>
-    // /// <typeparam name="T"></typeparam>
-    // public static class PoolChecker<T> where T : new()
+    // /// <typeparam name="P"></typeparam>
+    // public static class PoolChecker<P> where P : new()
     // {
     //     public static bool IsPool { get; }
     //
     //     static PoolChecker()
     //     {
-    //         IsPool = typeof(IPool).IsAssignableFrom(typeof(T));
+    //         IsPool = typeof(IPool).IsAssignableFrom(typeof(P));
     //     }
     // }
 }

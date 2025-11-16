@@ -5,8 +5,8 @@ using Fantasy.Entitas.Interface;
 
 namespace Fantasy
 {
-    [DbSet(Relationship = ToParentIs.JustLinking)]
-    public class Grandchild : Entity, IFollowCRUD
+    [DbSet(Relationship = ToParentIs.Child,IsAsDocument = true)] ///独立文档
+    public class Grandchild : Entity, IFollowSerialization
     {
         public int TestIntField;
 

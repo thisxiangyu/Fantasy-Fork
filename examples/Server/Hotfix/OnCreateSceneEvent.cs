@@ -95,7 +95,7 @@ public sealed class OnCreateSceneEvent : AsyncEventSystem<OnCreateScene>
             }
             case SceneType.Gate:
             {
-                // var tasks = new List<FTask>(2000);
+                // var tasks = new Archetypes<FTask>(2000);
                 // var session = scene.GetSession(_addressableSceneRunTimeId);
                 // var sceneNetworkMessagingComponent = scene.NetworkMessagingComponent;
                 // var g2ATestRequest = new G2A_TestRequest();
@@ -119,7 +119,7 @@ public sealed class OnCreateSceneEvent : AsyncEventSystem<OnCreateScene>
                 var testCustomSystemComponent = scene.AddComponent<TestCustomSystemComponent>();
                 // scene.EntityComponent.CustomSystem(testCustomSystemComponent, CustomSystemType.RunSystem);
                 // // 测试配置表
-                // var instanceList = UnitConfigData.Instance.List;
+                // var instanceList = UnitConfigData.Instance.Archetypes;
                 // var unitConfig = instanceList[0];
                 // Log.Debug(instanceList[0].Dic[1]);
                 break;
@@ -131,7 +131,9 @@ public sealed class OnCreateSceneEvent : AsyncEventSystem<OnCreateScene>
         {
             var TestFantasyDbSetRoot =  scene.AddComponent<ExampleRoot>();
             await TestFantasyDbSetRoot.StartTest<PostgreSQL>(TestWhat.FastDeploy, dutyId: 0);
-            await TestFantasyDbSetRoot.StartTest<PostgreSQL>(TestWhat.Insert, dutyId: 0);
+            //await TestFantasyDbSetRoot.StartTest<PostgreSQL>(TestWhat.Insert, dutyId: 0);
+            //await TestFantasyDbSetRoot.StartTest<PostgreSQL>(TestWhat.Query, dutyId: 0);
+
             //TestFantasyDbSetRoot.StartTest<MongoDb>(TestWhat.FastDeploy, dutyId: 2).Coroutine();
             //TestFantasyDbSetRoot.StartTest<MongoDb>(TestWhat.Insert, dutyId: 2).Coroutine();
             //TestFantasyDbSetRoot.TestAPI<MongoDb>(2);

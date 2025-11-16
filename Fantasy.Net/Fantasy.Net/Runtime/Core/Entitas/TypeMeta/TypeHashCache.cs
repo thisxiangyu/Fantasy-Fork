@@ -76,7 +76,7 @@ namespace Fantasy.Entitas.TypeMeta
     /// <item><description>每个类型的哈希码只计算一次，后续访问直接返回缓存值</description></item>
     /// <item><description>JIT编译器会将静态字段访问内联为常量</description></item>
     /// <item><description>无需字典查找，性能远超运行时缓存</description></item>
-    /// <item><description>适合在泛型方法中使用，如 GetComponent&lt;T&gt;()</description></item>
+    /// <item><description>适合在泛型方法中使用，如 GetComponent&lt;P&gt;()</description></item>
     /// </list>
     /// </remarks>
     internal static class TypeHashCache<T>
@@ -86,7 +86,7 @@ namespace Fantasy.Entitas.TypeMeta
         /// 该值在首次访问时计算并缓存，后续访问直接返回缓存值。
         /// </summary>
         /// <value>
-        /// 实体类型的哈希码，用于在 Entity 的 _tree 字典中快速查找组件。
+        /// 实体类型的哈希码，用于在 Entity 的 _single 字典中快速查找组件。
         /// </value>
         public static long HashCode { get; }
 

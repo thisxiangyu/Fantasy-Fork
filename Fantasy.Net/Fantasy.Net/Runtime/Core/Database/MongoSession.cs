@@ -1,13 +1,12 @@
 ﻿#if FANTASY_NET
-using Fantasy.Assembly;
+using System.Linq.Expressions;
 using Fantasy.Async;
+using Fantasy.Database.Helper;
 using Fantasy.DataStructure.Collection;
 using Fantasy.Entitas;
 using Microsoft.EntityFrameworkCore;
 using MongoDB.Bson;
 using MongoDB.Driver;
-using System.Collections.Frozen;
-using System.Linq.Expressions;
 
 #pragma warning disable CS8602 // Dereference of a possibly null reference.
 #pragma warning disable CS8603 // Possible null reference return.
@@ -47,7 +46,7 @@ namespace Fantasy.Database
         /// <param name="modelBuilder"></param>
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            DbSetMetadataHelper.ScanDbSetEntityTypes((type, tableName, attr) => {
+            DbSetMetadataHelper.ScanDbSetTypes((type, tableName, attr) => {
                 if (attr.IfSelectionContainsDbType(DatabaseType.MongoDB))
                 {
                     Log.Debug($"MongoDb ORM-Model Registering entity: {type.FullName} -> table {tableName}");
@@ -60,7 +59,7 @@ namespace Fantasy.Database
             //    .Where(t => !t.ClrType.GetCustomAttributes(typeof(TableAttribute), true).Any() &&
             //                !t.ClrType.GetCustomAttributes(typeof(FantasyTableAttribute), true).Any())
             //    .ToList()
-            //    .ForEach(t => modelBuilder.Ignore(t.ClrType));
+            //    .ForEachAllSingle(t => modelBuilder.Ignore(t.ClrType));
 
             //foreach (var entityType in modelBuilder.Model.GetEntityTypes())
             //{
@@ -826,7 +825,7 @@ namespace Fantasy.Database
                     }
                     catch (Exception e)
                     {
-                        Log.Error($"Save List ToParentIs Error: {clone.GetType().Name} {clone}\n{e}");
+                        Log.Error($"Save Archetypes ToParentIs Error: {clone.GetType().Name} {clone}\n{e}");
                     }
                 }
             }
@@ -842,7 +841,8 @@ namespace Fantasy.Database
         /// <typeparam name="T">实体类型。</typeparam>
         /// <param name="entity">要插入的实体对象。</param>
         /// <param name="collection">集合名称。</param>
-        public async FTask Insert<T>(T? entity, string collection = null) where T : Entity, new()
+        /// <param name="transaction">事务。</param>
+        public async FTask Insert<T>(T? entity, string collection = null, object? transaction = null) where T : Entity, new()
         {
             if (entity == null)
             {
@@ -854,7 +854,10 @@ namespace Fantasy.Database
 
             using (await mongo.FlowLock.Wait(entity.Id))
             {
-                await GetCollection<T>(collection).InsertOneAsync(clone);
+                if (transaction == null)
+                    await GetCollection<T>(collection).InsertOneAsync(clone);
+                else
+                    await GetCollection<T>(collection).InsertOneAsync((IClientSessionHandle)transaction, clone);
             }
         }
 
@@ -864,27 +867,15 @@ namespace Fantasy.Database
         /// <typeparam name="T">实体类型。</typeparam>
         /// <param name="list">要插入的实体对象列表。</param>
         /// <param name="collection">集合名称。</param>
-        public async FTask InsertBatch<T>(IEnumerable<T> list, string collection = null) where T : Entity, new()
+        /// <param name="transaction">事务。</param>
+        public async FTask InsertBatch<T>(IEnumerable<T> list, string collection = null, object? transaction = null) where T : Entity, new()
         {
             using (await mongo.FlowLock.WaitIfTooMuch())
             {
-                await GetCollection<T>(collection).InsertManyAsync(list);
-            }
-        }
-
-        /// <summary>
-        /// 批量插入实体对象列表到数据库（加锁）。
-        /// </summary>
-        /// <typeparam name="T">实体类型。</typeparam>
-        /// <param name="transactionSession">事务会话对象。</param>
-        /// <param name="list">要插入的实体对象列表。</param>
-        /// <param name="collection">集合名称。</param>
-        public async FTask InsertBatch<T>(object transactionSession, IEnumerable<T> list, string collection = null)
-            where T : Entity, new()
-        {
-            using (await mongo.FlowLock.WaitIfTooMuch())
-            {
-                await GetCollection<T>(collection).InsertManyAsync((IClientSessionHandle)transactionSession, list);
+                if(transaction==null)
+                    await GetCollection<T>(collection).InsertManyAsync(list);
+                else
+                    await GetCollection<T>(collection).InsertManyAsync((IClientSessionHandle)transaction, list);
             }
         }
 

@@ -115,17 +115,19 @@ namespace Fantasy
 
         /// <summary>
         /// 记录异常的错误级别的日志消息，并附带调用栈信息。
+        /// <param name="errType">报错类型。</param>
         /// </summary>
         /// <param name="e">异常对象。</param>
-        public static void Error(Exception e)
+        public static void Error(Exception e, ErrType errType = ErrType.UnDefined)
         {
+            string prefix = errType == ErrType.UnDefined ? string.Empty : $" ({errType}!) ";
             if (e.Data.Contains("StackTrace"))
             {
-                _logCore.Error($"{e.Data["StackTrace"]}\n{e}");
+                _logCore.Error($"{prefix}{e.Data["StackTrace"]}\n{e}");
                 return;
             }
             var str = e.ToString();
-            _logCore.Error(str);
+            _logCore.Error($"{prefix}{str}");
         }
 
         /// <summary>

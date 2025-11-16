@@ -2,6 +2,7 @@
 using Fantasy.Assembly;
 using Fantasy.Async;
 using Fantasy.Database.Attributes;
+using Fantasy.Database.Helper;
 using Fantasy.Entitas;
 using Fantasy.Helper;
 using Fantasy.Serialize;
@@ -188,7 +189,7 @@ namespace Fantasy.Database
         /// <returns></returns>
         public async FTask FastDeploy()
         {
-            await DbSetMetadataHelper.ScanDbSetEntityTypesAsync(async (type, tableName, attr) => {
+            await DbSetMetadataHelper.ScanDbSetTypesAsync(async (type, tableName, attr) => {
                 if (attr.IfSelectionContainsDbType(DatabaseType.MongoDB) == false)
                 { 
                     Log.Error($"Failed to operated a FantasyDbSet which`s Attr _info had not contained DbSelection of {DatabaseType.MongoDB}");

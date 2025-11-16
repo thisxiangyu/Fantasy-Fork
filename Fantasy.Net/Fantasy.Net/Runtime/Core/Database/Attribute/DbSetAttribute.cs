@@ -20,7 +20,7 @@ namespace Fantasy.Database.Attributes
         /// <summary>
         /// 子实体只是和父级连接, 被理解为单独的子实体, 而非父级的一个组成部分
         /// </summary>
-        JustLinking
+        Child
     }
 
     /// <summary>
@@ -55,6 +55,28 @@ namespace Fantasy.Database.Attributes
         /// 数据库权限选择, 默认为任意, 即所有数据库均可以操作这个类。
         /// </summary>
         public DatabaseType DbSelection = DatabaseType.Any;
+
+        /// <summary>
+        /// 以文档式存储。即不以表格的形式存储, 而是转换为JSONB。
+        /// <para>
+        /// 仅针对表格式数据库, 文档式数据库天然是以文档形式存储的。
+        /// </para>
+        /// </summary>
+        public bool IsAsDocument = false;
+
+        /// <summary>
+        /// 以嵌入式存储。即不构成独立的存储集, 而是被存为他者存储集的一部分 ( 比如在Mongo中存为BSON的部分, 在PgSQL中存为JSONB的部分 )。
+        /// <para>
+        /// 默认为 <see langword="false"/> , 表示独立存储。如果设置为<see langword="true"/>, 那么<see cref="IsAsDocument"/>也会被框架自动视作<see langword="true"/>, 即不会以表格形式、而是以文档形式存储了。
+        /// </para>
+        /// </summary>
+        public bool IsEmbedded = false;
+
+        /// <summary>
+        /// 以字节流的形式存储。是以纯粹不可读的<see langword="byte"/>s的形式存入数据库中。
+        /// 读存性能较普通的表格或文档形式更快, 但是牺牲了可查询性, 适合用于仅需单点查询、极致性能优先、非数据库操作、快照、压缩块等场景。
+        /// </summary>
+        public bool IsAsBytes = false;
 
         /// <summary>
         /// DbSet的实体与父实体的逻辑关系，用于过滤DbSet，从而控制从数据库中饥渴存取实体的精细度。

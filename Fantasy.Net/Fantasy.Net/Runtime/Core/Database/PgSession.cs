@@ -1,19 +1,25 @@
 ﻿#if FANTASY_NET
-using System.Collections.Frozen;
 using System.Data;
 using System.Data.Common;
 using System.Linq.Expressions;
+using Dapper;
 using Fantasy.Assembly;
 using Fantasy.Async;
 using Fantasy.Database.Attributes;
+using Fantasy.Database.DTO;
+using Fantasy.Database.Helper;
+using Fantasy.DataStructure.Collection;
 using Fantasy.Entitas;
-using Fantasy.Entitas.Interface;
 using Fantasy.Entitas.TypeMeta;
+using Fantasy.Helper;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Microsoft.EntityFrameworkCore.Storage;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using Npgsql;
+using static Fantasy.Helper.JsonHelper;
 
 #pragma warning disable CS8602 // Dereference of a possibly null reference.
 #pragma warning disable CS8603 // Possible null reference return.
@@ -107,92 +113,74 @@ namespace Fantasy.Database
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             //处理DbSet注册
-            List<EntityTypeBuilder> allBuilders = new ();
-            List<Type> allTypes = new();
-            DbSetMetadataHelper.ScanDbSetEntityTypes((type, tableName,attr) => {
-                if (attr.IfSelectionContainsDbType(DatabaseType.PostgreSQL))
+            DbSetMetadataHelper.ScanDbSetTypes((type, tableName,attr) => {
+
+                if (attr.IfSelectionContainsDbType(DatabaseType.PostgreSQL) == false)
+                    return;
+
+                if (attr.IsEmbedded)
                 {
-                    Log.Debug($"PgSQL ORM-Model Registering entity: {type.FullName} -> table {tableName}");
-
-                    string schemaStr = "public";//PgSQL默认命名空间
-                    if (attr.WithNamespace == true && !string.IsNullOrWhiteSpace(type.Namespace))
-                        schemaStr = type.Namespace;
-                    EntityTypeBuilder entityBuilder = modelBuilder.Entity(type).ToTable(tableName, schemaStr);
-                    allBuilders.Add(entityBuilder);
-                    allTypes.Add(type);
-                }
-            });
-
-            //处理DbSet与父级的关系
-            for (int i = 0; i< allBuilders.Count;i++) {
-
-                var builder = allBuilders[i];
-                var type = allTypes[i];
-                TypeDbSetCache TypeDbSetCache = TypeDbSetInfos.GetInfo(type);
-                var DbSetParents = TypeDbSetCache.DbSetParents;
-
-                //添加RefType + RefId 联合索引
-                if (TypeDbSetCache.HasDbSetRef)
-                {
-                    builder.Property<long>(DbSetProperty.RefType);
-                    builder.Property<long>(DbSetProperty.RefId);
-                    builder.HasIndex(DbSetProperty.RefType, DbSetProperty.RefId).IsUnique(false); ;
+                    Log.Info($"{type} is set as Embedded, been ignoured in PgSQL ORM-Model.");
+                    return;
                 }
 
-                if (DbSetParents == null || DbSetParents.Count == 0) 
-                {
-                    // --- 默认行为 : 将子实体存储集彻底嵌入父级实体 ---
-                    // --- 处理嵌入式存储集 ---
+                Log.Debug($"PgSQL ORM-Model Registering entities: {type.FullName} -> table {tableName}");
 
+                string schemaStr = "public";//PgSQL默认命名空间
+                if (attr.WithNamespace == true && !string.IsNullOrWhiteSpace(type.Namespace))
+                    schemaStr = type.Namespace;
+
+                EntityTypeBuilder? entityBuilder = default;
+                if (attr.IsAsDocument)
+                {
+                    //文档建表 (通过影子实体, 这段逻辑会在EF模型中创建一个“Dictionry~2”类型的模型内实体 )
+                    entityBuilder = modelBuilder.Entity($"{schemaStr}.{tableName}Doc");
+                    entityBuilder.ToTable($"{tableName}_Doc", schemaStr);
+                    entityBuilder.Property<long>("Id");
+                    entityBuilder.HasKey("Id");
+                    entityBuilder.Property<byte[]>("Bytes").HasColumnType("bytea").IsRequired(false);
+                    entityBuilder.Property<string>("Json").HasColumnType("jsonb").IsRequired(false);
                 }
                 else
                 {
-                    // 构建实体与父级DbSet的引用关联
-                    //foreach(var parent in DbSetParents)
-                    //{
-                    //    string FK = TypeDbSetCache.ForeignKeyByParentHash[TypeHashCache.GetHashCode(parent)];
+                    //实体建表
+                    entityBuilder = modelBuilder.Entity(type).ToTable(tableName, schemaStr);
 
-                    //    builder.Property<long>(FK);
-                    //    builder.HasOne(parent)
-                    //           .WithMany()
-                    //           .HasForeignKey($"{FK}");
-                        
-                    //    Log.Debug($"    Configured {type.Name} HasOne<{parent.Name}> with FK: {FK}");                       
-                    //}
+                    if(typeof(Entity).IsAssignableFrom(type))
+                    {
+                        SerializerSettings serializerSettings = new SerializerSettings();
+                        serializerSettings.Library = Library.Microsoft;
+                        serializerSettings.IsIndented = false;
+                        serializerSettings.WriteType = true;
 
-                    // 添加 CHECK 约束 (用于强制多选一的业务规则)
-                    // 这是一个高级操作，并且需要根据具体的数据库类型编写 SQL 检查语句。
-                    // 示例 (仅用于概念说明，可能需要调整 SQL 语法)：
-
-                    //var checkSql = string.Join(" AND ",
-                    //    Enumerable.Range(0, parentTypes.Count)
-                    //              .Select(i => $"[ForeignKey{i}] IS NULL")
-                    //              .Take(parentTypes.Count - 1));
-
-                    //// 逻辑: (FK0 IS NOT NULL AND FK1 IS NULL AND FK2 IS NULL...) OR (FK0 IS NULL AND FK1 IS NOT NULL AND FK2 IS NULL...) OR (FK0 IS NULL AND FK1 IS NULL AND FK2 IS NULL)
-                    //// 这个逻辑用 SQL 编写很复杂，通常会用一个计算列或数据库触发器实现。
-                    //// 简单化，只在应用层或迁移脚本中添加最关键的 CHECK 约束。
-
-                    //// 示例：确保至少有一个是 NULL（仅用于演示，实际约束更复杂）
-                    //entityBuilder.ToTable(tb => tb.HasCheckConstraint(
-                    //    $"CK_{tableName}_SingleParent",
-                    //    string.Join(" + ", parentTypes.Select((t, i) => $"CAST({FK} IS NOT NULL AS INT)")) + " <= 1"
-                    //));
-
+                        //承载Embedded实体的影子属性
+                        entityBuilder.Property<EntityList<Entity>>(DbSetProperty.JsonSingle).HasColumnType("jsonb")
+                            .HasConversion(
+                                           entityList => entityList.ToJson( serializerSettings, true),
+                                           jsonStr => jsonStr.Deserialize<EntityList<Entity>>(serializerSettings, true)
+                                           )
+                            .IsRequired(false);
+                        entityBuilder.Property<EntityList<Entity>>(DbSetProperty.JsonMulti).HasColumnType("jsonb")
+                            .HasConversion(
+                                           entityList => entityList.ToJson( serializerSettings, true),
+                                           jsonStr => jsonStr.Deserialize<EntityList<Entity>>(serializerSettings, true)
+                                           )
+                            .IsRequired(false);
+                        entityBuilder.Property<byte[]>(DbSetProperty.BytesSingle).HasColumnType("bytea")
+                            .IsRequired(false);
+                        entityBuilder.Property<byte[]>(DbSetProperty.BytesMulti).HasColumnType("bytea")
+                            .IsRequired(false);
+                    }                    
                 }
-            }
 
-            // 剔除属性导航
-            //modelBuilder.Model.GetEntityTypes()
-            //    .Where(t => !t.ClrType.GetCustomAttributes(typeof(TableAttribute), true).Any() &&
-            //                !t.ClrType.GetCustomAttributes(typeof(FantasyTableAttribute), true).Any())
-            //    .ToList()
-            //    .ForEach(t => modelBuilder.Ignore(t.ClrType));
-
-            //foreach (var entityType in modelBuilder.Model.GetEntityTypes())
-            //{
-            //    Log.Warning($"EFCore 全部注册的实体: {entityType.ClrType.FullName}");
-            //}
+                if (typeof(Entity).IsAssignableFrom(type))
+                {
+                    //父级Type+Id联合索引
+                    entityBuilder.Property<long>(DbSetProperty.ParentType);
+                    entityBuilder.Property<long>(DbSetProperty.ParentId);
+                    entityBuilder.HasIndex(DbSetProperty.ParentType, DbSetProperty.ParentId).IsUnique(false);                    
+                }
+            });          
 
             if (!modelBuilder.Model.GetEntityTypes().Any())
             {
@@ -302,13 +290,13 @@ namespace Fantasy.Database
         ///// <summary>
         ///// 统计指定表中的总行数。
         ///// </summary>
-        ///// <typeparam name="T">实体类型。</typeparam>
+        ///// <typeparam name="P">实体类型。</typeparam>
         ///// <param name="table">表名称，可选。如果未指定，将使用实体类型的名称。</param>
         ///// <param name="dbContext">上下文，可选。</param>
         ///// <returns>总行数。</returns>
-        //public async FTask<long> Count<T>(string table = null,DbContext dbContext = null) where T : ToParentIs
+        //public async FTask<long> Count<P>(string table = null,DbContext dbContext = null) where P : ToParentIs
         //{
-        //    var tableName = GetTableName<T>(table);
+        //    var tableName = GetTableName<P>(table);
         //    var connection = Handler.CreateConnection();
         //    try
         //    {
@@ -317,8 +305,8 @@ namespace Fantasy.Database
         //        {
         //            tableName = tableName.Replace("\"", "\"\"");
         //            cmd.CommandText = $"SELECT COUNT(*) FROM \"{tableName}\"";
-        //            var result = await cmd.ExecuteScalarAsync();
-        //            return Convert.ToInt64(result);
+        //            var entities = await cmd.ExecuteScalarAsync();
+        //            return Convert.ToInt64(entities);
         //        }
         //    }
         //    finally
@@ -428,7 +416,7 @@ namespace Fantasy.Database
         /// <returns>如果存在行则返回 true，否则返回 false。</returns>
         public async FTask<bool> Exist<T>(string table = null) where T : Entity
         {
-            // return await Count<T>(table) > 0;
+            // return await Count<P>(table) > 0;
             await FTask.CompletedTask;
             return false;
         }
@@ -442,7 +430,7 @@ namespace Fantasy.Database
         /// <returns>如果存在满足条件的行则返回 true，否则返回 false。</returns>
         public async FTask<bool> Exist<T>(Expression<Func<T, bool>> filter, string table = null) where T : Entity
         {
-            // return await Count(filter, table) > 0;
+            // return await Count(kind, table) > 0;
             await FTask.CompletedTask;
             return false;
         }
@@ -459,37 +447,9 @@ namespace Fantasy.Database
         /// <param name="isDeserialize">是否在查询后反序列化,执行反序列化后会自动将实体注册到框架系统中，并且能正常使用组件相关功能。</param>
         /// <param name="table">表名称。</param>
         /// <returns>查询到的行。</returns>
-        public async FTask<T> QueryNotLock<T>(long id, bool isDeserialize = false, string table = null) where T : Entity
+        public async FTask<T> QueryNotLock<T>(long id, bool isDeserialize = true, string table = null) where T : Entity
         {
-            // var tableName = GetTableName<T>(table);
-            // 
-            // using (await _dataBaseLock.Wait(id))
-            // {
-            //     await _connection.OpenAsync();
-            //     using (var cmd = _connection.CreateCommand())
-            //     {
-            //         cmd.CommandText = $"SELECT * FROM \"{tableName}\" WHERE \"Id\" = @Id";
-            //         cmd.Parameters.AddWithValue("Id", id);
-            //         using (var reader = await cmd.ExecuteReaderAsync())
-            //         {
-            //             if (await reader.ReadAsync())
-            //             {
-            //                 var bsonDocument = GetBsonDocumentFromReader(reader);
-            //                 var entity = _serializer.Deserialize<T>(bsonDocument);
-            //                 
-            //                 if (isDeserialize && entity != null)
-            //                 {
-            //                     entity.Deserialize(_scene);
-            //                 }
-            //                 
-            //                 await _connection.CloseAsync();
-            //                 return entity;
-            //             }
-            //         }
-            //     }
-            //     await _connection.CloseAsync();
-            //     return null;
-            // }
+            
             await FTask.CompletedTask;
             return null;
         }
@@ -502,39 +462,17 @@ namespace Fantasy.Database
         /// <param name="isDeserialize">是否在查询后反序列化,执行反序列化后会自动将实体注册到框架系统中，并且能正常使用组件相关功能。</param>
         /// <param name="table">表名称。</param>
         /// <returns>查询到的行。</returns>
-        public async FTask<T> Query<T>(long id, bool isDeserialize = false, string table = null) where T : Entity
+        public async FTask<T> Query<T>(long id, bool isDeserialize = true, string table = null) where T : Entity
         {
-            // var tableName = GetTableName<T>(table);
-            // 
-            // using (await _dataBaseLock.Wait(id))
-            // {
-            //     await _connection.OpenAsync();
-            //     using (var cmd = _connection.CreateCommand())
-            //     {
-            //         cmd.CommandText = $"SELECT * FROM \"{tableName}\" WHERE \"Id\" = @Id";
-            //         cmd.Parameters.AddWithValue("Id", id);
-            //         using (var reader = await cmd.ExecuteReaderAsync())
-            //         {
-            //             if (await reader.ReadAsync())
-            //             {
-            //                 var bsonDocument = GetBsonDocumentFromReader(reader);
-            //                 var entity = _serializer.Deserialize<T>(bsonDocument);
-            //                 
-            //                 if (isDeserialize && entity != null)
-            //                 {
-            //                     entity.Deserialize(_scene);
-            //                 }
-            //                 
-            //                 await _connection.CloseAsync();
-            //                 return entity;
-            //             }
-            //         }
-            //     }
-            //     await _connection.CloseAsync();
-            //     return null;
-            // }
-            await FTask.CompletedTask;
-            return null;
+            var entity = await Set<T>().FindAsync(id);
+            if (!isDeserialize || entity==null)
+            {
+                return entity;
+            }
+
+            entity.Deserialize(pg.Scene);
+
+            return entity;
         }
 
         /// <summary>
@@ -547,12 +485,12 @@ namespace Fantasy.Database
         /// <param name="isDeserialize">是否在查询后反序列化,执行反序列化后会自动将实体注册到框架系统中，并且能正常使用组件相关功能。</param>
         /// <param name="table">表名称。</param>
         /// <returns>满足条件的行数量和日期列表。</returns>
-        public async FTask<(int count, List<T> dates)> QueryCountAndDatesByPage<T>(Expression<Func<T, bool>> filter, int pageIndex, int pageSize, bool isDeserialize = false, string table = null) where T : Entity
+        public async FTask<(int count, List<T> dates)> QueryCountAndDatesByPage<T>(Expression<Func<T, bool>> filter, int pageIndex, int pageSize, bool isDeserialize = true, string table = null) where T : Entity
         {
             // using (await _dataBaseLock.Wait(RandomHelper.RandInt64() % DefaultTaskSize))
             // {
-            //     var count = await Count(filter);
-            //     var dates = await QueryByPage(filter, pageIndex, pageSize, isDeserialize, table);
+            //     var count = await Count(kind);
+            //     var dates = await QueryByPage(kind, pageIndex, pageSize, isDeserialize, table);
             //     return ((int)count, dates);
             // }
             await FTask.CompletedTask;
@@ -570,12 +508,12 @@ namespace Fantasy.Database
         /// <param name="isDeserialize">是否在查询后反序列化,执行反序列化后会自动将实体注册到框架系统中，并且能正常使用组件相关功能。</param>
         /// <param name="table">表名称。</param>
         /// <returns>满足条件的行数量和日期列表。</returns>
-        public async FTask<(int count, List<T> dates)> QueryCountAndDatesByPage<T>(Expression<Func<T, bool>> filter, int pageIndex, int pageSize, string[] cols, bool isDeserialize = false, string table = null) where T : Entity
+        public async FTask<(int count, List<T> dates)> QueryCountAndDatesByPage<T>(Expression<Func<T, bool>> filter, int pageIndex, int pageSize, string[] cols, bool isDeserialize = true, string table = null) where T : Entity
         {
             // using (await _dataBaseLock.Wait(RandomHelper.RandInt64() % DefaultTaskSize))
             // {
-            //     var count = await Count(filter);
-            //     var dates = await QueryByPage(filter, pageIndex, pageSize, cols, isDeserialize, table);
+            //     var count = await Count(kind);
+            //     var dates = await QueryByPage(kind, pageIndex, pageSize, cols, isDeserialize, table);
             //     return ((int)count, dates);
             // }
             await FTask.CompletedTask;
@@ -592,10 +530,10 @@ namespace Fantasy.Database
         /// <param name="isDeserialize">是否在查询后反序列化,执行反序列化后会自动将实体注册到框架系统中，并且能正常使用组件相关功能。</param>
         /// <param name="table">表名称。</param>
         /// <returns>满足条件的行列表。</returns>
-        public async FTask<List<T>> QueryByPage<T>(Expression<Func<T, bool>> filter, int pageIndex, int pageSize, bool isDeserialize = false, string table = null) where T : Entity
+        public async FTask<List<T>> QueryByPage<T>(Expression<Func<T, bool>> filter, int pageIndex, int pageSize, bool isDeserialize = true, string table = null) where T : Entity
         {
-            // var tableName = GetTableName<T>(table);
-            // var whereClause = GetWhereClause(filter);
+            // var tableName = GetTableName<P>(table);
+            // var whereClause = GetWhereClause(kind);
             // 
             // using (await _dataBaseLock.Wait(RandomHelper.RandInt64() % DefaultTaskSize))
             // {
@@ -603,27 +541,27 @@ namespace Fantasy.Database
             //     using (var cmd = _connection.CreateCommand())
             //     {
             //         cmd.CommandText = $"SELECT * FROM \"{tableName}\" WHERE {whereClause} LIMIT {pageSize} OFFSET {(pageIndex - 1) * pageSize}";
-            //         var list = new List<T>();
+            //         var list1 = new Archetypes<P>();
             //         using (var reader = await cmd.ExecuteReaderAsync())
             //         {
             //             while (await reader.ReadAsync())
             //             {
             //                 var bsonDocument = GetBsonDocumentFromReader(reader);
-            //                 var entity = _serializer.Deserialize<T>(bsonDocument);
-            //                 list.Add(entity);
+            //                 var entities = _serializer.Deserialize<P>(bsonDocument);
+            //                 list1.Add(entities);
             //             }
             //         }
             //         
-            //         if (isDeserialize && list.Count > 0)
+            //         if (isDeserialize && list1.Count > 0)
             //         {
-            //             foreach (var entity in list)
+            //             foreach (var entities in list1)
             //             {
-            //                 entity.Deserialize(_scene);
+            //                 entities.Deserialize(_scene);
             //             }
             //         }
             //         
             //         await _connection.CloseAsync();
-            //         return list;
+            //         return list1;
             //     }
             // }
             await FTask.CompletedTask;
@@ -641,10 +579,10 @@ namespace Fantasy.Database
         /// <param name="isDeserialize">是否在查询后反序列化,执行反序列化后会自动将实体注册到框架系统中，并且能正常使用组件相关功能。</param>
         /// <param name="table">表名称。</param>
         /// <returns>满足条件的行列表。</returns>
-        public async FTask<List<T>> QueryByPage<T>(Expression<Func<T, bool>> filter, int pageIndex, int pageSize, string[] cols, bool isDeserialize = false, string table = null) where T : Entity
+        public async FTask<List<T>> QueryByPage<T>(Expression<Func<T, bool>> filter, int pageIndex, int pageSize, string[] cols, bool isDeserialize = true, string table = null) where T : Entity
         {
-            // var tableName = GetTableName<T>(table);
-            // var whereClause = GetWhereClause(filter);
+            // var tableName = GetTableName<P>(table);
+            // var whereClause = GetWhereClause(kind);
             // var columns = cols != null && cols.Length > 0 ? string.Join(", ", cols.Select(c => $"\"{c}\"")) : "*";
             // 
             // using (await _dataBaseLock.Wait(RandomHelper.RandInt64() % DefaultTaskSize))
@@ -653,27 +591,27 @@ namespace Fantasy.Database
             //     using (var cmd = _connection.CreateCommand())
             //     {
             //         cmd.CommandText = $"SELECT {columns} FROM \"{tableName}\" WHERE {whereClause} LIMIT {pageSize} OFFSET {(pageIndex - 1) * pageSize}";
-            //         var list = new List<T>();
+            //         var list1 = new Archetypes<P>();
             //         using (var reader = await cmd.ExecuteReaderAsync())
             //         {
             //             while (await reader.ReadAsync())
             //             {
             //                 var bsonDocument = GetBsonDocumentFromReader(reader);
-            //                 var entity = _serializer.Deserialize<T>(bsonDocument);
-            //                 list.Add(entity);
+            //                 var entities = _serializer.Deserialize<P>(bsonDocument);
+            //                 list1.Add(entities);
             //             }
             //         }
             //         
-            //         if (isDeserialize && list.Count > 0)
+            //         if (isDeserialize && list1.Count > 0)
             //         {
-            //             foreach (var entity in list)
+            //             foreach (var entities in list1)
             //             {
-            //                 entity.Deserialize(_scene);
+            //                 entities.Deserialize(_scene);
             //             }
             //         }
             //         
             //         await _connection.CloseAsync();
-            //         return list;
+            //         return list1;
             //     }
             // }
             await FTask.CompletedTask;
@@ -692,10 +630,10 @@ namespace Fantasy.Database
         /// <param name="isDeserialize">是否在查询后反序列化,执行反序列化后会自动将实体注册到框架系统中，并且能正常使用组件相关功能。</param>
         /// <param name="table">表名称。</param>
         /// <returns>满足条件的行列表。</returns>
-        public async FTask<List<T>> QueryByPageOrderBy<T>(Expression<Func<T, bool>> filter, int pageIndex, int pageSize, Expression<Func<T, object>> orderByExpression, bool isAsc = true, bool isDeserialize = false, string table = null) where T : Entity
+        public async FTask<List<T>> QueryByPageOrderBy<T>(Expression<Func<T, bool>> filter, int pageIndex, int pageSize, Expression<Func<T, object>> orderByExpression, bool isAsc = true, bool isDeserialize = true, string table = null) where T : Entity
         {
-            // var tableName = GetTableName<T>(table);
-            // var whereClause = GetWhereClause(filter);
+            // var tableName = GetTableName<P>(table);
+            // var whereClause = GetWhereClause(kind);
             // var orderByColumn = GetColumnName(orderByExpression);
             // var orderDirection = isAsc ? "ASC" : "DESC";
             // 
@@ -705,27 +643,27 @@ namespace Fantasy.Database
             //     using (var cmd = _connection.CreateCommand())
             //     {
             //         cmd.CommandText = $"SELECT * FROM \"{tableName}\" WHERE {whereClause} ORDER BY \"{orderByColumn}\" {orderDirection} LIMIT {pageSize} OFFSET {(pageIndex - 1) * pageSize}";
-            //         var list = new List<T>();
+            //         var list1 = new Archetypes<P>();
             //         using (var reader = await cmd.ExecuteReaderAsync())
             //         {
             //             while (await reader.ReadAsync())
             //             {
             //                 var bsonDocument = GetBsonDocumentFromReader(reader);
-            //                 var entity = _serializer.Deserialize<T>(bsonDocument);
-            //                 list.Add(entity);
+            //                 var entities = _serializer.Deserialize<P>(bsonDocument);
+            //                 list1.Add(entities);
             //             }
             //         }
             //         
-            //         if (isDeserialize && list.Count > 0)
+            //         if (isDeserialize && list1.Count > 0)
             //         {
-            //             foreach (var entity in list)
+            //             foreach (var entities in list1)
             //             {
-            //                 entity.Deserialize(_scene);
+            //                 entities.Deserialize(_scene);
             //             }
             //         }
             //         
             //         await _connection.CloseAsync();
-            //         return list;
+            //         return list1;
             //     }
             // }
             await FTask.CompletedTask;
@@ -740,10 +678,10 @@ namespace Fantasy.Database
         /// <param name="isDeserialize">是否在查询后反序列化,执行反序列化后会自动将实体注册到框架系统中，并且能正常使用组件相关功能。</param>
         /// <param name="table">表名称。</param>
         /// <returns>满足条件的第一个行，如果未找到则为 null。</returns>
-        public async FTask<T?> First<T>(Expression<Func<T, bool>> filter, bool isDeserialize = false, string table = null) where T : Entity
+        public async FTask<T?> First<T>(Expression<Func<T, bool>> filter, bool isDeserialize = true, string table = null) where T : Entity
         {
-            // var tableName = GetTableName<T>(table);
-            // var whereClause = GetWhereClause(filter);
+            // var tableName = GetTableName<P>(table);
+            // var whereClause = GetWhereClause(kind);
             // 
             // using (await _dataBaseLock.Wait(RandomHelper.RandInt64() % DefaultTaskSize))
             // {
@@ -756,15 +694,15 @@ namespace Fantasy.Database
             //             if (await reader.ReadAsync())
             //             {
             //                 var bsonDocument = GetBsonDocumentFromReader(reader);
-            //                 var entity = _serializer.Deserialize<T>(bsonDocument);
+            //                 var entities = _serializer.Deserialize<P>(bsonDocument);
             //                 
-            //                 if (isDeserialize && entity != null)
+            //                 if (isDeserialize && entities != null)
             //                 {
-            //                     entity.Deserialize(_scene);
+            //                     entities.Deserialize(_scene);
             //                 }
             //                 
             //                 await _connection.CloseAsync();
-            //                 return entity;
+            //                 return entities;
             //             }
             //         }
             //     }
@@ -784,9 +722,9 @@ namespace Fantasy.Database
         /// <param name="isDeserialize">是否在查询后反序列化,执行反序列化后会自动将实体注册到框架系统中，并且能正常使用组件相关功能。</param>
         /// <param name="table">表名称。</param>
         /// <returns>满足条件的第一个行。</returns>
-        public async FTask<T> First<T>(string json, string[] cols, bool isDeserialize = false, string table = null) where T : Entity
+        public async FTask<T> First<T>(string json, string[] cols, bool isDeserialize = true, string table = null) where T : Entity
         {
-            // var tableName = GetTableName<T>(table);
+            // var tableName = GetTableName<P>(table);
             // var columns = cols != null && cols.Length > 0 ? string.Join(", ", cols.Select(c => $"\"{c}\"")) : "*";
             // 
             // using (await _dataBaseLock.Wait(RandomHelper.RandInt64() % DefaultTaskSize))
@@ -801,15 +739,15 @@ namespace Fantasy.Database
             //             if (await reader.ReadAsync())
             //             {
             //                 var bsonDocument = GetBsonDocumentFromReader(reader);
-            //                 var entity = _serializer.Deserialize<T>(bsonDocument);
+            //                 var entities = _serializer.Deserialize<P>(bsonDocument);
             //                 
-            //                 if (isDeserialize && entity != null)
+            //                 if (isDeserialize && entities != null)
             //                 {
-            //                     entity.Deserialize(_scene);
+            //                     entities.Deserialize(_scene);
             //                 }
             //                 
             //                 await _connection.CloseAsync();
-            //                 return entity;
+            //                 return entities;
             //             }
             //         }
             //     }
@@ -830,10 +768,10 @@ namespace Fantasy.Database
         /// <param name="isDeserialize">是否在查询后反序列化,执行反序列化后会自动将实体注册到框架系统中，并且能正常使用组件相关功能。</param>
         /// <param name="table">表名称。</param>
         /// <returns>满足条件的行列表。</returns>
-        public async FTask<List<T>> QueryOrderBy<T>(Expression<Func<T, bool>> filter, Expression<Func<T, object>> orderByExpression, bool isAsc = true, bool isDeserialize = false, string table = null) where T : Entity
+        public async FTask<List<T>> QueryOrderBy<T>(Expression<Func<T, bool>> filter, Expression<Func<T, object>> orderByExpression, bool isAsc = true, bool isDeserialize = true, string table = null) where T : Entity
         {
-            // var tableName = GetTableName<T>(table);
-            // var whereClause = GetWhereClause(filter);
+            // var tableName = GetTableName<P>(table);
+            // var whereClause = GetWhereClause(kind);
             // var orderByColumn = GetColumnName(orderByExpression);
             // var orderDirection = isAsc ? "ASC" : "DESC";
             // 
@@ -843,27 +781,27 @@ namespace Fantasy.Database
             //     using (var cmd = _connection.CreateCommand())
             //     {
             //         cmd.CommandText = $"SELECT * FROM \"{tableName}\" WHERE {whereClause} ORDER BY \"{orderByColumn}\" {orderDirection}";
-            //         var list = new List<T>();
+            //         var list1 = new Archetypes<P>();
             //         using (var reader = await cmd.ExecuteReaderAsync())
             //         {
             //             while (await reader.ReadAsync())
             //             {
             //                 var bsonDocument = GetBsonDocumentFromReader(reader);
-            //                 var entity = _serializer.Deserialize<T>(bsonDocument);
-            //                 list.Add(entity);
+            //                 var entities = _serializer.Deserialize<P>(bsonDocument);
+            //                 list1.Add(entities);
             //             }
             //         }
             //         
-            //         if (isDeserialize && list.Count > 0)
+            //         if (isDeserialize && list1.Count > 0)
             //         {
-            //             foreach (var entity in list)
+            //             foreach (var entities in list1)
             //             {
-            //                 entity.Deserialize(_scene);
+            //                 entities.Deserialize(_scene);
             //             }
             //         }
             //         
             //         await _connection.CloseAsync();
-            //         return list;
+            //         return list1;
             //     }
             // }
             await FTask.CompletedTask;
@@ -871,49 +809,598 @@ namespace Fantasy.Database
         }
 
         /// <summary>
-        /// 通过指定过滤条件查询并返回满足条件的行列表（加锁）。
+        /// 通过指定过滤条件查询并返回满足条件的行列表。
         /// </summary>
         /// <typeparam name="T">文档实体类型。</typeparam>
         /// <param name="filter">查询过滤条件。</param>
         /// <param name="isDeserialize">是否在查询后反序列化,执行反序列化后会自动将实体注册到框架系统中，并且能正常使用组件相关功能。</param>
         /// <param name="table">表名称。</param>
         /// <returns>满足条件的行列表。</returns>
-        public async FTask<List<T>> Query<T>(Expression<Func<T, bool>> filter, bool isDeserialize = false, string table = null) where T : Entity
+        public async FTask<List<T>> Query<T>(Expression<Func<T, bool>> filter, bool isDeserialize = true, string table = null) where T : Entity
         {
-            // var tableName = GetTableName<T>(table);
-            // var whereClause = GetWhereClause(filter);
-            // 
-            // using (await _dataBaseLock.Wait(RandomHelper.RandInt64() % DefaultTaskSize))
-            // {
-            //     await _connection.OpenAsync();
-            //     using (var cmd = _connection.CreateCommand())
-            //     {
-            //         cmd.CommandText = $"SELECT * FROM \"{tableName}\" WHERE {whereClause}";
-            //         var list = new List<T>();
-            //         using (var reader = await cmd.ExecuteReaderAsync())
-            //         {
-            //             while (await reader.ReadAsync())
-            //             {
-            //                 var bsonDocument = GetBsonDocumentFromReader(reader);
-            //                 var entity = _serializer.Deserialize<T>(bsonDocument);
-            //                 list.Add(entity);
-            //             }
-            //         }
-            //         
-            //         if (isDeserialize && list.Count > 0)
-            //         {
-            //             foreach (var entity in list)
-            //             {
-            //                 entity.Deserialize(_scene);
-            //             }
-            //         }
-            //         
-            //         await _connection.CloseAsync();
-            //         return list;
-            //     }
-            // }
-            await FTask.CompletedTask;
-            return new List<T>();
+            var list = await Set<T>().Where(filter).ToListAsync();
+            if (!isDeserialize || list.Count == 0 )
+            {
+                return list;
+            }
+
+            foreach (var entity in list)
+            {
+                entity.Deserialize(pg.Scene);
+            }
+
+            return list;
+        }
+
+        /// <summary>
+        /// 将查询结果装配到父级对象
+        /// </summary>
+        private IEnumerable<T> AppendFromDb<T>(IEnumerable<T> entities, Entity parent) where T : Entity 
+        {
+            if (entities == null || !entities.Any()) return entities;
+
+            foreach (var entity in entities)
+            {
+                entity.Deserialize(pg.Scene);
+                parent.AddComponent(entity);
+            }
+            return entities;
+        }
+
+        /// <summary>
+        /// 从类型中获取整表名 (如果有命名空间, 带命名空间)
+        /// <param name="isQuoted">是否带双引号, 默认为true ,适配SQL语句的嵌入规则。</param>
+        /// </summary>
+        private string GetFullTableName<T>(bool isQuoted = true)
+        {
+            IEntityType? entityType = Model.FindEntityType(typeof(T));
+
+            if (entityType == null)
+                throw new Exception($" This Type \"{typeof(T)}\" is not in built Entity-Table Model !");
+
+            var tableName = entityType.GetTableName();
+            var schema = entityType.GetSchema();
+            string? res = default;
+            if (isQuoted)
+                res = string.IsNullOrEmpty(schema) ? $"\"{tableName}\"" : $"\"{schema}\".\"{tableName}\"";
+            else
+                res = string.IsNullOrEmpty(schema) ? tableName : $"{schema}{tableName}";
+
+            if (res == null)
+                throw new Exception($" Unexpected : \"{typeof(T)}\" has a NULL-TableName in built Entity-Table Model !");
+
+            return res;
+        }
+
+        /// <summary>
+        /// 查询子级且挂载: 查询某个父级上所有的某类实体, 并挂载到父级实体上。
+        /// <para>
+        /// <see cref="Mode"/>为<see cref="PreferSqlMode.EFCore"/>时 支持Linq表达式过滤。
+        /// </para>
+        /// <para>
+        /// <see cref="Mode"/>为<see cref="PreferSqlMode.Dapper"/>时 不支持Linq表达式过滤。
+        /// </para>
+        /// </summary>
+        /// <param name="parent">父级实体。</param>
+        /// <param name="filter">过滤条件。</param>
+        /// <param name="transaction">事务。</param>
+        public async FTask<IEnumerable<T>> QueryAppend<T>(Entity parent, Expression<Func<T, bool>> filter = null,object transaction = null) where T : Entity
+        {
+            long parentType = TypeHashCache.GetHashCode(parent.Type);
+            long parentId = parent.Id;
+
+            if (Mode == PreferSqlMode.EFCore || filter != null)
+            {
+                IQueryable<T> query = Set<T>().AsNoTracking()
+                        .Where(e =>
+                            EF.Property<long>(e, DbSetProperty.ParentType) == parentType &&
+                            EF.Property<long>(e, DbSetProperty.ParentId) == parentId
+                        );
+
+                if (filter != null)
+                {
+                    query = query.Where(filter);
+                    if (Mode == PreferSqlMode.Dapper)
+                        Log.Warning($"Dapper does not support Linq filter, this Query for \"{typeof(T)}\" appended on {parentId} has switched to EFCore-Mode automatically");
+                }
+
+                return AppendFromDb(await query.ToListAsync(), parent); ;
+            }
+            else if (Mode == PreferSqlMode.Dapper)
+            {
+                var Connection = await GetOpenedConnection();
+
+                //统一事务, 直接传入EFCore的上下文事务需转为Dapper可用的数据库事务
+                var transa = transaction;
+                if (transaction is IDbContextTransaction contextTransa)
+                    transa = contextTransa.GetDbTransaction();
+
+                var result = await Connection.QueryAsync<T>(
+                    sql: $@"
+                            {SQL.QUERY_BY_PARENT(GetFullTableName<T>())}
+                            ",
+                    transaction: transa as IDbTransaction,
+                    param: new { ParentType = parentType, ParentId = parentId });
+
+                return AppendFromDb(result, parent);
+            }
+            else throw new Exception("Unexpected : Unknown ORM Mode in PgSession.");
+        }
+
+        /// <summary>
+        /// 查询子级且挂载: 查询某个父级上所有的某类实体, 并挂载到父级实体上。
+        /// <para>
+        /// <see cref="Mode"/>为<see cref="PreferSqlMode.EFCore"/>时 支持Linq表达式过滤。
+        /// </para>
+        /// <para>
+        /// <see cref="Mode"/>为<see cref="PreferSqlMode.Dapper"/>时 不支持Linq表达式过滤。
+        /// </para>
+        /// </summary>
+        /// <param name="parent">父级实体。</param>
+        /// <param name="filter1">过滤条件1。</param>
+        /// <param name="filter2">过滤条件2。</param>
+        /// <param name="transaction">事务。</param>
+        public async FTask<(IEnumerable<T1>, IEnumerable<T2>)> QueryAppend<T1, T2>(
+                Entity parent,
+                Expression<Func<T1, bool>> filter1 = null,
+                Expression<Func<T2, bool>> filter2 = null,
+                object transaction = null)
+                where T1 : Entity
+                where T2 : Entity
+        {
+            long parentType = TypeHashCache.GetHashCode(parent.Type);
+            long parentId = parent.Id;
+
+            if (Mode == PreferSqlMode.EFCore || filter1 != null || filter2 != null)
+            {
+                // EFCore 模式 , 构建两个独立的查询
+                IQueryable<T1> query1 = Set<T1>().AsNoTracking()
+                 .Where(e =>
+                     EF.Property<long>(e, DbSetProperty.ParentType) == parentType &&
+                     EF.Property<long>(e, DbSetProperty.ParentId) == parentId
+                 );
+
+                IQueryable<T2> query2 = Set<T2>().AsNoTracking()
+                    .Where(e =>
+                        EF.Property<long>(e, DbSetProperty.ParentType) == parentType &&
+                        EF.Property<long>(e, DbSetProperty.ParentId) == parentId
+                    );
+
+                // 应用过滤器
+                if (filter1 != null) query1 = query1.Where(filter1);
+                if (filter2 != null) query2 = query2.Where(filter2);
+
+                if (Mode == PreferSqlMode.Dapper && (filter1 != null || filter2 != null))
+                {
+                    // 记录 Dapper 模式下的自动切换
+                    Log.Warning($"Dapper does not support Linq filter, this multi-query for \"{typeof(T1)}\"/\"{typeof(T2)}\" on {parent.Id} has switched to EFCore-Mode automatically");
+                }
+
+                var task1 = query1.ToListAsync();
+                var task2 = query2.ToListAsync();
+                await Task.WhenAll(task1, task2);
+
+                var t1Results = AppendFromDb(await task1, parent);
+                var t2Results = AppendFromDb(await task2, parent);
+
+                return (t1Results, t2Results);
+            }
+            else if (Mode == PreferSqlMode.Dapper) // Dapper 模式(此模式下 filter1 和 filter2 必定为 null)
+            {
+                var Connection = await GetOpenedConnection();
+                string T1Name = GetFullTableName<T1>();
+                string T2Name = GetFullTableName<T2>();
+
+                //统一事务, 直接传入EFCore的上下文事务需转为Dapper可用的数据库事务
+                var transa = transaction;
+                if (transaction is IDbContextTransaction contextTransa)
+                    transa = contextTransa.GetDbTransaction();
+
+                var multi = await Connection.QueryMultipleAsync(
+                    sql: $@"
+                        {SQL.QUERY_BY_PARENT(T1Name)}
+                        {SQL.QUERY_BY_PARENT(T2Name)}
+                        ",
+                    transaction: transa as IDbTransaction,
+                    param: new { ParentType = parentType, ParentId = parentId });
+
+                var t1Results = AppendFromDb(await multi.ReadAsync<T1>(), parent);
+                var t2Results = AppendFromDb(await multi.ReadAsync<T2>(), parent);
+
+                return (t1Results, t2Results);
+            }
+            else
+            {
+                throw new Exception("Unexpected : Unknown ORM Mode in PgSession.");
+            }
+        }
+
+        /// <summary>
+        /// 查询子级且挂载: 查询某个父级上所有的某类实体, 并挂载到父级实体上。
+        /// <para>
+        /// <see cref="Mode"/>为<see cref="PreferSqlMode.EFCore"/>时 支持Linq表达式过滤。
+        /// </para>
+        /// <para>
+        /// <see cref="Mode"/>为<see cref="PreferSqlMode.Dapper"/>时 不支持Linq表达式过滤。
+        /// </para>
+        /// </summary>
+        /// <param name="parent">父级实体。</param>
+        /// <param name="filter1">过滤条件1。</param>
+        /// <param name="filter2">过滤条件2。</param>
+        /// <param name="filter3">过滤条件3。</param>
+        /// <param name="transaction">事务。</param>
+        public async FTask<(IEnumerable<T1>, IEnumerable<T2>, IEnumerable<T3>)> QueryAppend<T1, T2, T3>(
+                Entity parent,
+                Expression<Func<T1, bool>> filter1 = null,
+                Expression<Func<T2, bool>> filter2 = null,
+                Expression<Func<T3, bool>> filter3 = null,
+                object transaction = null)
+                where T1 : Entity
+                where T2 : Entity
+                where T3 : Entity
+        {
+            long parentType = TypeHashCache.GetHashCode(parent.Type);
+            long parentId = parent.Id;
+
+            if (Mode == PreferSqlMode.EFCore || filter1 != null || filter2 != null || filter3 != null)
+            {
+                // EFCore 模式 , 构建三个独立的查询
+                IQueryable<T1> query1 = Set<T1>().AsNoTracking()
+                 .Where(e =>
+                     EF.Property<long>(e, DbSetProperty.ParentType) == parentType &&
+                     EF.Property<long>(e, DbSetProperty.ParentId) == parentId
+                 );
+
+                IQueryable<T2> query2 = Set<T2>().AsNoTracking()
+                     .Where(e =>
+                         EF.Property<long>(e, DbSetProperty.ParentType) == parentType &&
+                         EF.Property<long>(e, DbSetProperty.ParentId) == parentId
+                     );
+
+                IQueryable<T3> query3 = Set<T3>().AsNoTracking()
+                     .Where(e =>
+                         EF.Property<long>(e, DbSetProperty.ParentType) == parentType &&
+                         EF.Property<long>(e, DbSetProperty.ParentId) == parentId
+                     );
+
+                // 应用过滤器
+                if (filter1 != null) query1 = query1.Where(filter1);
+                if (filter2 != null) query2 = query2.Where(filter2);
+                if (filter3 != null) query3 = query3.Where(filter3);
+
+                if (Mode == PreferSqlMode.Dapper && (filter1 != null || filter2 != null || filter3 != null))
+                {
+                    // 记录 Dapper 模式下的自动切换
+                    Log.Warning($"Dapper does not support Linq filter, this multi-query for \"{typeof(T1)}\"/\"{typeof(T2)}\"/\"{typeof(T3)}\" on {parent.Id} has switched to EFCore-Mode automatically");
+                }
+
+                var task1 = query1.ToListAsync();
+                var task2 = query2.ToListAsync();
+                var task3 = query3.ToListAsync();
+                await Task.WhenAll(task1, task2, task3);
+
+                var t1Results = AppendFromDb(await task1, parent);
+                var t2Results = AppendFromDb(await task2, parent);
+                var t3Results = AppendFromDb(await task3, parent);
+
+                return (t1Results, t2Results, t3Results);
+            }
+            else if (Mode == PreferSqlMode.Dapper) // Dapper 模式(此模式下 filter 必定为 null)
+            {
+                var Connection = await GetOpenedConnection();
+                string T1Name = GetFullTableName<T1>();
+                string T2Name = GetFullTableName<T2>();
+                string T3Name = GetFullTableName<T3>();
+
+
+                //统一事务, 直接传入EFCore的上下文事务需转为Dapper可用的数据库事务
+                var transa = transaction;
+                if (transaction is IDbContextTransaction contextTransa)
+                    transa = contextTransa.GetDbTransaction();
+
+                var multi = await Connection.QueryMultipleAsync(
+                    sql: $@"
+                {SQL.QUERY_BY_PARENT(T1Name)}
+                {SQL.QUERY_BY_PARENT(T2Name)}
+                {SQL.QUERY_BY_PARENT(T3Name)}
+                ",
+                    transaction: transa as IDbTransaction,
+                    param: new { ParentType = parentType, ParentId = parentId });
+
+                var t1Results = AppendFromDb(await multi.ReadAsync<T1>(), parent);
+                var t2Results = AppendFromDb(await multi.ReadAsync<T2>(), parent);
+                var t3Results = AppendFromDb(await multi.ReadAsync<T3>(), parent);
+
+                return (t1Results, t2Results, t3Results);
+            }
+            else
+            {
+                throw new Exception("Unexpected : Unknown ORM Mode in PgSession.");
+            }
+        }
+
+        /// <summary>
+        /// 查询子级且挂载: 查询某个父级上所有的某类实体, 并挂载到父级实体上。
+        /// <para>
+        /// <see cref="Mode"/>为<see cref="PreferSqlMode.EFCore"/>时 支持Linq表达式过滤。
+        /// </para>
+        /// <para>
+        /// <see cref="Mode"/>为<see cref="PreferSqlMode.Dapper"/>时 不支持Linq表达式过滤。
+        /// </para>
+        /// </summary>
+        /// <param name="parent">父级实体。</param>
+        /// <param name="filter1">过滤条件1。</param>
+        /// <param name="filter2">过滤条件2。</param>
+        /// <param name="filter3">过滤条件3。</param>
+        /// <param name="filter4">过滤条件4。</param>
+        /// <param name="transaction">事务。</param>
+        public async FTask<(IEnumerable<T1>, IEnumerable<T2>, IEnumerable<T3>, IEnumerable<T4>)> QueryAppend<T1, T2, T3, T4>(
+                Entity parent,
+                Expression<Func<T1, bool>> filter1 = null,
+                Expression<Func<T2, bool>> filter2 = null,
+                Expression<Func<T3, bool>> filter3 = null,
+                Expression<Func<T4, bool>> filter4 = null,
+                object? transaction = null)
+                where T1 : Entity
+                where T2 : Entity
+                where T3 : Entity
+                where T4 : Entity
+        {
+            long parentType = TypeHashCache.GetHashCode(parent.Type);
+            long parentId = parent.Id;
+
+            if (Mode == PreferSqlMode.EFCore || filter1 != null || filter2 != null || filter3 != null || filter4 != null)
+            {
+                // EFCore 模式 , 构建四个独立的查询
+                IQueryable<T1> query1 = Set<T1>().AsNoTracking()
+                 .Where(e =>
+                     EF.Property<long>(e, DbSetProperty.ParentType) == parentType &&
+                     EF.Property<long>(e, DbSetProperty.ParentId) == parentId
+                 );
+
+                IQueryable<T2> query2 = Set<T2>().AsNoTracking()
+                     .Where(e =>
+                         EF.Property<long>(e, DbSetProperty.ParentType) == parentType &&
+                         EF.Property<long>(e, DbSetProperty.ParentId) == parentId
+                     );
+
+                IQueryable<T3> query3 = Set<T3>().AsNoTracking()
+                     .Where(e =>
+                         EF.Property<long>(e, DbSetProperty.ParentType) == parentType &&
+                         EF.Property<long>(e, DbSetProperty.ParentId) == parentId
+                     );
+
+                IQueryable<T4> query4 = Set<T4>().AsNoTracking()
+                     .Where(e =>
+                         EF.Property<long>(e, DbSetProperty.ParentType) == parentType &&
+                         EF.Property<long>(e, DbSetProperty.ParentId) == parentId
+                     );
+
+                // 应用过滤器
+                if (filter1 != null) query1 = query1.Where(filter1);
+                if (filter2 != null) query2 = query2.Where(filter2);
+                if (filter3 != null) query3 = query3.Where(filter3);
+                if (filter4 != null) query4 = query4.Where(filter4);
+
+                if (Mode == PreferSqlMode.Dapper && (filter1 != null || filter2 != null || filter3 != null || filter4 != null))
+                {
+                    // 记录 Dapper 模式下的自动切换
+                    Log.Warning($"Dapper does not support Linq filter, this multi-query for \"{typeof(T1)}\"/\"{typeof(T2)}\"/\"{typeof(T3)}\"/\"{typeof(T4)}\" on {parent.Id} has switched to EFCore-Mode automatically");
+                }
+
+                var task1 = query1.ToListAsync();
+                var task2 = query2.ToListAsync();
+                var task3 = query3.ToListAsync();
+                var task4 = query4.ToListAsync();
+                await Task.WhenAll(task1, task2, task3, task4);
+
+                var t1Results = AppendFromDb(await task1, parent);
+                var t2Results = AppendFromDb(await task2, parent);
+                var t3Results = AppendFromDb(await task3, parent);
+                var t4Results = AppendFromDb(await task4, parent);
+
+                return (t1Results, t2Results, t3Results, t4Results);
+            }
+            else if (Mode == PreferSqlMode.Dapper) // Dapper 模式(此模式下 filter 必定为 null)
+            {
+                var Connection = await GetOpenedConnection();
+                string T1Name = GetFullTableName<T1>();
+                string T2Name = GetFullTableName<T2>();
+                string T3Name = GetFullTableName<T3>();
+                string T4Name = GetFullTableName<T4>();
+
+                var transa = transaction;
+                if (transaction is IDbContextTransaction contextTransa)
+                    transa = contextTransa.GetDbTransaction();
+
+                var multi = await Connection.QueryMultipleAsync(
+                    sql: $@"
+                {SQL.QUERY_BY_PARENT(T1Name)}
+                {SQL.QUERY_BY_PARENT(T2Name)}
+                {SQL.QUERY_BY_PARENT(T3Name)}
+                {SQL.QUERY_BY_PARENT(T4Name)}
+                ",
+                    transaction: transa as IDbTransaction,
+                    param: new { ParentType = parentType, ParentId = parentId });
+
+                var t1Results = AppendFromDb(await multi.ReadAsync<T1>(), parent);
+                var t2Results = AppendFromDb(await multi.ReadAsync<T2>(), parent);
+                var t3Results = AppendFromDb(await multi.ReadAsync<T3>(), parent);
+                var t4Results = AppendFromDb(await multi.ReadAsync<T4>(), parent);
+
+                return (t1Results, t2Results, t3Results, t4Results);
+            }
+            else
+            {
+                throw new Exception("Unexpected : Unknown ORM Mode in PgSession.");
+            }
+        }
+
+        /// <summary>
+        /// 查询子级且挂载: 查询某个父级上所有的某类实体, 并挂载到父级实体上。
+        /// <para>
+        /// <see cref="Mode"/>为<see cref="PreferSqlMode.EFCore"/>时 支持Linq表达式过滤。
+        /// </para>
+        /// <para>
+        /// <see cref="Mode"/>为<see cref="PreferSqlMode.Dapper"/>时 不支持Linq表达式过滤。
+        /// </para>
+        /// </summary>
+        /// <param name="parent">父级实体。</param>
+        /// <param name="filter1">过滤条件1。</param>
+        /// <param name="filter2">过滤条件2。</param>
+        /// <param name="filter3">过滤条件3。</param>
+        /// <param name="filter4">过滤条件4。</param>
+        /// <param name="filter5">过滤条件5。</param>
+        /// <param name="transaction">事务。</param>
+        public async FTask<(IEnumerable<T1>, IEnumerable<T2>, IEnumerable<T3>, IEnumerable<T4>, IEnumerable<T5>)> QueryAppend<T1, T2, T3, T4, T5>(
+                Entity parent,
+                Expression<Func<T1, bool>> filter1 = null,
+                Expression<Func<T2, bool>> filter2 = null,
+                Expression<Func<T3, bool>> filter3 = null,
+                Expression<Func<T4, bool>> filter4 = null,
+                Expression<Func<T5, bool>> filter5 = null,
+                object? transaction = null)
+                where T1 : Entity
+                where T2 : Entity
+                where T3 : Entity
+                where T4 : Entity
+                where T5 : Entity
+        {
+            long parentType = TypeHashCache.GetHashCode(parent.Type);
+            long parentId = parent.Id;
+
+            if (Mode == PreferSqlMode.EFCore || filter1 != null || filter2 != null || filter3 != null || filter4 != null || filter5 != null)
+            {
+                // EFCore 模式 , 构建五个独立的查询
+                IQueryable<T1> query1 = Set<T1>().AsNoTracking()
+                 .Where(e =>
+                     EF.Property<long>(e, DbSetProperty.ParentType) == parentType &&
+                     EF.Property<long>(e, DbSetProperty.ParentId) == parentId
+                 );
+
+                IQueryable<T2> query2 = Set<T2>().AsNoTracking()
+                     .Where(e =>
+                         EF.Property<long>(e, DbSetProperty.ParentType) == parentType &&
+                         EF.Property<long>(e, DbSetProperty.ParentId) == parentId
+                     );
+
+                IQueryable<T3> query3 = Set<T3>().AsNoTracking()
+                     .Where(e =>
+                         EF.Property<long>(e, DbSetProperty.ParentType) == parentType &&
+                         EF.Property<long>(e, DbSetProperty.ParentId) == parentId
+                     );
+
+                IQueryable<T4> query4 = Set<T4>().AsNoTracking()
+                     .Where(e =>
+                         EF.Property<long>(e, DbSetProperty.ParentType) == parentType &&
+                         EF.Property<long>(e, DbSetProperty.ParentId) == parentId
+                     );
+
+                IQueryable<T5> query5 = Set<T5>().AsNoTracking()
+                     .Where(e =>
+                         EF.Property<long>(e, DbSetProperty.ParentType) == parentType &&
+                         EF.Property<long>(e, DbSetProperty.ParentId) == parentId
+                     );
+
+                // 应用过滤器
+                if (filter1 != null) query1 = query1.Where(filter1);
+                if (filter2 != null) query2 = query2.Where(filter2);
+                if (filter3 != null) query3 = query3.Where(filter3);
+                if (filter4 != null) query4 = query4.Where(filter4);
+                if (filter5 != null) query5 = query5.Where(filter5);
+
+                if (Mode == PreferSqlMode.Dapper && (filter1 != null || filter2 != null || filter3 != null || filter4 != null || filter5 != null))
+                {
+                    // 记录 Dapper 模式下的自动切换
+                    Log.Warning($"Dapper does not support Linq filter, this multi-query for \"{typeof(T1)}\"/\"{typeof(T2)}\"/\"{typeof(T3)}\"/\"{typeof(T4)}\"/\"{typeof(T5)}\" on {parent.Id} has switched to EFCore-Mode automatically");
+                }
+
+                var task1 = query1.ToListAsync();
+                var task2 = query2.ToListAsync();
+                var task3 = query3.ToListAsync();
+                var task4 = query4.ToListAsync();
+                var task5 = query5.ToListAsync();
+                await Task.WhenAll(task1, task2, task3, task4, task5);
+
+                var t1Results = AppendFromDb(await task1, parent);
+                var t2Results = AppendFromDb(await task2, parent);
+                var t3Results = AppendFromDb(await task3, parent);
+                var t4Results = AppendFromDb(await task4, parent);
+                var t5Results = AppendFromDb(await task5, parent);
+
+                return (t1Results, t2Results, t3Results, t4Results, t5Results);
+            }
+            else if (Mode == PreferSqlMode.Dapper) // Dapper 模式(此模式下 filter 必定为 null)
+            {
+                var Connection = await GetOpenedConnection();
+                string T1Name = GetFullTableName<T1>();
+                string T2Name = GetFullTableName<T2>();
+                string T3Name = GetFullTableName<T3>();
+                string T4Name = GetFullTableName<T4>();
+                string T5Name = GetFullTableName<T5>();
+
+                var transa = transaction;
+                if (transaction is IDbContextTransaction contextTransa)
+                    transa = contextTransa.GetDbTransaction();
+
+                var multi = await Connection.QueryMultipleAsync(
+                    sql: $@"
+                {SQL.QUERY_BY_PARENT(T1Name)}
+                {SQL.QUERY_BY_PARENT(T2Name)}
+                {SQL.QUERY_BY_PARENT(T3Name)}
+                {SQL.QUERY_BY_PARENT(T4Name)}
+                {SQL.QUERY_BY_PARENT(T5Name)}
+                ",
+                     transaction: transa as IDbTransaction,
+                    param: new { ParentType = parentType, ParentId = parentId });
+
+                var t1Results = AppendFromDb(await multi.ReadAsync<T1>(), parent);
+                var t2Results = AppendFromDb(await multi.ReadAsync<T2>(), parent);
+                var t3Results = AppendFromDb(await multi.ReadAsync<T3>(), parent);
+                var t4Results = AppendFromDb(await multi.ReadAsync<T4>(), parent);
+                var t5Results = AppendFromDb(await multi.ReadAsync<T5>(), parent);
+
+                return (t1Results, t2Results, t3Results, t4Results, t5Results);
+            }
+            else
+            {
+                throw new Exception("Unexpected : Unknown ORM Mode in PgSession.");
+            }
+        }
+
+        /// <summary>
+        /// TODO : JOIN, 目前不适用, 得想清楚JOIN适合什么地方再写一个新的。
+        /// JOIN 可能更适合查某组实体分别连带出不同的引用的数据, 即N:1的场景
+        /// </summary>
+        public async FTask<IEnumerable<TResult>> QueryJoin<TResult>(Type[] types, Func<object[], TResult> mapFunc, Entity parent, bool isDeserialize = true, string table = null)
+        {
+            long parentType = TypeHashCache.GetHashCode(parent.Type);
+            long parentId = parent.Id;
+
+            var JOIN_SQL = @"
+
+            ";
+            var Connection = await GetOpenedConnection();
+
+            IEnumerable<TResult> result = await Connection.QueryAsync(
+                sql: JOIN_SQL,
+                map: mapFunc,
+                param: new { ParentType = parentType, ParentId = parentId },
+                splitOn: DbSetProperty.MultiEntitiesRowSplitOn, 
+                types: types
+                );
+
+            if (!isDeserialize || result.Count() == 0)
+            {
+                return result;
+            }
+
+            foreach (TResult? res in result)
+            {
+                //TODO
+
+            }
+            return result;
         }
 
         /// <summary>
@@ -923,7 +1410,7 @@ namespace Fantasy.Database
         /// <param name="tableNames">要查询的表名称列表。</param>
         /// <param name="result">查询结果存储列表。</param>
         /// <param name="isDeserialize">是否在查询后反序列化,执行反序列化后会自动将实体注册到框架系统中，并且能正常使用组件相关功能。</param>
-        public async FTask Query(long id, List<string>? tableNames, List<Entity> result, bool isDeserialize = false)
+        public async FTask Query(long id, List<string>? tableNames, List<Entity> result, bool isDeserialize = true)
         {
             // if (tableNames == null || tableNames.Count == 0)
             // {
@@ -947,12 +1434,12 @@ namespace Fantasy.Database
             //                     var entityType = Type.GetType($"Fantasy.Entities.{tableName}, Fantasy");
             //                     if (entityType != null && typeof(ToParentIs).IsAssignableFrom(entityType))
             //                     {
-            //                         var entity = _serializer.Deserialize(entityType, bsonDocument) as ToParentIs;
-            //                         if (isDeserialize && entity != null)
+            //                         var entities = _serializer.Deserialize(entityType, bsonDocument) as ToParentIs;
+            //                         if (isDeserialize && entities != null)
             //                         {
-            //                             entity.Deserialize(_scene);
+            //                             entities.Deserialize(_scene);
             //                         }
-            //                         result.Add(entity);
+            //                         entities.Add(entities);
             //                     }
             //                 }
             //             }
@@ -971,9 +1458,9 @@ namespace Fantasy.Database
         /// <param name="isDeserialize">是否在查询后反序列化,执行反序列化后会自动将实体注册到框架系统中，并且能正常使用组件相关功能。</param>
         /// <param name="table">表名称。</param>
         /// <returns>满足条件的行列表。</returns>
-        public async FTask<List<T>> QueryJson<T>(string json, bool isDeserialize = false, string table = null) where T : Entity
+        public async FTask<List<T>> QueryJson<T>(string json, bool isDeserialize = true, string table = null) where T : Entity
         {
-            // var tableName = GetTableName<T>(table);
+            // var tableName = GetTableName<P>(table);
             // 
             // using (await _dataBaseLock.Wait(RandomHelper.RandInt64() % DefaultTaskSize))
             // {
@@ -982,27 +1469,27 @@ namespace Fantasy.Database
             //     {
             //         // 这里需要将JSON条件转换为SQL WHERE子句
             //         cmd.CommandText = $"SELECT * FROM \"{tableName}\" WHERE {ConvertJsonToWhereClause(json)}";
-            //         var list = new List<T>();
+            //         var list1 = new Archetypes<P>();
             //         using (var reader = await cmd.ExecuteReaderAsync())
             //         {
             //             while (await reader.ReadAsync())
             //             {
             //                 var bsonDocument = GetBsonDocumentFromReader(reader);
-            //                 var entity = _serializer.Deserialize<T>(bsonDocument);
-            //                 list.Add(entity);
+            //                 var entities = _serializer.Deserialize<P>(bsonDocument);
+            //                 list1.Add(entities);
             //             }
             //         }
             //         
-            //         if (isDeserialize && list.Count > 0)
+            //         if (isDeserialize && list1.Count > 0)
             //         {
-            //             foreach (var entity in list)
+            //             foreach (var entities in list1)
             //             {
-            //                 entity.Deserialize(_scene);
+            //                 entities.Deserialize(_scene);
             //             }
             //         }
             //         
             //         await _connection.CloseAsync();
-            //         return list;
+            //         return list1;
             //     }
             // }
             await FTask.CompletedTask;
@@ -1018,9 +1505,9 @@ namespace Fantasy.Database
         /// <param name="isDeserialize">是否在查询后反序列化,执行反序列化后会自动将实体注册到框架系统中，并且能正常使用组件相关功能。</param>
         /// <param name="table">表名称。</param>
         /// <returns>满足条件的行列表。</returns>
-        public async FTask<List<T>> QueryJson<T>(string json, string[] cols, bool isDeserialize = false, string table = null) where T : Entity
+        public async FTask<List<T>> QueryJson<T>(string json, string[] cols, bool isDeserialize = true, string table = null) where T : Entity
         {
-            // var tableName = GetTableName<T>(table);
+            // var tableName = GetTableName<P>(table);
             // var columns = cols != null && cols.Length > 0 ? string.Join(", ", cols.Select(c => $"\"{c}\"")) : "*";
             // 
             // using (await _dataBaseLock.Wait(RandomHelper.RandInt64() % DefaultTaskSize))
@@ -1030,27 +1517,27 @@ namespace Fantasy.Database
             //     {
             //         // 这里需要将JSON条件转换为SQL WHERE子句
             //         cmd.CommandText = $"SELECT {columns} FROM \"{tableName}\" WHERE {ConvertJsonToWhereClause(json)}";
-            //         var list = new List<T>();
+            //         var list1 = new Archetypes<P>();
             //         using (var reader = await cmd.ExecuteReaderAsync())
             //         {
             //             while (await reader.ReadAsync())
             //             {
             //                 var bsonDocument = GetBsonDocumentFromReader(reader);
-            //                 var entity = _serializer.Deserialize<T>(bsonDocument);
-            //                 list.Add(entity);
+            //                 var entities = _serializer.Deserialize<P>(bsonDocument);
+            //                 list1.Add(entities);
             //             }
             //         }
             //         
-            //         if (isDeserialize && list.Count > 0)
+            //         if (isDeserialize && list1.Count > 0)
             //         {
-            //             foreach (var entity in list)
+            //             foreach (var entities in list1)
             //             {
-            //                 entity.Deserialize(_scene);
+            //                 entities.Deserialize(_scene);
             //             }
             //         }
             //         
             //         await _connection.CloseAsync();
-            //         return list;
+            //         return list1;
             //     }
             // }
             await FTask.CompletedTask;
@@ -1066,9 +1553,9 @@ namespace Fantasy.Database
         /// <param name="isDeserialize">是否在查询后反序列化,执行反序列化后会自动将实体注册到框架系统中，并且能正常使用组件相关功能。</param>
         /// <param name="table">表名称。</param>
         /// <returns>满足条件的行列表。</returns>
-        public async FTask<List<T>> QueryJson<T>(long taskId, string json, bool isDeserialize = false, string table = null) where T : Entity
+        public async FTask<List<T>> QueryJson<T>(long taskId, string json, bool isDeserialize = true, string table = null) where T : Entity
         {
-            // var tableName = GetTableName<T>(table);
+            // var tableName = GetTableName<P>(table);
             // 
             // using (await _dataBaseLock.Wait(taskId))
             // {
@@ -1077,27 +1564,27 @@ namespace Fantasy.Database
             //     {
             //         // 这里需要将JSON条件转换为SQL WHERE子句
             //         cmd.CommandText = $"SELECT * FROM \"{tableName}\" WHERE {ConvertJsonToWhereClause(json)}";
-            //         var list = new List<T>();
+            //         var list1 = new Archetypes<P>();
             //         using (var reader = await cmd.ExecuteReaderAsync())
             //         {
             //             while (await reader.ReadAsync())
             //             {
             //                 var bsonDocument = GetBsonDocumentFromReader(reader);
-            //                 var entity = _serializer.Deserialize<T>(bsonDocument);
-            //                 list.Add(entity);
+            //                 var entities = _serializer.Deserialize<P>(bsonDocument);
+            //                 list1.Add(entities);
             //             }
             //         }
             //         
-            //         if (isDeserialize && list.Count > 0)
+            //         if (isDeserialize && list1.Count > 0)
             //         {
-            //             foreach (var entity in list)
+            //             foreach (var entities in list1)
             //             {
-            //                 entity.Deserialize(_scene);
+            //                 entities.Deserialize(_scene);
             //             }
             //         }
             //         
             //         await _connection.CloseAsync();
-            //         return list;
+            //         return list1;
             //     }
             // }
             await FTask.CompletedTask;
@@ -1113,9 +1600,9 @@ namespace Fantasy.Database
         /// <param name="isDeserialize">是否在查询后反序列化,执行反序列化后会自动将实体注册到框架系统中，并且能正常使用组件相关功能。</param>
         /// <param name="table">表名称。</param>
         /// <returns>满足条件的行列表。</returns>
-        public async FTask<List<T>> Query<T>(Expression<Func<T, bool>> filter, string[] cols, bool isDeserialize = false, string table = null) where T : Entity
+        public async FTask<List<T>> Query<T>(Expression<Func<T, bool>> filter, string[] cols, bool isDeserialize = true, string table = null) where T : Entity
         {
-            // var tableName = GetTableName<T>(table);
+            // var tableName = GetTableName<P>(table);
             // var whereClause = GetWhereClause(filter);
             // var columns = cols != null && cols.Length > 0 ? string.Join(", ", cols.Select(c => $"\"{c}\"")) : "*";
             // 
@@ -1125,27 +1612,27 @@ namespace Fantasy.Database
             //     using (var cmd = _connection.CreateCommand())
             //     {
             //         cmd.CommandText = $"SELECT {columns} FROM \"{tableName}\" WHERE {whereClause}";
-            //         var list = new List<T>();
+            //         var list1 = new Archetypes<P>();
             //         using (var reader = await cmd.ExecuteReaderAsync())
             //         {
             //             while (await reader.ReadAsync())
             //             {
             //                 var bsonDocument = GetBsonDocumentFromReader(reader);
-            //                 var entity = _serializer.Deserialize<T>(bsonDocument);
-            //                 list.Add(entity);
+            //                 var entities = _serializer.Deserialize<P>(bsonDocument);
+            //                 list1.Add(entities);
             //             }
             //         }
             //         
-            //         if (isDeserialize && list.Count > 0)
+            //         if (isDeserialize && list1.Count > 0)
             //         {
-            //             foreach (var entity in list)
+            //             foreach (var entities in list1)
             //             {
-            //                 entity.Deserialize(_scene);
+            //                 entities.Deserialize(_scene);
             //             }
             //         }
             //         
             //         await _connection.CloseAsync();
-            //         return list;
+            //         return list1;
             //     }
             // }
             await FTask.CompletedTask;
@@ -1161,11 +1648,11 @@ namespace Fantasy.Database
         /// <param name="table">是否在查询后反序列化,执行反序列化后会自动将实体注册到框架系统中，并且能正常使用组件相关功能。</param>
         /// <typeparam name="T">表名称。</typeparam>
         /// <returns></returns>
-        public async FTask<List<T>> Query<T>(Expression<Func<T, bool>> filter, Expression<Func<T, object>>[] cols, bool isDeserialize = false, string table = null) where T : Entity
+        public async FTask<List<T>> Query<T>(Expression<Func<T, bool>> filter, Expression<Func<T, object>>[] cols, bool isDeserialize = true, string table = null) where T : Entity
         {
-            // var tableName = GetTableName<T>(table);
+            // var tableName = GetTableName<P>(table);
             // var whereClause = GetWhereClause(filter);
-            // var columns = new List<string> { "\"Id\"" }; // 确保包含Id列
+            // var columns = new Archetypes<string> { "\"Id\"" }; // 确保包含Id列
             // 
             // foreach (var col in cols)
             // {
@@ -1187,27 +1674,27 @@ namespace Fantasy.Database
             //     using (var cmd = _connection.CreateCommand())
             //     {
             //         cmd.CommandText = $"SELECT {columnsStr} FROM \"{tableName}\" WHERE {whereClause}";
-            //         var list = new List<T>();
+            //         var list1 = new Archetypes<P>();
             //         using (var reader = await cmd.ExecuteReaderAsync())
             //         {
             //             while (await reader.ReadAsync())
             //             {
             //                 var bsonDocument = GetBsonDocumentFromReader(reader);
-            //                 var entity = _serializer.Deserialize<T>(bsonDocument);
-            //                 list.Add(entity);
+            //                 var entities = _serializer.Deserialize<P>(bsonDocument);
+            //                 list1.Add(entities);
             //             }
             //         }
             //         
-            //         if (isDeserialize && list.Count > 0)
+            //         if (isDeserialize && list1.Count > 0)
             //         {
-            //             foreach (var entity in list)
+            //             foreach (var entities in list1)
             //             {
-            //                 entity.Deserialize(_scene);
+            //                 entities.Deserialize(_scene);
             //             }
             //         }
             //         
             //         await _connection.CloseAsync();
-            //         return list;
+            //         return list1;
             //     }
             // }
             await FTask.CompletedTask;
@@ -1227,21 +1714,21 @@ namespace Fantasy.Database
         /// <param name="table">表名称。</param>
         public async FTask Save<T>(object transactionSession, T? entity, string table = null) where T : Entity
         {
-            // if (entity == null)
+            // if (entities == null)
             // {
-            //     Log.Error($"save entity is null: {typeof(T).Name}");
+            //     Log.Error($"save entities is null: {typeof(P).Name}");
             //     return;
             // }
             // 
-            // var clone = _serializer.Clone(entity);
-            // var tableName = GetTableName<T>(table);
+            // var clone = _serializer.Clone(entities);
+            // var tableName = GetTableName<P>(table);
             // 
             // using (await _dataBaseLock.Wait(clone.Id))
             // {
             //     await _connection.OpenAsync();
             //     using (var cmd = _connection.CreateCommand())
             //     {
-            //         cmd.Transaction = (NpgsqlTransaction)transactionSession;
+            //         cmd.Transaction = (NpgsqlTransaction)transaction;
             //         var columns = GetColumnsForEntity(clone);
             //         var values = GetValuesForEntity(clone);
             //         
@@ -1284,7 +1771,7 @@ namespace Fantasy.Database
         {
             if (entity == null)
             {
-                Log.Error($"save entity is null: {typeof(T).Name}");
+                Log.Error($"save entities is null: {typeof(T).Name}");
                 return;
             }
 
@@ -1321,14 +1808,14 @@ namespace Fantasy.Database
         /// <typeparam name="T"></typeparam>
         public async FTask Save<T>(Expression<Func<T, bool>> filter, T? entity, string table = null) where T : Entity, new()
         {
-            // if (entity == null)
+            // if (entities == null)
             // {
-            //     Log.Error($"save entity is null: {typeof(T).Name}");
+            //     Log.Error($"save entities is null: {typeof(P).Name}");
             //     return;
             // }
             // 
-            // var clone = _serializer.Clone(entity);
-            // var tableName = GetTableName<T>(table);
+            // var clone = _serializer.Clone(entities);
+            // var tableName = GetTableName<P>(table);
             // var whereClause = GetWhereClause(filter);
             // 
             // using (await _dataBaseLock.Wait(clone.Id))
@@ -1358,15 +1845,15 @@ namespace Fantasy.Database
         {
             // if (entities == null || entities.Count == 0)
             // {
-            //     Log.Error("save entity is null");
+            //     Log.Error("save entities is null");
             //     return;
             // }
             // 
             // using var listPool = ListPool<ToParentIs>.Create();
             // 
-            // foreach (var entity in entities)
+            // foreach (var entities in entities)
             // {
-            //     listPool.Add(_serializer.Clone(entity)); 
+            //     listPool.Add(_serializer.Clone(entities)); 
             // }
             // 
             // using (await _dataBaseLock.Wait(id))
@@ -1408,7 +1895,7 @@ namespace Fantasy.Database
             //         }
             //         catch (Exception e)
             //         {
-            //             Log.Error($"Save List ToParentIs Error: {clone.GetType().Name} {clone}\n{e}");
+            //             Log.Error($"Save Archetypes ToParentIs Error: {clone.GetType().Name} {clone}\n{e}");
             //         }
             //     }
             //     await _connection.CloseAsync();
@@ -1421,121 +1908,106 @@ namespace Fantasy.Database
         #region Insert
 
         /// <summary>
-        /// 插入单个实体对象到数据库（加锁）。
+        /// 插入单个实体对象到数据库。
+        /// 插入操作仅支持使用EFCore, 不支持Dapper。 
         /// </summary>
         /// <typeparam name="T">实体类型。</typeparam>
         /// <param name="entity">要插入的实体对象。</param>
         /// <param name="table">表名称。</param>
-        public async FTask Insert<T>(T? entity, string table = null) where T : Entity, new()
+        /// <param name="transaction">事务,因为仅支持EFCore,会自动跟踪事务,不需要显式传入。</param>
+        public async FTask Insert<T>(T? entity, string table = null,object? transaction = null) where T : Entity, new()
         {
             if (entity == null)
+            {
+                throw new($" Null parent {entity.Id} can not Insert.");
+            }
+
+            if (!TypeDbSetChecker<T>.IsDbSet() || TypeDbSetChecker<T>.IsEmbedded())
+            {
+                Log.Warning($"Can not Insert {entity.Id} due to type \"{typeof(T)}\" is not with [DbSet] or is set as Embedded. It`s been ignoured.");
                 return;
+            }
+
             try
             {
                 Set<T>().Add(entity);
-                Log.Debug("当前试图存储类型:" + entity.Type.Name);
-                if (entity is IDbSetRef)
-                {
-                    var parent = entity.Parent;
-                    Log.Debug("父级DbSet所存类型:" + parent.Type.Name);
+                var parent = entity.Parent;
 
-                    //设置联合索引
-                    Entry(entity).Property(DbSetProperty.RefType).CurrentValue = TypeHashCache.GetHashCode(parent.Type);
-                    Entry(entity).Property(DbSetProperty.RefId).CurrentValue = parent.Id;
+                //更新影子属性的值
+                Entry(entity).Property<long>(DbSetProperty.ParentType).CurrentValue = parent.TypeHashCode;
+                Entry(entity).Property<long>(DbSetProperty.ParentId).CurrentValue = parent.Id;
+                //Entry(entity).Property<EntityList<Entity>>(DbSetProperty.JsonSingle).CurrentValue = 1;
+                //Entry(entity).Property<EntityList<Entity>>(DbSetProperty.JsonMulti).CurrentValue = 1;
+                //Entry(entity).Property<byte[]>(DbSetProperty.BytesSingle).CurrentValue = 1;
+                //Entry(entity).Property<byte[]>(DbSetProperty.BytesMulti).CurrentValue = 1;
 
-                    //TODO 判断父级是否是受到 IDbSetRef 关系型约束的类型, 如果在约束之外, 那么意味着关系引用退化成了纯引用(思考这里要不要用桥接表)
-
-                    //根据Parent类型更新所有影子外键的值
-                    //FrozenDictionary<long, string>? FK = TypeDbSetChecker<T>.ForeignKeyByTypeHash;
-                    //if(FK!=null)
-                    //{
-                    //    long parentTypeHash = TypeHashCache.GetHashCode(parent.Type);
-                    //    foreach (var fk in FK)
-                    //    {
-                    //        //if (fk.Key == parentTypeHash)
-                    //            Entry(entity).Property(fk.Value).CurrentValue = parent.Id;
-                    //        //else 
-                    //        //    Entry(entity).Property(fk.Value).CurrentValue = null; //非Parent的影子外键直接设为null
-                    //    }
-                    //}
-                }
                 var count = await SaveChangesAsync();
             }
             catch (Exception ex) { 
-                Log.Error($"{pg.GetDatabaseType} Insert-Err ({entity.Type}:{entity.Id}) !\n {ex} ",ErrType.CriticalEmergency);
+                throw new($"{pg.GetDatabaseType} Insert-Err ({entity.Type}:{entity.Id}) !\n {ex} ");
             }
         }
 
         /// <summary>
-        /// 批量插入实体对象列表到数据库（加锁）。
+        /// 批量插入实体对象列表到数据库。
+        /// 插入操作仅支持使用EFCore, 不支持Dapper。 
         /// </summary>
         /// <typeparam name="T">实体类型。</typeparam>
         /// <param name="list">要插入的实体对象列表。</param>
-        /// <param name="table">表名称。</param>
-        public async FTask InsertBatch<T>(IEnumerable<T> list, string table = null) where T : Entity, new()
+        /// <param name="table">可选表名称。</param>
+        /// <param name="transaction">事务,因为仅支持EFCore,会自动跟踪事务,不需要显式传入。</param>
+        public async FTask InsertBatch<T>(IEnumerable<T> list, string table = null, object? transaction=null) where T : Entity, new()
         {
-            // var tableName = GetTableName<T>(table);
-            // 
-            // using (await _dataBaseLock.Wait(RandomHelper.RandInt64() % DefaultTaskSize))
-            // {
-            //     await _connection.OpenAsync();
-            //     using (var cmd = _connection.CreateCommand())
-            //     {
-            //         foreach (var entity in list)
-            //         {
-            //             var clone = _serializer.Clone(entity);
-            //             var columns = GetColumnsForEntity(clone);
-            //             var columnList = string.Join(", ", columns.Select(c => $"\"{c}\""));
-            //             var valueList = string.Join(", ", columns.Select(c => $"@{c}"));
-            //             
-            //             cmd.CommandText = $"INSERT INTO \"{tableName}\" ({columnList}) VALUES ({valueList})";
-            //             cmd.Parameters.Clear();
-            //             AddParametersForEntity(cmd, clone, columns);
-            //             
-            //             await cmd.ExecuteNonQueryAsync();
-            //         }
-            //         await _connection.CloseAsync();
-            //     }
-            // }
-            await FTask.CompletedTask;
-        }
+            if (list == null)
+                throw new ArgumentNullException(nameof(list), "InsertBatch: list1 can not be null.");
 
-        /// <summary>
-        /// 批量插入实体对象列表到数据库（加锁）。
-        /// </summary>
-        /// <typeparam name="T">实体类型。</typeparam>
-        /// <param name="transactionSession">事务会话对象。</param>
-        /// <param name="list">要插入的实体对象列表。</param>
-        /// <param name="table">表名称。</param>
-        public async FTask InsertBatch<T>(object transactionSession, IEnumerable<T> list, string table = null)
-            where T : Entity, new()
-        {
-            // var tableName = GetTableName<T>(table);
-            // 
-            // using (await _dataBaseLock.Wait(RandomHelper.RandInt64() % DefaultTaskSize))
-            // {
-            //     await _connection.OpenAsync();
-            //     using (var cmd = _connection.CreateCommand())
-            //     {
-            //         cmd.Transaction = (NpgsqlTransaction)transactionSession;
-            //         
-            //         foreach (var entity in list)
-            //         {
-            //             var clone = _serializer.Clone(entity);
-            //             var columns = GetColumnsForEntity(clone);
-            //             var columnList = string.Join(", ", columns.Select(c => $"\"{c}\""));
-            //             var valueList = string.Join(", ", columns.Select(c => $"@{c}"));
-            //             
-            //             cmd.CommandText = $"INSERT INTO \"{tableName}\" ({columnList}) VALUES ({valueList})";
-            //             cmd.Parameters.Clear();
-            //             AddParametersForEntity(cmd, clone, columns);
-            //             
-            //             await cmd.ExecuteNonQueryAsync();
-            //         }
-            //         await _connection.CloseAsync();
-            //     }
-            // }
-            await FTask.CompletedTask;
+            var validList = ReuseList<T>.Create();
+
+            foreach (var entity in list)
+            {
+                if (entity == null)
+                {
+                    Log.Error($"InsertBatch: Skipped null entity.");
+                    continue;
+                }
+
+                if (!TypeDbSetChecker<T>.IsDbSet() || TypeDbSetChecker<T>.IsEmbedded())
+                {
+                    Log.Warning($"InsertBatch: Skipped entity {entity.Id} due to type \"{typeof(T)}\" not a DbSet or marked as Embedded.");
+                    continue;
+                }
+
+                // 更新影子索引
+                var parent = entity.Parent;
+                if (parent != null)
+                {
+                    Entry(entity).Property(DbSetProperty.ParentType).CurrentValue = parent.TypeHashCode;
+                    Entry(entity).Property(DbSetProperty.ParentId).CurrentValue = parent.Id;
+                }
+
+                validList.Add(entity);
+            }
+
+            if (!validList.Any())
+            {
+                Log.Error("InsertBatch: No valid entities to insert.");
+                return;
+            }
+
+            try
+            {
+                await Set<T>().AddRangeAsync(validList);
+                var count = await SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                var ids = string.Join(", ", validList.Select(e => e.Id));
+                throw new Exception($"{pg.GetDatabaseType} InsertBatch-Err ({typeof(T)} ids: {ids})!\n{ex}");
+            }
+            finally
+            {
+                validList.Dispose();
+            }
         }
 
         /// <summary>
@@ -1546,7 +2018,7 @@ namespace Fantasy.Database
         /// <typeparam name="T"></typeparam>
         public async Task Insert<T>(BsonDocument bsonDocument, long taskId) where T : Entity
         {
-            // var tableName = GetTableName<T>();
+            // var tableName = GetTableName<P>();
             // 
             // using (await _dataBaseLock.Wait(taskId))
             // {
@@ -1585,19 +2057,19 @@ namespace Fantasy.Database
         public async FTask<long> Remove<T>(object transactionSession, long id, string table = null)
             where T : Entity, new()
         {
-            // var tableName = GetTableName<T>(table);
+            // var tableName = GetTableName<P>(table);
             // 
             // using (await _dataBaseLock.Wait(id))
             // {
             //     await _connection.OpenAsync();
             //     using (var cmd = _connection.CreateCommand())
             //     {
-            //         cmd.Transaction = (NpgsqlTransaction)transactionSession;
+            //         cmd.Transaction = (NpgsqlTransaction)transaction;
             //         cmd.CommandText = $"DELETE FROM \"{tableName}\" WHERE \"Id\" = @Id";
             //         cmd.Parameters.AddWithValue("Id", id);
-            //         var result = await cmd.ExecuteNonQueryAsync();
+            //         var entities = await cmd.ExecuteNonQueryAsync();
             //         await _connection.CloseAsync();
-            //         return result;
+            //         return entities;
             //     }
             // }
             await FTask.CompletedTask;
@@ -1613,7 +2085,7 @@ namespace Fantasy.Database
         /// <returns>删除的实体数量。</returns>
         public async FTask<long> Remove<T>(long id, string table = null) where T : Entity, new()
         {
-            // var tableName = GetTableName<T>(table);
+            // var tableName = GetTableName<P>(table);
             // 
             // using (await _dataBaseLock.Wait(id))
             // {
@@ -1622,9 +2094,9 @@ namespace Fantasy.Database
             //     {
             //         cmd.CommandText = $"DELETE FROM \"{tableName}\" WHERE \"Id\" = @Id";
             //         cmd.Parameters.AddWithValue("Id", id);
-            //         var result = await cmd.ExecuteNonQueryAsync();
+            //         var entities = await cmd.ExecuteNonQueryAsync();
             //         await _connection.CloseAsync();
-            //         return result;
+            //         return entities;
             //     }
             // }
             await FTask.CompletedTask;
@@ -1643,19 +2115,19 @@ namespace Fantasy.Database
         public async FTask<long> Remove<T>(long coroutineLockQueueKey, object transactionSession,
             Expression<Func<T, bool>> filter, string table = null) where T : Entity, new()
         {
-            // var tableName = GetTableName<T>(table);
-            // var whereClause = GetWhereClause(filter);
+            // var tableName = GetTableName<P>(table);
+            // var whereClause = GetWhereClause(kind);
             // 
             // using (await _dataBaseLock.Wait(coroutineLockQueueKey))
             // {
             //     await _connection.OpenAsync();
             //     using (var cmd = _connection.CreateCommand())
             //     {
-            //         cmd.Transaction = (NpgsqlTransaction)transactionSession;
+            //         cmd.Transaction = (NpgsqlTransaction)transaction;
             //         cmd.CommandText = $"DELETE FROM \"{tableName}\" WHERE {whereClause}";
-            //         var result = await cmd.ExecuteNonQueryAsync();
+            //         var entities = await cmd.ExecuteNonQueryAsync();
             //         await _connection.CloseAsync();
-            //         return result;
+            //         return entities;
             //     }
             // }
             await FTask.CompletedTask;
@@ -1673,8 +2145,8 @@ namespace Fantasy.Database
         public async FTask<long> Remove<T>(long coroutineLockQueueKey, Expression<Func<T, bool>> filter,
             string table = null) where T : Entity, new()
         {
-            // var tableName = GetTableName<T>(table);
-            // var whereClause = GetWhereClause(filter);
+            // var tableName = GetTableName<P>(table);
+            // var whereClause = GetWhereClause(kind);
             // 
             // using (await _dataBaseLock.Wait(coroutineLockQueueKey))
             // {
@@ -1682,9 +2154,9 @@ namespace Fantasy.Database
             //     using (var cmd = _connection.CreateCommand())
             //     {
             //         cmd.CommandText = $"DELETE FROM \"{tableName}\" WHERE {whereClause}";
-            //         var result = await cmd.ExecuteNonQueryAsync();
+            //         var entities = await cmd.ExecuteNonQueryAsync();
             //         await _connection.CloseAsync();
-            //         return result;
+            //         return entities;
             //     }
             // }
             await FTask.CompletedTask;
@@ -1706,10 +2178,10 @@ namespace Fantasy.Database
         /// <returns>满足条件的行中指定字段的求和结果。</returns>
         public async FTask<long> Sum<T>(Expression<Func<T, bool>> filter, Expression<Func<T, object>> sumExpression, string? table = null) where T : Entity
         {
-            //var tableName = table ?? typeof(T).Name.ToLowerInvariant();
+            //var tableName = table ?? typeof(P).Name.ToLowerInvariant();
             //var columnName = GetColumnName(sumExpression);
 
-            //var (whereClause, parameters) = BuildSqlWhereClause(filter); //这里调用之后进行了复杂的构建
+            //var (whereClause, parameters) = BuildSqlWhereClause(kind); //这里调用之后进行了复杂的构建
 
             //await using var conn = await Handler.OpenConnectionAsync();
             //await using var cmd = conn.CreateCommand();
@@ -1719,8 +2191,8 @@ namespace Fantasy.Database
             //foreach (var param in parameters)
             //    cmd.Parameters.Add(param);
 
-            //var result = await cmd.ExecuteScalarAsync();
-            //return result != DBNull.Value ? Convert.ToInt64(result) : 0;
+            //var entities = await cmd.ExecuteScalarAsync();
+            //return entities != DBNull.Value ? Convert.ToInt64(entities) : 0;
             await FTask.CompletedTask;
             return 1;
         }
@@ -1768,9 +2240,9 @@ namespace Fantasy.Database
         /// </summary>
         private List<string> GetColumnsForEntity<T>(T entity) where T : Entity
         {
-            // var columns = new List<string>();
-            // var properties = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance);
-            // foreach (var property in properties)
+            // var columns = new Archetypes<string>();
+            // var parentProperties = typeof(P).GetProperties(BindingFlags.Public | BindingFlags.Instance);
+            // foreach (var property in parentProperties)
             // {
             //     columns.Add(property.Name);
             // }
@@ -1783,11 +2255,11 @@ namespace Fantasy.Database
         /// </summary>
         private List<object> GetValuesForEntity<T>(T entity) where T : Entity
         {
-            // var values = new List<object>();
-            // var properties = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance);
-            // foreach (var property in properties)
+            // var values = new Archetypes<object>();
+            // var parentProperties = typeof(P).GetProperties(BindingFlags.Public | BindingFlags.Instance);
+            // foreach (var property in parentProperties)
             // {
-            //     values.Add(property.GetValue(entity));
+            //     values.Add(property.GetValue(entities));
             // }
             // return values;
             return new List<object>();
@@ -1800,10 +2272,10 @@ namespace Fantasy.Database
         {
             // foreach (var column in columns)
             // {
-            //     var property = typeof(T).GetProperty(column);
+            //     var property = typeof(P).GetProperty(column);
             //     if (property != null)
             //     {
-            //         var value = property.GetValue(entity);
+            //         var value = property.GetValue(entities);
             //         cmd.Parameters.AddWithValue(column, value ?? DBNull.Value);
             //     }
             // }

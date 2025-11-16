@@ -80,7 +80,7 @@ namespace Fantasy.Network.Interface
                     scene = entity.Scene;
                 }
                 
-                Log.Error($"SceneConfigId:{session.Scene.SceneConfigId} ProcessConfigId:{scene.Process.Id} SceneType:{scene.SceneType} EntityId {tEntity.Id} : Error {e}");
+                Log.Error($"SceneConfigId:{session.Scene.SceneConfigId} ProcessConfigId:{scene.Process.Id} SceneType:{scene.SceneType} Key {tEntity.Id} : Error {e}");
             }
         }
 
@@ -163,7 +163,7 @@ namespace Fantasy.Network.Interface
                     scene = entity.Scene;
                 }
                 
-                Log.Error($"SceneConfigId:{session.Scene.SceneConfigId} ProcessConfigId:{scene.Process.Id} SceneType:{scene.SceneType} EntityId {tEntity.Id} : Error {e}");
+                Log.Error($"SceneConfigId:{session.Scene.SceneConfigId} ProcessConfigId:{scene.Process.Id} SceneType:{scene.SceneType} Key {tEntity.Id} : Error {e}");
                 response.ErrorCode = InnerErrorCode.ErrRpcFail;
             }
             finally
@@ -231,7 +231,7 @@ namespace Fantasy.Network.Interface
                     scene = entity.Scene;
                 }
                 
-                Log.Error($"SceneConfigId:{session.Scene.SceneConfigId} ProcessConfigId:{scene.Process.Id} SceneType:{scene.SceneType} EntityId {tEntity.Id} : Error {e}");
+                Log.Error($"SceneConfigId:{session.Scene.SceneConfigId} ProcessConfigId:{scene.Process.Id} SceneType:{scene.SceneType} Key {tEntity.Id} : Error {e}");
             }
             finally
             {
@@ -316,7 +316,7 @@ namespace Fantasy.Network.Interface
                     scene = entity.Scene;
                 }
                 
-                Log.Error($"SceneConfigId:{session.Scene.SceneConfigId} ProcessConfigId:{scene.Process.Id} SceneType:{scene.SceneType} EntityId {tEntity.Id} : Error {e}");
+                Log.Error($"SceneConfigId:{session.Scene.SceneConfigId} ProcessConfigId:{scene.Process.Id} SceneType:{scene.SceneType} Key {tEntity.Id} : Error {e}");
                 response.ErrorCode = InnerErrorCode.ErrRpcFail;
             }
             finally
@@ -383,7 +383,7 @@ namespace Fantasy.Network.Interface
                     scene = entity.Scene;
                 }
                 
-                Log.Error($"SceneConfigId:{session.Scene.SceneConfigId} ProcessConfigId:{scene.Process.Id} SceneType:{scene.SceneType} EntityId {tEntity.Id} : Error {e}");
+                Log.Error($"SceneConfigId:{session.Scene.SceneConfigId} ProcessConfigId:{scene.Process.Id} SceneType:{scene.SceneType} Key {tEntity.Id} : Error {e}");
             }
             finally
             {
@@ -468,7 +468,7 @@ namespace Fantasy.Network.Interface
                     scene = entity.Scene;
                 }
                 
-                Log.Error($"SceneConfigId:{session.Scene.SceneConfigId} ProcessConfigId:{scene.Process.Id} SceneType:{scene.SceneType} EntityId {tEntity.Id} : Error {e}");
+                Log.Error($"SceneConfigId:{session.Scene.SceneConfigId} ProcessConfigId:{scene.Process.Id} SceneType:{scene.SceneType} Key {tEntity.Id} : Error {e}");
                 response.ErrorCode = InnerErrorCode.ErrRpcFail;
             }
             finally

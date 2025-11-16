@@ -7,7 +7,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Fantasy
 {
-    [DbSet(Name = "FantasyDbSetExample", Relationship = ToParentIs.JustLinking, WithNamespace = true)]
+    [DbSet(Name = "FantasyDbSetExample", Relationship = ToParentIs.Child, WithNamespace = true)]
     public class ExampleRoot : Entity, IMultiAppended
     {
         public int TestIntField { get; set; }
@@ -25,15 +25,17 @@ namespace Fantasy
             var child01 = componentA.GetOrAddComponent<Child>();
             var child02 = componentA.GetOrAddComponent<Child>();
             var child03 = componentA.GetOrAddComponent<Child>();
+            var b2 = componentA.GetOrAddComponent<ComponentB>();
+            var c2 = componentA.GetOrAddComponent<ComponentC>();
 
-            child01.GetOrAddComponent<ComponentA>();
-            child02.GetOrAddComponent<ComponentB>();
+            var a2 = child01.GetOrAddComponent<ComponentA>();
+            var b3 = child02.GetOrAddComponent<ComponentB>();
 
             var componentC = child03.GetOrAddComponent<ComponentC>();
             var grandChild = componentC.GetOrAddComponent<Grandchild>();
-            grandChild.GetOrAddComponent<ComponentA>();
-            grandChild.GetOrAddComponent<ComponentB>();
-            grandChild.GetOrAddComponent<ComponentC>();
+            var a3 = grandChild.GetOrAddComponent<ComponentA>();
+            var b4 = grandChild.GetOrAddComponent<ComponentB>();
+            var c3 = grandChild.GetOrAddComponent<ComponentC>();
 
             Log.Debug("[FantasyDbSet] 测试: 实体树已构造,");
             Log.Debug("\r\n        ///     Root\r\n        ///     ├─ ComponentA\r\n        ///     │  ├─ Child01\r\n        ///     │  │  └─ ComponentA\r\n        ///     │  ├─ Child02\r\n        ///     │  │  └─ ComponentB\r\n        ///     │  └─ Child03\r\n        ///     │     └─ ComponentC\r\n        ///     │        └─ Grandchild\r\n        ///     │           ├─ ComponentA\r\n        ///     │           ├─ ComponentB\r\n        ///     │           └─ ComponentC\r\n        ///     └─ ComponentB");
@@ -57,28 +59,44 @@ namespace Fantasy
                             using var scope = pgSQL.Use(out PgSession? pgSession);
                             if (pgSession == null)
                                 throw new("Failed to use dbSession.");
-                            //var childEntityType = pgSession.Model.FindEntityType(typeof(ComponentB))!;
-                            //var fkProperty = childEntityType.FindProperty("ExampleRoot")!;
-                            //var parentEntityType = pgSession.Model.FindEntityType(typeof(ExampleRoot))!;
-                            //var principalKey = parentEntityType.FindPrimaryKey()!;
-                            //// 测试确认一下FK存在性
-                            //var fk = childEntityType.FindForeignKey(fkProperty, principalKey, parentEntityType);
-                            //Log.Debug(fk != null ? "测试确认一下FK存在性: ForeignKeyByParentHash exists in model" : "测试确认一下FK存在性: ForeignKeyByParentHash not found in model");
                         }
                         break;
                     }
                 case TestWhat.Insert:
                     {
-                        using var scope = db.Use(out IDbSession? dbSession);
+                        if (db is PostgreSQL pgSQL)
+                        {
+                            using var scope = pgSQL.Use(out PgSession? dbSession);
 
-                        if (dbSession == null)
-                            throw new("Failed to use dbSession.");
+                            if (dbSession == null)
+                                throw new("Failed to use dbSession.");
 
-                        await dbSession.Insert(this);
-                        await dbSession.Insert(componentA);
-                        await dbSession.Insert(componentB);
-                        await dbSession.Insert(componentC);
-
+                            //开启事务
+                            using var transaction = await dbSession.Database.BeginTransactionAsync();
+                            try
+                            {
+                                await dbSession.InsertBatch(this.ForEachMulti<Child>());
+                                await dbSession.Insert(this);
+                                await dbSession.Insert(componentA);
+                                await dbSession.Insert(componentB);
+                                await dbSession.Insert(componentC);
+                                await dbSession.Insert(grandChild);
+                                await dbSession.Insert(a2);
+                                await dbSession.Insert(a3);
+                                await dbSession.Insert(b2);
+                                await dbSession.Insert(b3);
+                                await dbSession.Insert(b4);
+                                await dbSession.Insert(c2);
+                                await dbSession.Insert(c3);
+                                //await dbSession.Insert(c3); //测试重复Id会不会报错
+                            }
+                            catch
+                            {
+                                // 回滚事务
+                                await transaction.RollbackAsync();
+                                throw;
+                            }
+                        }
                         break;
                     }
                 case TestWhat.Save:
@@ -88,7 +106,35 @@ namespace Fantasy
                     }
                 case TestWhat.Query:
                     {
+                        if(db is PostgreSQL pgSQL)
+                        {
+                            Log.Debug("--------------------PgSQL API测试开始--------------------");
+                            using var scope = pgSQL.Use(out PgSession? dbSession);
+                            if (dbSession == null)
+                                throw new("Failed to use dbSession.");
 
+                            var notExist = await dbSession.Query<ComponentC>(id: 10000); //测试失败查询
+
+                            if (notExist == null)
+                                Log.Info($"id:{10000} ComponentC 不存在.");
+                            else
+                                Log.Warning("测试失败查询异常.");
+
+                            var root = await dbSession.Query<ExampleRoot>(id: 465195535759048706); //成功查询                            
+                             Log.Info($"ExampleRoot :{root.Id} Scene:{root.Scene.SceneConfigId}.");
+
+                            var component_a =  (await dbSession.QueryAppend<ComponentA>(root)).FirstOrDefault(); //查询且附加
+                            Log.Info($"component_a :{component_a!.Id} 已查到, 且附加到了 ExampleRoot :{root.Id}");
+
+                            var children = await dbSession.QueryAppend<Child>(component_a!); //多子实体查询
+                            foreach (var child in children)
+                            {
+                                var result1 = await dbSession.QueryAppend<ComponentA, ComponentB>(child); //双重查询且附加
+                                Log.Info($"查到 child {child.Id} 有 {result1.Item1.Count()}个 ComponentA 和 {result1.Item2.Count()}个 ComponentB");
+                            }
+                            var result2 = await dbSession.QueryAppend<Child,ComponentB,ComponentC>(component_a!); //三重查询且附加
+                            Log.Debug("--------------------PgSQL API测试结束--------------------");
+                        }
                         break;
                     }
                 case TestWhat.QueryWithIndexes:

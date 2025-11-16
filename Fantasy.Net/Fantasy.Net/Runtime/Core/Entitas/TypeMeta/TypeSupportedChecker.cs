@@ -34,7 +34,7 @@ namespace Fantasy.Entitas.TypeMeta
         internal static TypeSupportedCache WarmUpOne(Type type) {
             TypeSupportedCache cache = new();
             cache.IsMulti = typeof(IMultiAppended).IsAssignableFrom(type);
-            cache.ShouldFollowSerialization = typeof(IFollowCRUD).IsAssignableFrom(type);
+            cache.ShouldFollowSerialization = typeof(IFollowSerialization).IsAssignableFrom(type);
 #if FANTASY_NET
             cache.IsTransfer = typeof(ISupportedTransfer).IsAssignableFrom(type);
 #endif
@@ -82,11 +82,11 @@ namespace Fantasy.Entitas.TypeMeta
         /// </value>
         public bool IsMulti { get; internal set; }
         /// <summary>
-        /// 获取实体类型是否标记了 <see cref="IFollowCRUD"/> 。
+        /// 获取实体类型是否标记了 <see cref="IFollowSerialization"/> 。
         /// 实现该接口的实体支持跟随父级序列化-反序列化。
         /// </summary>
         /// <value>
-        /// 如果实体类型标记了 <see cref="IFollowCRUD"/> ，则为 <c>true</c>；否则为 <c>false</c>。
+        /// 如果实体类型标记了 <see cref="IFollowSerialization"/> ，则为 <c>true</c>；否则为 <c>false</c>。
         /// </value>
         public bool ShouldFollowSerialization { get; internal set; }
 #if FANTASY_NET
@@ -116,11 +116,11 @@ namespace Fantasy.Entitas.TypeMeta
         /// </value>
         public static bool IsMulti => _info?.IsMulti ?? false;
         /// <summary>
-        /// 获取实体类型是否标记了 <see cref="IFollowCRUD"/> 。
+        /// 获取实体类型是否标记了 <see cref="IFollowSerialization"/> 。
         /// 实现该接口的实体支持跟随父级序列化-反序列化。
         /// </summary>
         /// <value>
-        /// 如果实体类型标记了 <see cref="IFollowCRUD"/> ，则为 <c>true</c>；否则为 <c>false</c>。
+        /// 如果实体类型标记了 <see cref="IFollowSerialization"/> ，则为 <c>true</c>；否则为 <c>false</c>。
         /// </value>
         public static bool ShouldFollowSerialization => _info?.ShouldFollowSerialization ?? false;
 #if FANTASY_NET
