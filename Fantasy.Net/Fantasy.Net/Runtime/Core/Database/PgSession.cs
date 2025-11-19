@@ -148,22 +148,22 @@ namespace Fantasy.Database
 
                     if(typeof(Entity).IsAssignableFrom(type))
                     {
-                        SerializerSettings serializerSettings = new SerializerSettings();
-                        serializerSettings.Library = Library.Microsoft;
-                        serializerSettings.IsIndented = false;
-                        serializerSettings.WriteType = true;
+                        JsonSettings JsonSettings = new JsonSettings();
+                        JsonSettings.Library = Library.Microsoft;
+                        JsonSettings.IsIndented = false;
+                        JsonSettings.WriteTypeWhenNecessary = true;
 
                         //承载Embedded实体的影子属性
                         entityBuilder.Property<EntityList<Entity>>(DbSetProperty.JsonSingle).HasColumnType("jsonb")
                             .HasConversion(
-                                           entityList => entityList.ToJson( serializerSettings, true),
-                                           jsonStr => jsonStr.Deserialize<EntityList<Entity>>(serializerSettings, true)
+                                           entityList => entityList.ToJson( JsonSettings, true),
+                                           jsonStr => jsonStr.Deserialize<EntityList<Entity>>(JsonSettings, true)
                                            )
                             .IsRequired(false);
                         entityBuilder.Property<EntityList<Entity>>(DbSetProperty.JsonMulti).HasColumnType("jsonb")
                             .HasConversion(
-                                           entityList => entityList.ToJson( serializerSettings, true),
-                                           jsonStr => jsonStr.Deserialize<EntityList<Entity>>(serializerSettings, true)
+                                           entityList => entityList.ToJson( JsonSettings, true),
+                                           jsonStr => jsonStr.Deserialize<EntityList<Entity>>(JsonSettings, true)
                                            )
                             .IsRequired(false);
                         entityBuilder.Property<byte[]>(DbSetProperty.BytesSingle).HasColumnType("bytea")
