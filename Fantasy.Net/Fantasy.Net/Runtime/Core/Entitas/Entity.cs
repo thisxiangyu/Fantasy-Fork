@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations.Schema;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
-using System.Text.Json.Serialization;
 using Fantasy.Entitas.Interface;
 using Fantasy.Entitas.TypeMeta;
 using Fantasy.IdFactory;
@@ -11,6 +9,10 @@ using Fantasy.Pool;
 using MongoDB.Bson.Serialization.Attributes;
 using Newtonsoft.Json;
 using ProtoBuf;
+#if FANTASY_NET
+using System.Text.Json.Serialization;
+using System.ComponentModel.DataAnnotations.Schema;
+#endif
 // ReSharper disable ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
 // ReSharper disable MergeIntoPattern
 // ReSharper disable SuspiciousTypeConversion.Global
@@ -50,14 +52,21 @@ namespace Fantasy.Entitas
         [BsonIgnore]
         [IgnoreDataMember]
         [ProtoIgnore]
+#if FANTASY_NET
         [NotMapped]
+        [Newtonsoft.Json.JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
+#endif
         public long RuntimeId { get; protected set; }
         /// <summary>
         /// 当前实体是否已经被销毁
         /// </summary>
         [BsonIgnore]
+#if FANTASY_NET
+        [NotMapped]
         [Newtonsoft.Json.JsonIgnore]
         [System.Text.Json.Serialization.JsonIgnore]
+#endif
         [IgnoreDataMember]
         [ProtoIgnore]
         public bool IsDisposed => RuntimeId == 0;
@@ -65,56 +74,71 @@ namespace Fantasy.Entitas
         /// 当前实体所归属的Scene
         /// </summary>
         [BsonIgnore]
+#if FANTASY_NET
+        [NotMapped]
         [Newtonsoft.Json.JsonIgnore]
         [System.Text.Json.Serialization.JsonIgnore]
+#endif
         [IgnoreDataMember]
         [ProtoIgnore]
-        [NotMapped]
         public Scene Scene { get; protected set; }
         /// <summary>
         /// 实体的父实体
         /// </summary>
         [BsonIgnore]
+#if FANTASY_NET
+        [NotMapped]
         [Newtonsoft.Json.JsonIgnore]
         [System.Text.Json.Serialization.JsonIgnore]
+#endif
         [IgnoreDataMember]
         [ProtoIgnore]
-        [NotMapped]
         public Entity Parent { get; protected set; }
         /// <summary>
         /// 实体的真实Type
         /// </summary>
         [BsonIgnore]
+#if FANTASY_NET
+        [NotMapped]
         [Newtonsoft.Json.JsonIgnore]
         [System.Text.Json.Serialization.JsonIgnore]
+#endif
         [IgnoreDataMember]
         [ProtoIgnore]
-        [NotMapped]
         public Type Type { get; protected set; }
         /// <summary>
         /// 实体的真实Type的编码
         /// </summary>
-        [BsonIgnore][IgnoreDataMember][ProtoIgnore] 
-        [NotMapped][JsonProperty("Type")][JsonInclude][JsonPropertyName("Type")]
+        [BsonIgnore][IgnoreDataMember][ProtoIgnore]
+#if FANTASY_NET
+        [NotMapped]
+        [Newtonsoft.Json.JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
+#endif
         public long TypeHashCode { get; private set; }
 #if FANTASY_NET
         [BsonElement("_s")] [BsonIgnoreIfNull] private EntityList<Entity> _singleDb;
         [BsonElement("_m")] [BsonIgnoreIfNull] private EntityList<Entity> _multiDb;
 #endif
         [BsonIgnore]
+        [IgnoreDataMember]
+        [ProtoIgnore]
+#if FANTASY_NET
+        [NotMapped]
         [Newtonsoft.Json.JsonIgnore]
         [System.Text.Json.Serialization.JsonIgnore]
-        [IgnoreDataMember] 
-        [ProtoIgnore]
-        [NotMapped] 
+#endif
         private EntitySortedDictionary<long, Entity> _single;
 
         [BsonIgnore]
+        [IgnoreDataMember]
+        [ProtoIgnore]
+#if FANTASY_NET
+        [NotMapped]
         [Newtonsoft.Json.JsonIgnore]
         [System.Text.Json.Serialization.JsonIgnore]
-        [IgnoreDataMember] 
-        [ProtoIgnore]
-        [NotMapped] private EntitySortedDictionary<long, Entity> _multi;
+#endif
+        private EntitySortedDictionary<long, Entity> _multi;
         
         /// <summary>
         /// 获得父Entity
@@ -876,11 +900,13 @@ namespace Fantasy.Entitas
         /// 查询当前实体下的实现了IMultiAppended接口的实体
         /// </summary>
         [BsonIgnore]
+#if FANTASY_NET
+        [NotMapped]
         [Newtonsoft.Json.JsonIgnore]
         [System.Text.Json.Serialization.JsonIgnore]
+#endif
         [IgnoreDataMember]
         [ProtoIgnore]
-        [NotMapped]
         public IEnumerable<Entity> ForEachAllMulti
         {
             get
@@ -916,11 +942,13 @@ namespace Fantasy.Entitas
         /// 查找当前实体下的所有子实体，不包括实现IMultiAppended接口的实体
         /// </summary>
         [BsonIgnore]
+#if FANTASY_NET
+        [NotMapped]
         [Newtonsoft.Json.JsonIgnore]
         [System.Text.Json.Serialization.JsonIgnore]
+#endif
         [IgnoreDataMember]
         [ProtoIgnore]
-        [NotMapped]
         public IEnumerable<Entity> ForEachAllSingle
         {
             get

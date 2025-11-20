@@ -79,8 +79,8 @@ namespace Fantasy.Network.Interface
                 {
                     scene = entity.Scene;
                 }
-                
-                Log.Error($"SceneConfigId:{session.Scene.SceneConfigId} ProcessConfigId:{scene.Process.Id} SceneType:{scene.SceneType} Key {tEntity.Id} : Error {e}");
+
+                Log.Error($"SceneConfigId:{session.Scene.SceneConfigId} ProcessConfigId:{scene.Process.Id} SceneType:{scene.SceneType} EntityId {tEntity.Id} : Error {e}");
             }
         }
 
@@ -131,10 +131,10 @@ namespace Fantasy.Network.Interface
                 Log.Error($"{this.GetType().Name} Route type conversion error: {entity.GetType().Name} to {typeof(TEntity).Name}");
                 return;
             }
-            
+
             var isReply = false;
             var response = new TRouteResponse();
-            
+
             void Reply()
             {
                 if (isReply)
@@ -151,7 +151,7 @@ namespace Fantasy.Network.Interface
 
                 session.Send(response, rpcId);
             }
-            
+
             try
             {
                 await Run(tEntity, tRouteRequest, response, Reply);
@@ -162,8 +162,8 @@ namespace Fantasy.Network.Interface
                 {
                     scene = entity.Scene;
                 }
-                
-                Log.Error($"SceneConfigId:{session.Scene.SceneConfigId} ProcessConfigId:{scene.Process.Id} SceneType:{scene.SceneType} Key {tEntity.Id} : Error {e}");
+
+                Log.Error($"SceneConfigId:{session.Scene.SceneConfigId} ProcessConfigId:{scene.Process.Id} SceneType:{scene.SceneType} EntityId {tEntity.Id} : Error {e}");
                 response.ErrorCode = InnerErrorCode.ErrRpcFail;
             }
             finally
@@ -230,8 +230,8 @@ namespace Fantasy.Network.Interface
                 {
                     scene = entity.Scene;
                 }
-                
-                Log.Error($"SceneConfigId:{session.Scene.SceneConfigId} ProcessConfigId:{scene.Process.Id} SceneType:{scene.SceneType} Key {tEntity.Id} : Error {e}");
+
+                Log.Error($"SceneConfigId:{session.Scene.SceneConfigId} ProcessConfigId:{scene.Process.Id} SceneType:{scene.SceneType} EntityId {tEntity.Id} : Error {e}");
             }
             finally
             {
@@ -284,10 +284,10 @@ namespace Fantasy.Network.Interface
                 Log.Error($"{this.GetType().Name} Route type conversion error: {entity.GetType().Name} to {typeof(TEntity).Name}");
                 return;
             }
-            
+
             var isReply = false;
             var response = new TRouteResponse();
-            
+
             void Reply()
             {
                 if (isReply)
@@ -304,7 +304,7 @@ namespace Fantasy.Network.Interface
 
                 session.Send(response, rpcId);
             }
-            
+
             try
             {
                 await Run(tEntity, tRouteRequest, response, Reply);
@@ -315,8 +315,8 @@ namespace Fantasy.Network.Interface
                 {
                     scene = entity.Scene;
                 }
-                
-                Log.Error($"SceneConfigId:{session.Scene.SceneConfigId} ProcessConfigId:{scene.Process.Id} SceneType:{scene.SceneType} Key {tEntity.Id} : Error {e}");
+
+                Log.Error($"SceneConfigId:{session.Scene.SceneConfigId} ProcessConfigId:{scene.Process.Id} SceneType:{scene.SceneType} EntityId {tEntity.Id} : Error {e}");
                 response.ErrorCode = InnerErrorCode.ErrRpcFail;
             }
             finally
@@ -334,7 +334,7 @@ namespace Fantasy.Network.Interface
         /// <param name="reply">回复操作。</param>
         protected abstract FTask Run(TEntity entity, TRouteRequest request, TRouteResponse response, Action reply);
     }
-    
+
     /// <summary>
     /// 泛型漫游路由基类，实现了 <see cref="IRouteMessageHandler"/> 接口，用于处理特定实体和漫游路由消息类型的路由。
     /// </summary>
@@ -382,8 +382,8 @@ namespace Fantasy.Network.Interface
                 {
                     scene = entity.Scene;
                 }
-                
-                Log.Error($"SceneConfigId:{session.Scene.SceneConfigId} ProcessConfigId:{scene.Process.Id} SceneType:{scene.SceneType} Key {tEntity.Id} : Error {e}");
+
+                Log.Error($"SceneConfigId:{session.Scene.SceneConfigId} ProcessConfigId:{scene.Process.Id} SceneType:{scene.SceneType} EntityId {tEntity.Id} : Error {e}");
             }
             finally
             {
@@ -436,10 +436,10 @@ namespace Fantasy.Network.Interface
                 Log.Error($"{this.GetType().Name} Route type conversion error: {entity.GetType().Name} to {typeof(TEntity).Name}");
                 return;
             }
-            
+
             var isReply = false;
             var response = new TRouteResponse();
-            
+
             void Reply()
             {
                 if (isReply)
@@ -456,7 +456,7 @@ namespace Fantasy.Network.Interface
 
                 session.Send(response, rpcId);
             }
-            
+
             try
             {
                 await Run(tEntity, tRouteRequest, response, Reply);
@@ -467,8 +467,8 @@ namespace Fantasy.Network.Interface
                 {
                     scene = entity.Scene;
                 }
-                
-                Log.Error($"SceneConfigId:{session.Scene.SceneConfigId} ProcessConfigId:{scene.Process.Id} SceneType:{scene.SceneType} Key {tEntity.Id} : Error {e}");
+
+                Log.Error($"SceneConfigId:{session.Scene.SceneConfigId} ProcessConfigId:{scene.Process.Id} SceneType:{scene.SceneType} EntityId {tEntity.Id} : Error {e}");
                 response.ErrorCode = InnerErrorCode.ErrRpcFail;
             }
             finally

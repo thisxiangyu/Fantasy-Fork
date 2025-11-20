@@ -90,7 +90,7 @@
 //                 ReceiveSocketAsync().Coroutine();
 //             });
 //             _thread.Start();
-//             Log.Info($"SceneConfigId = {Scene.SceneConfigId} networkTarget = {networkTarget.ToString()} KCPServer Listen {address}");
+//             Log._info($"SceneConfigId = {Scene.SceneConfigId} networkTarget = {networkTarget.ToString()} KCPServer Listen {address}");
 //         }
 //
 //         public override void Dispose()

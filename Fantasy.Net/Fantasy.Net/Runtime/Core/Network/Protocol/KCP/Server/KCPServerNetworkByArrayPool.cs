@@ -54,9 +54,9 @@
 //         private bool _allowWraparound = true;
 //         
 //         private readonly byte[] _sendBuff = new byte[5];
-//         private readonly Archetypes<uint> _pendingTimeOutTime = new Archetypes<uint>();
+//         private readonly List<uint> _pendingTimeOutTime = new List<uint>();
 //         private readonly HashSet<uint> _updateChannels = new HashSet<uint>();
-//         private readonly Archetypes<uint> _updateTimeOutTime = new Archetypes<uint>();
+//         private readonly List<uint> _updateTimeOutTime = new List<uint>();
 //         private readonly CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
 //         private readonly SortedOneToManyList<uint, uint> _updateTimer = new SortedOneToManyList<uint, uint>();
 //

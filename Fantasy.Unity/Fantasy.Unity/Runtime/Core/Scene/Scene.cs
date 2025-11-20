@@ -10,14 +10,13 @@ using Fantasy.Network.Interface;
 using Fantasy.Pool;
 using Fantasy.Scheduler;
 using Fantasy.Timer;
+
 #if FANTASY_NET
-using Fantasy.DataBase;
 using Fantasy.Platform.Net;
 // using Fantasy.SingleCollection;
 using System.Runtime.CompilerServices;
 using Fantasy.Network.Route;
 using Fantasy.Network.Roaming;
-using Fantasy.SeparateTable;
 using Fantasy.Sphere;
 #endif
 // ReSharper disable ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
@@ -140,10 +139,6 @@ namespace Fantasy
         internal MessageDispatcherComponent MessageDispatcherComponent { get; set; }
 #if FANTASY_NET
         /// <summary>
-        /// Scene下的Entity分表组件
-        /// </summary>
-        public SeparateTableComponent SeparateTableComponent { get; internal set; }
-        /// <summary>
         /// Scene下的内网消息发送组件
         /// </summary>
         public NetworkMessagingComponent NetworkMessagingComponent { get; internal set; }
@@ -181,7 +176,6 @@ namespace Fantasy
             MessageDispatcherComponent = await Create<MessageDispatcherComponent>(this, false, true).Initialize();
 #if FANTASY_NET
             NetworkMessagingComponent = Create<NetworkMessagingComponent>(this, false, true);
-            SeparateTableComponent = await Create<SeparateTableComponent>(this, false, true).Initialize();
             TerminusComponent = Create<TerminusComponent>(this, false, true);
             RoamingComponent = Create<RoamingComponent>(this, false, true).Initialize();
             SphereEventComponent = await Create<SphereEventComponent>(this, false, true).Initialize();
@@ -281,7 +275,6 @@ namespace Fantasy
             Process = null;
             SceneType = 0;
             SceneConfigId = 0;
-            SeparateTableComponent = null;
             NetworkMessagingComponent = null;
             TerminusComponent = null;
             RoamingComponent = null;

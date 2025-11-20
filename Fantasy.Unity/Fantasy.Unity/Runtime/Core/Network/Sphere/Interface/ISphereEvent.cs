@@ -1,6 +1,7 @@
 #if FANTASY_NET
 using Fantasy.Async;
 using Fantasy.Entitas.Interface;
+using Fantasy.Entitas.TypeMeta;
 // ReSharper disable CheckNamespace
 
 namespace Fantasy.Sphere;
@@ -44,7 +45,7 @@ public abstract class SphereEventSystem<T> : ISphereEvent where T : SphereEventA
 
     /// <summary>
     /// 自身类型的反射信息，用于错误日志输出
-    /// Reflection info of self type, used for error logging
+    /// Reflection _info of self type, used for error logging
     /// </summary>
     private readonly Type _selfType = typeof(T);
 

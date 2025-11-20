@@ -1,11 +1,20 @@
-global using MicrosoftJsonSerializer = System.Text.Json.JsonSerializer;
+#if FANTASY_NET
+using MicrosoftJsonSerializer = System.Text.Json.JsonSerializer;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
+#endif
+#if FANTASY_UNITY
+using UnityEngine;
+using Newtonsoft.Json.Linq;
+#endif
 using Fantasy.Assembly;
 using Fantasy.Entitas;
 using Newtonsoft.Json;
 using static Fantasy.Helper.JsonHelper;
+using System;
+using System.Collections.Generic;
+using System.Collections.Concurrent;
 #pragma warning disable CS8603
 
 namespace Fantasy.Helper
@@ -18,14 +27,18 @@ namespace Fantasy.Helper
         /// <summary>
         /// 表示库类型
         /// </summary>
+#if FANTASY_NET
         [System.Text.Json.Serialization.JsonPropertyName(MetaPropertyStr.L)]
+#endif
         [Newtonsoft.Json.JsonProperty(MetaPropertyStr.L)]
         public string? L { get; set; }
 
         /// <summary>
         /// 表示数据存放处
         /// </summary>
+#if FANTASY_NET
         [System.Text.Json.Serialization.JsonPropertyName(MetaPropertyStr.D)]
+#endif
         [Newtonsoft.Json.JsonProperty(MetaPropertyStr.D)]
         public T? Data { get; set; }
     }
@@ -38,17 +51,29 @@ namespace Fantasy.Helper
         /// <summary>
         /// 构造函数
         /// </summary>
-        public JsonSettings() { }
+        public JsonSettings(
+           Library library = Library.Newtonsoft,
+           bool isIndented = true,
+           bool writeTypeWhenNecessary = true,
+           bool noCycles = false,
+           bool noNull = true)
+        {
+            Library = library;
+            IsIndented = isIndented;
+            WriteTypeWhenNecessary = writeTypeWhenNecessary;
+            NoCycles = noCycles;
+            NoNull = noNull;
+        }
         /// <summary>
         /// 选择序列化库。
         /// </summary>
-        public Library Library = Library.Microsoft;
+        public Library Library;
         /// <summary>
-        /// 采用缩进格式, 默认开启。
+        /// 采用缩进格式。
         /// </summary>
-        public bool IsIndented = true;
+        public bool IsIndented;
         /// <summary>
-        /// 必要时把类型信息写到Json当中。默认开启。
+        /// 必要时把类型信息写到Json当中。
         /// <para>
         /// 当派生类实例以基类的形式序列化时会生效, 典型的情况是List序列化时保存了各种不同类型的实体，需要记录真实类型，才能正确反序列化。
         /// </para>
@@ -56,15 +81,15 @@ namespace Fantasy.Helper
         ///  ( 注: Newtonsoft库支持写出任意类型; Microsoft库开启这个后,框架仅默认支持派生自<see cref="Entity"/>的情况, 如需拓展自定义派生类型写出, 需自行实现微软的Json库多态配置, 框架不予额外支持。)
         /// </para>
         /// </summary>
-        public bool WriteTypeWhenNecessary = true;
+        public bool WriteTypeWhenNecessary;
         /// <summary>
-        /// 禁用循环引用。默认不禁用。
+        /// 禁用循环引用。
         /// </summary>
-        public bool NoCycles = false;
+        public bool NoCycles;
         /// <summary>
-        /// 关闭Null值写出, 默认为true。
+        /// 关闭Null值写出。
         /// </summary>
-        public bool NoNull = true;
+        public bool NoNull;
 
         // ... NOTE: 除了以上, 未来可拓展
     }
@@ -79,14 +104,22 @@ namespace Fantasy.Helper
         /// </summary>
         public enum Library
         {
+#if FANTASY_NET
             /// <summary>
-            /// .NET自带, 微软提供的Json库, 性能通常略占优势
+            /// .NET自带, 微软提供的Json库, 性能通常占优势
             /// </summary>
             Microsoft,
+#endif
+#if FANTASY_UNITY
+            /// <summary>
+            /// Unity提供的Json库。注意: 其在 <see cref="JsonSettings"/> 的功能支持非常有限。
+            /// </summary>
+            UnityJson,
+#endif
             /// <summary>
             /// 第三方开发者Newtonsoft提供的Json库  
             /// </summary>
-            Newtonsoft
+            Newtonsoft,
         }
 
         /// <summary>
@@ -98,6 +131,10 @@ namespace Fantasy.Helper
             /// 代表 微软
             /// </summary>
             public const string M = "M";
+            /// <summary>
+            /// 代表 Unity
+            /// </summary>
+            public const string U = "U";
             /// <summary>
             /// 代表 Newtonsoft
             /// </summary>
@@ -123,14 +160,19 @@ namespace Fantasy.Helper
             public const string T = "$T";
         }
 
-        #region 把JsonSettings分别映射到M和N两家的设置项
+        #region 把JsonSettings分别映射到提供方的设置项
 
         // ** 这里缓存采用 List 而不是 HashSet, 因为元素少的情况下遍历列表取值很快 **//
+#if FANTASY_NET
         private static readonly List<(JsonSettings, JsonSerializerOptions)> _serializerSettingsCache_M = new();
+#endif
         private static readonly List<(JsonSettings, JsonSerializerSettings)> _serializerSettingsCache_N = new();
 
+
         // ** 线程安全缓存 **//
+#if FANTASY_NET
         private static readonly List<(JsonSettings, JsonSerializerOptions)> _lockedCache_M = new();
+#endif
         private static readonly List<(JsonSettings, JsonSerializerSettings)> _lockedCache_N = new();
         private static readonly object _lock_M = new object();
         private static readonly object _lock_N = new object();
@@ -143,6 +185,7 @@ namespace Fantasy.Helper
         };
 
         // Microsoft序列化器默认设置 
+#if FANTASY_NET
         private readonly static JsonSerializerOptions _defaultOptions = new()
         {
             WriteIndented = true,
@@ -205,7 +248,7 @@ namespace Fantasy.Helper
 
             return opt;
         }
-
+#endif
         private static JsonSerializerSettings MakeNewtonsoftSettings(JsonSettings settings, bool threadSafe = false)
         {
             if (!threadSafe)
@@ -282,14 +325,29 @@ namespace Fantasy.Helper
 
             string json = string.Empty;
             var lib = settings.Value.Library;
-            wrapper.L = lib == Library.Microsoft ? Mark.M : Mark.N;
+            wrapper.L = lib switch
+            {
+#if FANTASY_NET
+                Library.Microsoft => Mark.M,
+#endif
+#if FANTASY_UNITY
+                Library.UnityJson => Mark.U,
+#endif
+                Library.Newtonsoft => Mark.N,
+                _ => throw new ArgumentOutOfRangeException(nameof(lib))
+            };
 
             switch (lib)
             {
+#if FANTASY_NET
                 case Library.Microsoft:
                     json = MicrosoftJsonSerializer.Serialize(wrapper, MakeMicrosoftOptions(settings.Value, isCacheThreadSafe));
                     break;
-
+#endif
+#if FANTASY_UNITY
+                case Library.UnityJson:
+                    json = JsonUtility.ToJson(wrapper); break;
+#endif
                 case Library.Newtonsoft:
                     json = JsonConvert.SerializeObject(wrapper, MakeNewtonsoftSettings(settings.Value, isCacheThreadSafe));
                     break;
@@ -300,6 +358,8 @@ namespace Fantasy.Helper
 
             return json;
         }
+
+        private static readonly ConcurrentDictionary<Type, Type> _wrapperCache = new();
 
         /// <summary>
         /// 反序列化 JSON 字符串为指定类型的对象。
@@ -312,7 +372,7 @@ namespace Fantasy.Helper
         public static object Deserialize(this string json, Type type, JsonSettings? settings = null, bool isCacheThreadSafe = false)
         {
             // 探测是不是 Wrapper 结构
-            settings ??= new JsonSettings();
+#if FANTASY_NET
             using JsonDocument document = JsonDocument.Parse(json);
             JsonElement root = document.RootElement;
             JsonElement LibMark_Element = default;
@@ -321,22 +381,58 @@ namespace Fantasy.Helper
             bool isWrapped = root.ValueKind == JsonValueKind.Object &&
                              root.TryGetProperty(MetaPropertyStr.L, out LibMark_Element) &&
                              root.TryGetProperty(MetaPropertyStr.D, out Data_Element);
+#endif
+#if FANTASY_UNITY
+            var root = JObject.Parse(json);
+            JToken libMarkElement = default;
+            JToken dataElement = default;
+            bool isWrapped =
+                root.Type == JTokenType.Object &&
+                root.TryGetValue(MetaPropertyStr.L, out libMarkElement) &&
+                root.TryGetValue(MetaPropertyStr.D, out dataElement);
 
+#endif
             if (isWrapped)
             {
+#if FANTASY_NET
                 string? libraryMark = LibMark_Element.GetString();
-                Type wrapperType = typeof(JsonWrapper<>).MakeGenericType(type); // 构造闭合泛型 Wrapper<T> 类型
+#endif
+#if FANTASY_UNITY
+                string libraryMark = libMarkElement.Value<string>();
+#endif
+                // 获取或构造闭合泛型 Wrapper<T> 类型
+                Type wrapperType = _wrapperCache.GetOrAdd(type, typeof(JsonWrapper<>).MakeGenericType(type));
 
                 switch (libraryMark)
                 {
                     case Mark.M:  //使用微软库
                         {
+#if FANTASY_NET
+                            settings ??= new JsonSettings();
                             JsonSerializerOptions options = MakeMicrosoftOptions(settings.Value, isCacheThreadSafe);
                             dynamic? wrapper = MicrosoftJsonSerializer.Deserialize(json, wrapperType, options);
                             return wrapper?.Data;
+#endif
+#if FANTASY_UNITY
+                            throw new("Fantasy.Unity can not deserialize a JSON serialized by Microsoft`s System.Text.Json, you shall use Fantasy.Net or check your json file`s library selection.");
+#endif
+                        }
+                    case Mark.U: //使用Unity库
+                        {
+#if FANTASY_NET
+                            throw new("Fantasy.Net can not deserialize a JSON serialized by Unity`s JsonUtility, you shall use Fantasy.Unity or check your json file`s library selection.");
+#endif
+#if FANTASY_UNITY
+                            if (settings != null)
+                                Log.Warning("You are trying to use advanced JsonSettings whitch may not be supported by Unity Json Utility.");
+                            
+                            dynamic? wrapper = JsonUtility.FromJson(json, wrapperType);
+                            return wrapper?.Data;
+#endif
                         }
                     case Mark.N:  //使用Newtonsoft库
                         {
+                            settings ??= new JsonSettings();
                             JsonSerializerSettings options = MakeNewtonsoftSettings(settings.Value, isCacheThreadSafe);
                             dynamic? wrapper = JsonConvert.DeserializeObject(json, wrapperType, options);
                             return wrapper?.Data;
@@ -346,6 +442,7 @@ namespace Fantasy.Helper
             }
             else  // --- 处理未包装的JSON  ---
             {
+                settings ??= new JsonSettings();
                 JsonSerializerSettings options = MakeNewtonsoftSettings(settings.Value, isCacheThreadSafe);
 
                 try
@@ -354,14 +451,19 @@ namespace Fantasy.Helper
                 }
                 catch (Exception ex)
                 {
-                    // 如果 Newtonsoft 失败，尝试改用 Microsoft
+                    // 如果 Newtonsoft 失败，改库尝试
                     try
                     {
+#if FANTASY_NET
                         return MicrosoftJsonSerializer.Deserialize(json, type, MakeMicrosoftOptions(settings.Value, isCacheThreadSafe));
+#endif
+#if FANTASY_UNITY
+                        return JsonUtility.FromJson(json, type);
+#endif
                     }
                     catch (Exception)
                     {
-                        // 两个都失败
+                        // 都失败
                         throw
                         new Exception($"Deserialize UnWrapped Type Failed for {type.Name}. Msg: \n {ex.Message}", ex);
                     }
@@ -393,7 +495,7 @@ namespace Fantasy.Helper
             return t.ToJson().Deserialize<T>();
         }
     }
-
+#if FANTASY_NET
     /// <summary>
     /// 打开实体多态鉴别配置器。这个类是针对采用微软的Json库的情况下序列化和反序列化的类型写入拓展，
     /// 用于将一个"<see langword="$T"/>"字段注入Json, 以记录基类的派生类的真实类型。
@@ -465,7 +567,7 @@ namespace Fantasy.Helper
     ///// Note : 目前的所有派生实体是通过<see cref="DefaultJsonTypeInfoResolver.GetTypeInfo"/>方法动态注册的。
     ///// 由于STJ的源生成器无法识别自行实现的 IIncrementalGenerator , 所以
     ///// 理论上要达到最高性能的Json序列化, 有可能需要模仿STJ的官方源生成模板, 来自行实现一套STJ源生成。
-    ///// 这个工作量浩大, 在NativeAOT场景下的确具备高收益, 但是目前没有时间来做, 只能以后再考虑了.
+    ///// 这个工作量浩大, 在AOT场景下的确具备高收益, 但是目前没有时间来做, 只能以后再考虑了.
     ///// 然而, 经过测试, 即便没有STJ源码优化, .NET的Json库也比Newtonsoft的要快。
     ///// </para>
     ///// </summary>
@@ -474,4 +576,5 @@ namespace Fantasy.Helper
     //{
     //    // 注: 这个类不用写任何逻辑, 因为STJ的源码生成器会自动生成 ...
     //}
+#endif
 }

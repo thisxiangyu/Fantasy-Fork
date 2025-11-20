@@ -4,6 +4,7 @@ using Fantasy.Async;
 using Fantasy.DataStructure.Collection;
 using Fantasy.Entitas;
 using Fantasy.Entitas.Interface;
+using Fantasy.Entitas.TypeMeta;
 using Fantasy.InnerMessage;
 using Fantasy.Network;
 // ReSharper disable CheckNamespace

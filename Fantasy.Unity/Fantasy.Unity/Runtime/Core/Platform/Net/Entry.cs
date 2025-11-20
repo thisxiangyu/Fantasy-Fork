@@ -18,13 +18,33 @@ namespace Fantasy.Platform.Net;
 public static class Entry
 {
     private static readonly List<Process> ProcessList = new List<Process>();
+
+    /// <summary>
+    /// 框架初始化回执
+    /// </summary>
+    public struct InitializationReceipt
+    {
+        /// <summary>
+        /// EFCore运行时
+        /// </summary>
+        public bool isEFCoreDesignTime = false;
+        /// <summary>
+        /// 构造函数
+        /// </summary>
+        public InitializationReceipt() {
+        
+        }
+    }
+
     /// <summary>
     /// 启动Fantasy.Net
     /// </summary>
     public static async FTask Start(ILog log = null)
     {
         // 初始化
-        await Initialize(log);
+        var receipt =  await Initialize(log);
+        if (receipt.isEFCoreDesignTime)
+            return;
         // 启动Process
         StartProcess().Coroutine();
         await FTask.CompletedTask;
@@ -64,7 +84,6 @@ public static class Entry
                         ProcessList.Add(process);
                     }
                 }
-                
                 return;
             }
             case ProcessMode.Release:
@@ -76,21 +95,44 @@ public static class Entry
                 }
                 return;
             }
-        }
+        }        
     }
-    
+
+    private static void LogFantasyVersion()
+    {
+        Log.Info($"\r\n" +
+        $"\r\n==========================================================================\r\n \r\n" +
+        $"  ███████╗ █████╗ ███╗   ██╗████████╗ █████╗  ██████╗ ██╗   ██╗\r\n" +
+        $"  ██╔════╝██╔══██╗████╗  ██║╚══██╔══╝██╔══██╗██╔════╝ ╚██╗ ██╔╝\r\n" +
+        $"  █████╗  ███████║██╔██╗ ██║   ██║   ███████║╚█████╗   ╚████╔╝ \r\n" +
+        $"  ██╔══╝  ██╔══██║██║╚██╗██║   ██║   ██╔══██║╚════██║   ╚██╔╝  \r\n" +
+        $"  ██║     ██║  ██║██║ ╚████║   ██║   ██║  ██║██████╔╝    ██║   \r\n" +
+        $"  ╚═╝     ╚═╝  ╚═╝╚═╝  ╚═══╝   ╚═╝   ╚═╝  ╚═╝╚═════╝     ╚═╝   \r\n" +
+        $"                                                            \r\n" +
+        $"                                          Version : {ProgramDefine.VERSION}\r\n");
+
+    }
+
     /// <summary>
     /// 框架初始化
     /// </summary>
     /// <param name="log">日志实例</param>
     /// <returns></returns>
-    private static async FTask Initialize(ILog log = null)
+    private static async FTask<InitializationReceipt> Initialize(ILog log = null)
     {
+        InitializationReceipt receipt = new();
         // 初始化Log系统
         Log.Initialize(log);
-        Log.Info($"Fantasy Version:{ProgramDefine.VERSION}");
+        LogFantasyVersion();
         // 加载Fantasy.config配置文件
         await ConfigLoader.InitializeFromXml(Path.Combine(AppContext.BaseDirectory, "Fantasy.config"));
+        // 🔴 判断是否是 EF Core 设计时调用，是则直接返回( 防止一些DesignTime的命令, 比如生成数据库迁移 报错)
+        if (IsEFCoreDesignTime())
+        {
+            Log.Debug("EF Core Design Time，Skip command-line parsing and some initialization phrases.");
+            receipt.isEFCoreDesignTime = true;
+            return receipt;
+        }
         // 解析命令行参数
         Parser.Default.ParseArguments<CommandLineOptions>(Environment.GetCommandLineArgs())
             .WithNotParsed(error => throw new Exception("Command line format error!"))
@@ -117,6 +159,32 @@ public static class Entry
         await SerializerManager.Initialize();
         // 精度处理（只针对Windows下有作用、其他系统没有这个问题、一般也不会用Windows来做服务器的）
         WinPeriod.Initialize();
+        return receipt;
+    }
+
+    /// <summary>
+    /// 判断是否是 EF Core 设计时调用
+    /// </summary>
+    public static bool IsEFCoreDesignTime()
+    {
+        // 环境变量方式检测
+        if (Environment.GetEnvironmentVariable("EF_DESIGNTIME") == "1")
+            return true;
+
+        // 命令行参数中包含 EFCore 检测
+        var args = Environment.GetCommandLineArgs();
+        string joined = string.Join(' ', args).ToLowerInvariant();
+
+        // 常见标志：ef/migrations/database/update/design
+        if (joined.Contains("ef") ||
+            joined.Contains("migrations") ||
+            joined.Contains("design") ||
+            joined.Contains("database") ||
+            joined.Contains("--project") ||
+            joined.Contains("--startup-project"))
+            return true;
+
+        return false;
     }
 
     /// <summary>

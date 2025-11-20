@@ -40,7 +40,6 @@ namespace Fantasy
             MessageDispatcherComponent = rootScene.MessageDispatcherComponent;
 #if FANTASY_NET
             NetworkMessagingComponent = rootScene.NetworkMessagingComponent;
-            SeparateTableComponent = rootScene.SeparateTableComponent;
             RoamingComponent = rootScene.RoamingComponent;
             TerminusComponent = rootScene.TerminusComponent;
             SphereEventComponent = rootScene.SphereEventComponent;

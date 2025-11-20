@@ -5,6 +5,7 @@ using Fantasy.Async;
 using Fantasy.DataStructure.Collection;
 using Fantasy.Entitas;
 using Fantasy.Entitas.Interface;
+using Fantasy.Entitas.TypeMeta;
 
 // ReSharper disable ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
 #pragma warning disable CS8602 // Dereference of a possibly null reference.
@@ -74,10 +75,6 @@ namespace Fantasy.Assembly
         /// </summary>
         internal ICustomInterfaceRegistrar CustomInterfaceRegistrar { get; set; }
 #if FANTASY_NET
-        /// <summary>
-        /// 分表注册器
-        /// </summary>
-        internal ISeparateTableRegistrar SeparateTableRegistrar { get; set; }
         internal ISphereEventRegistrar SphereEventRegistrar { get; set; }
 #endif
         private readonly OneToManyList<long, Type> CustomInterfaces = new();
@@ -107,7 +104,6 @@ namespace Fantasy.Assembly
             MessageHandlerResolver = null;
             EntityTypeCollectionRegistrar = null;
 #if FANTASY_NET
-            SeparateTableRegistrar = null;
             SphereEventRegistrar = null;
 #endif
         }
@@ -127,7 +123,6 @@ namespace Fantasy.Assembly
         /// <param name="entitySystemRegistrar">实体系统注册器</param>
         /// <param name="messageHandlerResolver">消息分发器注册器</param>
         /// <param name="entityTypeCollectionRegistrar">实体类型集合注册器</param>
-        /// <param name="separateTableRegistrar">分表注册器</param>
         /// <param name="networkProtocolOpCodeResolver">网络协议 OpCode 解析器接口</param>
         /// <param name="networkProtocolResponseTypeResolver">网络协议 Response 解析器接口</param>
         /// <param name="sphereEventRegistrar">领域事件系统注册器</param>
@@ -140,7 +135,6 @@ namespace Fantasy.Assembly
             IEntitySystemRegistrar entitySystemRegistrar,
             IMessageHandlerResolver messageHandlerResolver,
             IEntityTypeCollectionRegistrar entityTypeCollectionRegistrar,
-            ISeparateTableRegistrar separateTableRegistrar,
             INetworkProtocolOpCodeResolver networkProtocolOpCodeResolver,
             INetworkProtocolResponseTypeResolver networkProtocolResponseTypeResolver,
             ISphereEventRegistrar sphereEventRegistrar,
@@ -155,7 +149,6 @@ namespace Fantasy.Assembly
                 EntitySystemRegistrar = entitySystemRegistrar,
                 MessageHandlerResolver = messageHandlerResolver,
                 EntityTypeCollectionRegistrar = entityTypeCollectionRegistrar,
-                SeparateTableRegistrar = separateTableRegistrar,
                 NetworkProtocolOpCodeResolver = networkProtocolOpCodeResolver,
                 NetworkProtocolResponseTypeResolver = networkProtocolResponseTypeResolver,
                 SphereEventRegistrar = sphereEventRegistrar,

@@ -161,10 +161,7 @@ namespace Fantasy
             }
             if (db is MongoDb mongo)
             {
-                //mongo.开始测试(限流锁测试.信号量锁住Id).Coroutine();
-                mongo.开始测试(限流锁测试.信号量锁).Coroutine();
-                mongo.开始测试(限流锁测试.随机数锁).Coroutine();
-                //mongo.开始信号量锁有效性测试().Coroutine();
+
             }
 
             if (db is PostgreSQL pgSQL)

@@ -1,99 +1,94 @@
-#if FANTASY_NET
+﻿#if FANTASY_NET
 using System.Linq.Expressions;
 using Fantasy.Async;
+using Fantasy.Database.Helper;
 using Fantasy.DataStructure.Collection;
 using Fantasy.Entitas;
-using Fantasy.Helper;
-using Fantasy.Serialize;
+using Microsoft.EntityFrameworkCore;
 using MongoDB.Bson;
 using MongoDB.Driver;
+
 #pragma warning disable CS8602 // Dereference of a possibly null reference.
 #pragma warning disable CS8603 // Possible null reference return.
 #pragma warning disable CS8625 // Cannot convert null literal to non-nullable reference type.
 #pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
 
-namespace Fantasy.DataBase
+namespace Fantasy.Database
 {
     /// <summary>
-    /// 使用 MongoDB 数据库的实现。
+    /// MongoDB的会话,适用于数据库基本CRUD操作
     /// </summary>
-    public sealed class MongoDataBase : IDataBase
+    public sealed partial class MongoSession : DbContext, IDbSession, IDisposable
     {
-        private const int DefaultTaskSize = 1024;
-        private Scene _scene;
-        private MongoClient _mongoClient;
-        private ISerialize _serializer;
-        private IMongoDatabase _mongoDatabase;
-        private CoroutineLock _dataBaseLock;
-        private readonly HashSet<string> _collections = new HashSet<string>();
+        private MongoDb mongo;
+
         /// <summary>
-        /// 获得当前数据的类型
+        /// 构造函数
         /// </summary>
-        public DataBaseType GetDataBaseType { get; } = DataBaseType.MongoDB;
+        ///<param name="mongo"></param>
+        public MongoSession(MongoDb mongo) {
+            this.mongo = mongo;
+        }
+
         /// <summary>
-        /// 获得对应数据的操作实例
+        /// 构造函数, 就这样继承就可以了 
         /// </summary>
-        public object GetDataBaseInstance => _mongoDatabase;
-        /// <summary>
-        /// 初始化 MongoDB 数据库连接并记录所有集合名。
-        /// </summary>
-        /// <param name="scene">场景对象。</param>
-        /// <param name="connectionString">数据库连接字符串。</param>
-        /// <param name="dbName">数据库名称。</param>
-        /// <returns>初始化后的数据库实例。</returns>
-        public IDataBase Initialize(Scene scene, string connectionString, string dbName)
+        /// <param name="options"></param>
+        public MongoSession(DbContextOptions options) : base(options)
         {
-            _scene = scene;
-            _mongoClient = DataBaseSetting.MongoDBCustomInitialize != null
-                ? DataBaseSetting.MongoDBCustomInitialize(new DataBaseCustomConfig()
+
+        }
+
+        /// <summary>
+        ///  " EntityTable" 映射模型构建阶段。
+        ///  在 DbContext 首次实例化的时候会自动检查是否建构过模型，如果检测到从未建构过，OnModelCreating 就会生效。  
+        /// </summary>
+        /// <param name="modelBuilder"></param>
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            DbSetMetadataHelper.ScanDbSetTypes((type, tableName, attr) => {
+                if (attr.IfSelectionContainsDbType(DatabaseType.MongoDB))
                 {
-                    Scene = scene, ConnectionString = connectionString, DBName = dbName
-                })
-                : new MongoClient(connectionString);
-            _mongoDatabase = _mongoClient.GetDatabase(dbName);
-            _dataBaseLock = scene.CoroutineLockComponent.Create(GetType().TypeHandle.Value.ToInt64());
-            // 记录所有集合名
-            _collections.UnionWith(_mongoDatabase.ListCollectionNames().ToList());
-            _serializer = SerializerManager.GetSerializer(FantasySerializerType.Bson);
-            return this;
-        }
-        
-        /// <summary>
-        /// 销毁释放资源。
-        /// </summary>
-        public void Dispose()
-        {
-            // 优先释放协程锁。
-            _dataBaseLock.Dispose();
-            // 清理资源。
-            _scene = null;
-            _serializer = null;
-            _mongoDatabase = null;
-            _dataBaseLock = null;
-            _collections.Clear();
-            _mongoClient.Dispose();
-        }
+                    Log.Debug($"MongoDb ORM-Model Registering entity: {type.FullName} -> table {tableName}");
+                    modelBuilder.Entity(type).ToTable(tableName);
+                }
+            });
 
-        #region Other
+            // 剔除属性导航
+            //modelBuilder.Model.GetEntityTypes()
+            //    .Where(t => !t.ClrType.GetCustomAttributes(typeof(TableAttribute), true).Any() &&
+            //                !t.ClrType.GetCustomAttributes(typeof(FantasyTableAttribute), true).Any())
+            //    .ToList()
+            //    .ForEachAllSingle(t => modelBuilder.Ignore(t.ClrType));
+
+            //foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+            //{
+            //    Log.Warning($"EFCore 全部注册的实体: {entityType.ClrType.FullName}");
+            //}
+
+            base.OnModelCreating(modelBuilder);
+        }
 
         /// <summary>
-        /// 对满足条件的文档中的某个数值字段进行求和操作。
+        /// 销毁
         /// </summary>
-        /// <typeparam name="T">实体类型。</typeparam>
-        /// <param name="filter">用于筛选文档的表达式。</param>
-        /// <param name="sumExpression">要对其进行求和的字段表达式。</param>
-        /// <param name="collection">集合名称，可选。如果未指定，将使用实体类型的名称。</param>
-        /// <returns>满足条件的文档中指定字段的求和结果。</returns>
-        public async FTask<long> Sum<T>(Expression<Func<T, bool>> filter, Expression<Func<T, object>> sumExpression, string collection = null) where T : Entity
+        public override void Dispose()
         {
-            var member = (MemberExpression)((UnaryExpression)sumExpression.Body).Operand;
-            var projection = new BsonDocument("_id", "null").Add("Result", new BsonDocument("$sum", $"${member.Member.Name}"));
-            var data = await GetCollection<T>(collection).Aggregate().Match(filter).Group(projection).FirstOrDefaultAsync();
-            return data == null ? 0 : Convert.ToInt64(data["Result"]);
+            mongo = null;
+            base.Dispose();
         }
 
-        #endregion
-
+        /// <summary>
+        /// 异步销毁
+        /// </summary>
+        /// <returns></returns>
+        public override async ValueTask DisposeAsync()
+        {
+            mongo = null;
+            await FTask.CompletedTask;
+            await base.DisposeAsync();
+        }
+          
         #region GetCollection
 
         /// <summary>
@@ -102,19 +97,19 @@ namespace Fantasy.DataBase
         /// <typeparam name="T">实体类型。</typeparam>
         /// <param name="collection">集合名称，可选。如果未指定，将使用实体类型的名称。</param>
         /// <returns>IMongoCollection 对象。</returns>
-        private IMongoCollection<T> GetCollection<T>(string collection = null)
+        public IMongoCollection<T> GetCollection<T>(string collection = null)
         {
-            return _mongoDatabase.GetCollection<T>(collection ?? typeof(T).Name);
+            return mongo.RawHandler.GetCollection<T>(collection ?? typeof(T).Name);
         }
 
         /// <summary>
-        /// 获取指定集合中的 MongoDB 文档的 IMongoCollection 对象，其中实体类型为 Entity。
+        /// 获取指定集合中的 MongoDB 文档的 IMongoCollection 对象，其中实体类型为 ToParentIs。
         /// </summary>
         /// <param name="name">集合名称。</param>
         /// <returns>IMongoCollection 对象。</returns>
-        private IMongoCollection<Entity> GetCollection(string name)
+        public IMongoCollection<Entity> GetCollection(string name)
         {
-            return _mongoDatabase.GetCollection<Entity>(name);
+            return mongo.RawHandler.GetCollection<Entity>(name);
         }
 
         #endregion
@@ -122,14 +117,25 @@ namespace Fantasy.DataBase
         #region Count
 
         /// <summary>
-        /// 统计指定集合中满足条件的文档数量。
+        /// 快速估算指定集合中的文档数量。(非准确值, 但是很快)
         /// </summary>
         /// <typeparam name="T">实体类型。</typeparam>
         /// <param name="collection">集合名称，可选。如果未指定，将使用实体类型的名称。</param>
-        /// <returns>满足条件的文档数量。</returns>
+        /// <returns>文档数量。</returns>
+        public async FTask<long> FastCount<T>(string collection = null) where T : Entity
+        {
+            return await GetCollection<T>(collection).EstimatedDocumentCountAsync();
+        }
+
+        /// <summary>
+        /// 统计指定集合中的实体文档数量。
+        /// </summary>
+        /// <typeparam name="T">实体类型。</typeparam>
+        /// <param name="collection">集合名称，可选。如果未指定，将使用实体类型的名称。</param>
+        /// <returns>实体文档数量。</returns>
         public async FTask<long> Count<T>(string collection = null) where T : Entity
         {
-            return await GetCollection<T>(collection).CountDocumentsAsync(d => true);
+            return await GetCollection<T>(collection).CountDocumentsAsync(Builders<T>.Filter.Empty);
         }
 
         /// <summary>
@@ -190,7 +196,7 @@ namespace Fantasy.DataBase
 
             if (isDeserialize && v != null)
             {
-                v.Deserialize(_scene);
+                v.Deserialize(mongo.Scene);
             }
 
             return v;
@@ -206,14 +212,14 @@ namespace Fantasy.DataBase
         /// <returns>查询到的文档。</returns>
         public async FTask<T> Query<T>(long id, bool isDeserialize = false, string collection = null) where T : Entity
         {
-            using (await _dataBaseLock.Wait(id))
+            using (await mongo.FlowLock.Wait(id))
             {
                 var cursor = await GetCollection<T>(collection).FindAsync(d => d.Id == id);
                 var v = await cursor.FirstOrDefaultAsync();
 
                 if (isDeserialize && v != null)
                 {
-                    v.Deserialize(_scene);
+                    v.Deserialize(mongo.Scene);
                 }
 
                 return v;
@@ -232,12 +238,9 @@ namespace Fantasy.DataBase
         /// <returns>满足条件的文档数量和日期列表。</returns>
         public async FTask<(int count, List<T> dates)> QueryCountAndDatesByPage<T>(Expression<Func<T, bool>> filter, int pageIndex, int pageSize, bool isDeserialize = false, string collection = null) where T : Entity
         {
-            using (await _dataBaseLock.Wait(RandomHelper.RandInt64() % DefaultTaskSize))
-            {
-                var count = await Count(filter);
-                var dates = await QueryByPage(filter, pageIndex, pageSize, isDeserialize, collection);
-                return ((int)count, dates);
-            }
+            var count = await Count(filter);
+            var dates = await QueryByPage(filter, pageIndex, pageSize, isDeserialize, collection);
+            return ((int)count, dates);
         }
 
         /// <summary>
@@ -253,7 +256,7 @@ namespace Fantasy.DataBase
         /// <returns>满足条件的文档数量和日期列表。</returns>
         public async FTask<(int count, List<T> dates)> QueryCountAndDatesByPage<T>(Expression<Func<T, bool>> filter, int pageIndex, int pageSize, string[] cols, bool isDeserialize = false, string collection = null) where T : Entity
         {
-            using (await _dataBaseLock.Wait(RandomHelper.RandInt64() % DefaultTaskSize))
+            using (await mongo.FlowLock.WaitIfTooMuch())
             {
                 var count = await Count(filter);
                 var dates = await QueryByPage(filter, pageIndex, pageSize, cols, isDeserialize, collection);
@@ -273,7 +276,7 @@ namespace Fantasy.DataBase
         /// <returns>满足条件的文档列表。</returns>
         public async FTask<List<T>> QueryByPage<T>(Expression<Func<T, bool>> filter, int pageIndex, int pageSize, bool isDeserialize = false, string collection = null) where T : Entity
         {
-            using (await _dataBaseLock.Wait(RandomHelper.RandInt64() % DefaultTaskSize))
+            using (await mongo.FlowLock.WaitIfTooMuch())
             {
                 var list = await GetCollection<T>(collection).Find(filter).Skip((pageIndex - 1) * pageSize)
                     .Limit(pageSize)
@@ -286,7 +289,7 @@ namespace Fantasy.DataBase
 
                 foreach (var entity in list)
                 {
-                    entity.Deserialize(_scene);
+                    entity.Deserialize(mongo.Scene);
                 }
 
                 return list;
@@ -306,7 +309,7 @@ namespace Fantasy.DataBase
         /// <returns>满足条件的文档列表。</returns>
         public async FTask<List<T>> QueryByPage<T>(Expression<Func<T, bool>> filter, int pageIndex, int pageSize, string[] cols, bool isDeserialize = false, string collection = null) where T : Entity
         {
-            using (await _dataBaseLock.Wait(RandomHelper.RandInt64() % DefaultTaskSize))
+            using (await mongo.FlowLock.WaitIfTooMuch())
             {
                 var projection = Builders<T>.Projection.Include("");
 
@@ -314,7 +317,7 @@ namespace Fantasy.DataBase
                 {
                     projection = projection.Include(col);
                 }
-                
+
                 var list = await GetCollection<T>(collection).Find(filter).Project<T>(projection)
                     .Skip((pageIndex - 1) * pageSize).Limit(pageSize).ToListAsync();
 
@@ -325,7 +328,7 @@ namespace Fantasy.DataBase
 
                 foreach (var entity in list)
                 {
-                    entity.Deserialize(_scene);
+                    entity.Deserialize(mongo.Scene);
                 }
 
                 return list;
@@ -346,10 +349,10 @@ namespace Fantasy.DataBase
         /// <returns>满足条件的文档列表。</returns>
         public async FTask<List<T>> QueryByPageOrderBy<T>(Expression<Func<T, bool>> filter, int pageIndex, int pageSize, Expression<Func<T, object>> orderByExpression, bool isAsc = true, bool isDeserialize = false, string collection = null) where T : Entity
         {
-            using (await _dataBaseLock.Wait(RandomHelper.RandInt64() % DefaultTaskSize))
+            using (await mongo.FlowLock.WaitIfTooMuch())
             {
                 List<T> list;
-                
+
                 if (isAsc)
                 {
                     list = await GetCollection<T>(collection).Find(filter).SortBy(orderByExpression).Skip((pageIndex - 1) * pageSize).Limit(pageSize).ToListAsync();
@@ -363,10 +366,10 @@ namespace Fantasy.DataBase
                 {
                     return list;
                 }
-                
+
                 foreach (var entity in list)
                 {
-                    entity.Deserialize(_scene);
+                    entity.Deserialize(mongo.Scene);
                 }
 
                 return list;
@@ -383,14 +386,14 @@ namespace Fantasy.DataBase
         /// <returns>满足条件的第一个文档，如果未找到则为 null。</returns>
         public async FTask<T?> First<T>(Expression<Func<T, bool>> filter, bool isDeserialize = false, string collection = null) where T : Entity
         {
-            using (await _dataBaseLock.Wait(RandomHelper.RandInt64() % DefaultTaskSize))
+            using (await mongo.FlowLock.WaitIfTooMuch())
             {
                 var cursor = await GetCollection<T>(collection).FindAsync(filter);
                 var t = await cursor.FirstOrDefaultAsync();
 
                 if (isDeserialize && t != null)
                 {
-                    t.Deserialize(_scene);
+                    t.Deserialize(mongo.Scene);
                 }
 
                 return t;
@@ -408,7 +411,7 @@ namespace Fantasy.DataBase
         /// <returns>满足条件的第一个文档。</returns>
         public async FTask<T> First<T>(string json, string[] cols, bool isDeserialize = false, string collection = null) where T : Entity
         {
-            using (await _dataBaseLock.Wait(RandomHelper.RandInt64() % DefaultTaskSize))
+            using (await mongo.FlowLock.WaitIfTooMuch())
             {
                 var projection = Builders<T>.Projection.Include("");
 
@@ -426,7 +429,7 @@ namespace Fantasy.DataBase
 
                 if (isDeserialize && t != null)
                 {
-                    t.Deserialize(_scene);
+                    t.Deserialize(mongo.Scene);
                 }
 
                 return t;
@@ -445,10 +448,10 @@ namespace Fantasy.DataBase
         /// <returns>满足条件的文档列表。</returns>
         public async FTask<List<T>> QueryOrderBy<T>(Expression<Func<T, bool>> filter, Expression<Func<T, object>> orderByExpression, bool isAsc = true, bool isDeserialize = false, string collection = null) where T : Entity
         {
-            using (await _dataBaseLock.Wait(RandomHelper.RandInt64() % DefaultTaskSize))
+            using (await mongo.FlowLock.WaitIfTooMuch())
             {
                 List<T> list;
-                
+
                 if (isAsc)
                 {
                     list = await GetCollection<T>(collection).Find(filter).SortBy(orderByExpression).ToListAsync();
@@ -462,10 +465,10 @@ namespace Fantasy.DataBase
                 {
                     return list;
                 }
-                
+
                 foreach (var entity in list)
                 {
-                    entity.Deserialize(_scene);
+                    entity.Deserialize(mongo.Scene);
                 }
 
                 return list;
@@ -482,21 +485,21 @@ namespace Fantasy.DataBase
         /// <returns>满足条件的文档列表。</returns>
         public async FTask<List<T>> Query<T>(Expression<Func<T, bool>> filter, bool isDeserialize = false, string collection = null) where T : Entity
         {
-            using (await _dataBaseLock.Wait(RandomHelper.RandInt64() % DefaultTaskSize))
+            using (await mongo.FlowLock.WaitIfTooMuch())
             {
                 var cursor = await GetCollection<T>(collection).FindAsync(filter);
                 var list = await cursor.ToListAsync();
-                
+
                 if (!isDeserialize || list is not { Count: > 0 })
                 {
                     return list;
                 }
-                
+
                 foreach (var entity in list)
                 {
-                    entity.Deserialize(_scene);
+                    entity.Deserialize(mongo.Scene);
                 }
-                
+
                 return list;
             }
         }
@@ -510,7 +513,7 @@ namespace Fantasy.DataBase
         /// <param name="isDeserialize">是否在查询后反序列化,执行反序列化后会自动将实体注册到框架系统中，并且能正常使用组件相关功能。</param>
         public async FTask Query(long id, List<string>? collectionNames, List<Entity> result, bool isDeserialize = false)
         {
-            using (await _dataBaseLock.Wait(id))
+            using (await mongo.FlowLock.Wait(id))
             {
                 if (collectionNames == null || collectionNames.Count == 0)
                 {
@@ -530,7 +533,7 @@ namespace Fantasy.DataBase
 
                     if (isDeserialize)
                     {
-                        e.Deserialize(_scene);
+                        e.Deserialize(mongo.Scene);
                     }
 
                     result.Add(e);
@@ -548,22 +551,22 @@ namespace Fantasy.DataBase
         /// <returns>满足条件的文档列表。</returns>
         public async FTask<List<T>> QueryJson<T>(string json, bool isDeserialize = false, string collection = null) where T : Entity
         {
-            using (await _dataBaseLock.Wait(RandomHelper.RandInt64() % DefaultTaskSize))
+            using (await mongo.FlowLock.WaitIfTooMuch())
             {
                 FilterDefinition<T> filterDefinition = new JsonFilterDefinition<T>(json);
                 var cursor = await GetCollection<T>(collection).FindAsync(filterDefinition);
                 var list = await cursor.ToListAsync();
-                
+
                 if (!isDeserialize || list is not { Count: > 0 })
                 {
                     return list;
                 }
-                
+
                 foreach (var entity in list)
                 {
-                    entity.Deserialize(_scene);
+                    entity.Deserialize(mongo.Scene);
                 }
-                
+
                 return list;
             }
         }
@@ -579,7 +582,7 @@ namespace Fantasy.DataBase
         /// <returns>满足条件的文档列表。</returns>
         public async FTask<List<T>> QueryJson<T>(string json, string[] cols, bool isDeserialize = false, string collection = null) where T : Entity
         {
-            using (await _dataBaseLock.Wait(RandomHelper.RandInt64() % DefaultTaskSize))
+            using (await mongo.FlowLock.WaitIfTooMuch())
             {
                 var projection = Builders<T>.Projection.Include("");
 
@@ -594,17 +597,17 @@ namespace Fantasy.DataBase
 
                 var cursor = await GetCollection<T>(collection).FindAsync(filterDefinition, options);
                 var list = await cursor.ToListAsync();
-                
+
                 if (!isDeserialize || list is not { Count: > 0 })
                 {
                     return list;
                 }
-                
+
                 foreach (var entity in list)
                 {
-                    entity.Deserialize(_scene);
+                    entity.Deserialize(mongo.Scene);
                 }
-                
+
                 return list;
             }
         }
@@ -620,22 +623,22 @@ namespace Fantasy.DataBase
         /// <returns>满足条件的文档列表。</returns>
         public async FTask<List<T>> QueryJson<T>(long taskId, string json, bool isDeserialize = false, string collection = null) where T : Entity
         {
-            using (await _dataBaseLock.Wait(taskId))
+            using (await mongo.FlowLock.Wait(taskId))
             {
                 FilterDefinition<T> filterDefinition = new JsonFilterDefinition<T>(json);
                 var cursor = await GetCollection<T>(collection).FindAsync(filterDefinition);
                 var list = await cursor.ToListAsync();
-                
+
                 if (!isDeserialize || list is not { Count: > 0 })
                 {
                     return list;
                 }
-                
+
                 foreach (var entity in list)
                 {
-                    entity.Deserialize(_scene);
+                    entity.Deserialize(mongo.Scene);
                 }
-                
+
                 return list;
             }
         }
@@ -651,7 +654,7 @@ namespace Fantasy.DataBase
         /// <returns>满足条件的文档列表。</returns>
         public async FTask<List<T>> Query<T>(Expression<Func<T, bool>> filter, string[] cols, bool isDeserialize = false, string collection = null) where T : Entity
         {
-            using (await _dataBaseLock.Wait(RandomHelper.RandInt64() % DefaultTaskSize))
+            using (await mongo.FlowLock.WaitIfTooMuch())
             {
                 var projection = Builders<T>.Projection.Include("_id");
 
@@ -661,17 +664,17 @@ namespace Fantasy.DataBase
                 }
 
                 var list = await GetCollection<T>(collection).Find(filter).Project<T>(projection).ToListAsync();
-                
+
                 if (!isDeserialize || list is not { Count: > 0 })
                 {
                     return list;
                 }
-                
+
                 foreach (var entity in list)
                 {
-                    entity.Deserialize(_scene);
+                    entity.Deserialize(mongo.Scene);
                 }
-                
+
                 return list;
             }
         }
@@ -687,7 +690,7 @@ namespace Fantasy.DataBase
         /// <returns></returns>
         public async FTask<List<T>> Query<T>(Expression<Func<T, bool>> filter, Expression<Func<T, object>>[] cols, bool isDeserialize = false, string collection = null) where T : Entity
         {
-            using (await _dataBaseLock.Wait(RandomHelper.RandInt64() % DefaultTaskSize))
+            using (await mongo.FlowLock.WaitIfTooMuch())
             {
                 var projection = Builders<T>.Projection.Include("_id");
 
@@ -710,7 +713,7 @@ namespace Fantasy.DataBase
 
                 foreach (var entity in list)
                 {
-                    entity.Deserialize(_scene);
+                    entity.Deserialize(mongo.Scene);
                 }
 
                 return list;
@@ -736,9 +739,9 @@ namespace Fantasy.DataBase
                 return;
             }
 
-            var clone = _serializer.Clone(entity);
+            var clone = mongo.Serializer.Clone(entity);
 
-            using (await _dataBaseLock.Wait(clone.Id))
+            using (await mongo.FlowLock.Wait(clone.Id))
             {
                 await GetCollection<T>(collection).ReplaceOneAsync(
                     (IClientSessionHandle)transactionSession, d => d.Id == clone.Id, clone,
@@ -761,9 +764,9 @@ namespace Fantasy.DataBase
                 return;
             }
 
-            var clone = _serializer.Clone(entity);
+            var clone = mongo.Serializer.Clone(entity);
 
-            using (await _dataBaseLock.Wait(clone.Id))
+            using (await mongo.FlowLock.Wait(clone.Id))
             {
                 await GetCollection<T>(collection).ReplaceOneAsync(d => d.Id == clone.Id, clone, new ReplaceOptions { IsUpsert = true });
             }
@@ -784,9 +787,9 @@ namespace Fantasy.DataBase
                 return;
             }
 
-            T clone = _serializer.Clone(entity);
+            T clone = mongo.Serializer.Clone(entity);
 
-            using (await _dataBaseLock.Wait(clone.Id))
+            using (await mongo.FlowLock.Wait(clone.Id))
             {
                 await GetCollection<T>(collection).ReplaceOneAsync<T>(filter, clone, new ReplaceOptions { IsUpsert = true });
             }
@@ -806,13 +809,13 @@ namespace Fantasy.DataBase
             }
 
             using var listPool = ListPool<Entity>.Create();
-            
+
             foreach (var entity in entities)
             {
-                listPool.Add(_serializer.Clone(entity)); 
+                listPool.Add(mongo.Serializer.Clone(entity));
             }
 
-            using (await _dataBaseLock.Wait(id))
+            using (await mongo.FlowLock.Wait(id))
             {
                 foreach (var clone in listPool)
                 {
@@ -822,7 +825,7 @@ namespace Fantasy.DataBase
                     }
                     catch (Exception e)
                     {
-                        Log.Error($"Save List Entity Error: {clone.GetType().Name} {clone}\n{e}");
+                        Log.Error($"Save Archetypes ToParentIs Error: {clone.GetType().Name} {clone}\n{e}");
                     }
                 }
             }
@@ -838,7 +841,8 @@ namespace Fantasy.DataBase
         /// <typeparam name="T">实体类型。</typeparam>
         /// <param name="entity">要插入的实体对象。</param>
         /// <param name="collection">集合名称。</param>
-        public async FTask Insert<T>(T? entity, string collection = null) where T : Entity, new()
+        /// <param name="transaction">事务。</param>
+        public async FTask Insert<T>(T? entity, string collection = null, object? transaction = null) where T : Entity, new()
         {
             if (entity == null)
             {
@@ -846,11 +850,14 @@ namespace Fantasy.DataBase
                 return;
             }
 
-            var clone = _serializer.Clone(entity);
-            
-            using (await _dataBaseLock.Wait(entity.Id))
+            var clone = mongo.Serializer.Clone(entity);
+
+            using (await mongo.FlowLock.Wait(entity.Id))
             {
-                await GetCollection<T>(collection).InsertOneAsync(clone);
+                if (transaction == null)
+                    await GetCollection<T>(collection).InsertOneAsync(clone);
+                else
+                    await GetCollection<T>(collection).InsertOneAsync((IClientSessionHandle)transaction, clone);
             }
         }
 
@@ -860,30 +867,18 @@ namespace Fantasy.DataBase
         /// <typeparam name="T">实体类型。</typeparam>
         /// <param name="list">要插入的实体对象列表。</param>
         /// <param name="collection">集合名称。</param>
-        public async FTask InsertBatch<T>(IEnumerable<T> list, string collection = null) where T : Entity, new()
+        /// <param name="transaction">事务。</param>
+        public async FTask InsertBatch<T>(IEnumerable<T> list, string collection = null, object? transaction = null) where T : Entity, new()
         {
-            using (await _dataBaseLock.Wait(RandomHelper.RandInt64() % DefaultTaskSize))
+            using (await mongo.FlowLock.WaitIfTooMuch())
             {
-                await GetCollection<T>(collection).InsertManyAsync(list);
+                if(transaction==null)
+                    await GetCollection<T>(collection).InsertManyAsync(list);
+                else
+                    await GetCollection<T>(collection).InsertManyAsync((IClientSessionHandle)transaction, list);
             }
         }
 
-        /// <summary>
-        /// 批量插入实体对象列表到数据库（加锁）。
-        /// </summary>
-        /// <typeparam name="T">实体类型。</typeparam>
-        /// <param name="transactionSession">事务会话对象。</param>
-        /// <param name="list">要插入的实体对象列表。</param>
-        /// <param name="collection">集合名称。</param>
-        public async FTask InsertBatch<T>(object transactionSession, IEnumerable<T> list, string collection = null)
-            where T : Entity, new()
-        {
-            using (await _dataBaseLock.Wait(RandomHelper.RandInt64() % DefaultTaskSize))
-            {
-                await GetCollection<T>(collection).InsertManyAsync((IClientSessionHandle)transactionSession, list);
-            }
-        }
-        
         /// <summary>
         /// 插入BsonDocument到数据库（加锁）。
         /// </summary>
@@ -892,7 +887,7 @@ namespace Fantasy.DataBase
         /// <typeparam name="T"></typeparam>
         public async Task Insert<T>(BsonDocument bsonDocument, long taskId) where T : Entity
         {
-            using (await _dataBaseLock.Wait(taskId))
+            using (await mongo.FlowLock.Wait(taskId))
             {
                 await GetCollection<BsonDocument>(typeof(T).Name).InsertOneAsync(bsonDocument);
             }
@@ -913,7 +908,7 @@ namespace Fantasy.DataBase
         public async FTask<long> Remove<T>(object transactionSession, long id, string collection = null)
             where T : Entity, new()
         {
-            using (await _dataBaseLock.Wait(id))
+            using (await mongo.FlowLock.Wait(id))
             {
                 var result = await GetCollection<T>(collection)
                     .DeleteOneAsync((IClientSessionHandle)transactionSession, d => d.Id == id);
@@ -930,7 +925,7 @@ namespace Fantasy.DataBase
         /// <returns>删除的实体数量。</returns>
         public async FTask<long> Remove<T>(long id, string collection = null) where T : Entity, new()
         {
-            using (await _dataBaseLock.Wait(id))
+            using (await mongo.FlowLock.Wait(id))
             {
                 var result = await GetCollection<T>(collection).DeleteOneAsync(d => d.Id == id);
                 return result.DeletedCount;
@@ -949,7 +944,7 @@ namespace Fantasy.DataBase
         public async FTask<long> Remove<T>(long coroutineLockQueueKey, object transactionSession,
             Expression<Func<T, bool>> filter, string collection = null) where T : Entity, new()
         {
-            using (await _dataBaseLock.Wait(coroutineLockQueueKey))
+            using (await mongo.FlowLock.Wait(coroutineLockQueueKey))
             {
                 var result = await GetCollection<T>(collection)
                     .DeleteManyAsync((IClientSessionHandle)transactionSession, filter);
@@ -968,111 +963,31 @@ namespace Fantasy.DataBase
         public async FTask<long> Remove<T>(long coroutineLockQueueKey, Expression<Func<T, bool>> filter,
             string collection = null) where T : Entity, new()
         {
-            using (await _dataBaseLock.Wait(coroutineLockQueueKey))
+            using (await mongo.FlowLock.Wait(coroutineLockQueueKey))
             {
                 var result = await GetCollection<T>(collection).DeleteManyAsync(filter);
                 return result.DeletedCount;
             }
         }
 
-        #endregion
+        #endregion       
 
-        #region Index
-
-        /// <summary>
-        /// 创建数据库索引（加锁）。
-        /// </summary>
-        /// <param name="collection"></param>
-        /// <param name="keys"></param>
-        /// <typeparam name="T"></typeparam>
-        /// <code>
-        /// 使用例子(可多个):
-        /// 1 : Builders.IndexKeys.Ascending(d=>d.Id)
-        /// 2 : Builders.IndexKeys.Descending(d=>d.Id).Ascending(d=>d.Name)
-        /// 3 : Builders.IndexKeys.Descending(d=>d.Id),Builders.IndexKeys.Descending(d=>d.Name)
-        /// </code>
-        public async FTask CreateIndex<T>(string collection, params object[]? keys) where T : Entity
-        {
-            if (keys == null || keys.Length <= 0)
-            {
-                return;
-            }
-
-            var indexModels = new List<CreateIndexModel<T>>();
-
-            foreach (object key in keys)
-            {
-                IndexKeysDefinition<T> indexKeysDefinition = (IndexKeysDefinition<T>)key;
-
-                indexModels.Add(new CreateIndexModel<T>(indexKeysDefinition));
-            }
-
-            await GetCollection<T>(collection).Indexes.CreateManyAsync(indexModels);
-        }
+        #region Utility
 
         /// <summary>
-        /// 创建数据库的索引（加锁）。
+        /// 对满足条件的文档中的某个数值字段进行求和操作。
         /// </summary>
         /// <typeparam name="T">实体类型。</typeparam>
-        /// <param name="keys">索引键定义。</param>
-        public async FTask CreateIndex<T>(params object[]? keys) where T : Entity
+        /// <param name="filter">用于筛选文档的表达式。</param>
+        /// <param name="sumExpression">要对其进行求和的字段表达式。</param>
+        /// <param name="collection">集合名称，可选。如果未指定，将使用实体类型的名称。</param>
+        /// <returns>满足条件的文档中指定字段的求和结果。</returns>
+        public async FTask<long> Sum<T>(Expression<Func<T, bool>> filter, Expression<Func<T, object>> sumExpression, string collection = null) where T : Entity
         {
-            if (keys == null)
-            {
-                return;
-            }
-
-            List<CreateIndexModel<T>> indexModels = new List<CreateIndexModel<T>>();
-
-            foreach (object key in keys)
-            {
-                IndexKeysDefinition<T> indexKeysDefinition = (IndexKeysDefinition<T>)key;
-
-                indexModels.Add(new CreateIndexModel<T>(indexKeysDefinition));
-            }
-
-            await GetCollection<T>().Indexes.CreateManyAsync(indexModels);
-        }
-
-        #endregion
-
-        #region CreateDB
-
-        /// <summary>
-        /// 创建数据库集合（如果不存在）。
-        /// </summary>
-        /// <typeparam name="T">实体类型。</typeparam>
-        public async FTask CreateDB<T>() where T : Entity
-        {
-            // 已经存在数据库表
-            string name = typeof(T).Name;
-
-            if (_collections.Contains(name))
-            {
-                return;
-            }
-
-            await _mongoDatabase.CreateCollectionAsync(name);
-
-            _collections.Add(name);
-        }
-
-        /// <summary>
-        /// 创建数据库集合（如果不存在）。
-        /// </summary>
-        /// <param name="type">实体类型。</param>
-        public async FTask CreateDB(Type type)
-        {
-            string name = type.Name;
-
-            if (_collections.Contains(name))
-            {
-                return;
-            }
-
-            await _mongoDatabase.CreateCollectionAsync(name);
-
-            _collections.Add(name);
+            var member = (MemberExpression)((UnaryExpression)sumExpression.Body).Operand;
+            var projection = new BsonDocument("_id", "null").Add("Result", new BsonDocument("$sum", $"${member.Member.Name}"));
+            var data = await GetCollection<T>(collection).Aggregate().Match(filter).Group(projection).FirstOrDefaultAsync();
+            return data == null ? 0 : Convert.ToInt64(data["Result"]);
         }
 
         #endregion

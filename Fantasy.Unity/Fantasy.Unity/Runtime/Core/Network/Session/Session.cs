@@ -32,7 +32,7 @@ namespace Fantasy.Network
     /// <summary>
     /// 网络会话的基类，用于管理网络通信。
     /// </summary>
-    public class Session : Entity, ISupportedMultiEntity
+    public class Session : Entity, IMultiAppended
     {
         private uint _rpcId;
         internal long LastReceiveTime;

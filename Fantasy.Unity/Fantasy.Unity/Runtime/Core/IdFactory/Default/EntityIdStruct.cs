@@ -13,7 +13,7 @@ namespace Fantasy.IdFactory
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     internal struct EntityIdStruct
     {
-        // EntityId:39 + 16 + 18 =  64
+        // Key:39 + 16 + 18 =  64
         // +-------------------+-----------------------------+------------------------------------+
         // |  time(30) 最大34年 | SceneId(16) 最多65535个Scene | sequence(18) 每秒每个进程能生产262143个
         // +-------------------+-----------------------------+------------------------------------+
