@@ -15,22 +15,39 @@
     <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
       <DefineConstants>TRACE;FANTASY_NET</DefineConstants>
     </PropertyGroup>
-
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.1">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
     <ItemGroup>
-      <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.1">
-        <PrivateAssets>all</PrivateAssets>
-        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      </PackageReference>
-    </ItemGroup>
-
-    <ItemGroup>
-        <ProjectReference Include="..\..\..\Fantasy.Net\Fantasy.Net\Fantasy.Net.csproj" />
-        <ProjectReference Include="..\..\..\Fantasy.Packages\Fantasy.ConfigTable\Net\Fantasy.ConfigTable.csproj" />
+        <ProjectReference Include="..\..\..\Fantasy.Packages\Fantasy.Net\Fantasy.Net.csproj" />
     </ItemGroup>
 
     <!-- Source Generator Reference -->
     <ItemGroup>
-      <ProjectReference Include="..\..\..\Fantasy.Net\Fantasy.SourceGenerator\Fantasy.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+      <ProjectReference Include="..\..\..\Fantasy.Packages\Fantasy.SourceGenerator\Fantasy.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    </ItemGroup>
+    <ItemGroup>
+      <AdditionalFiles Include="Fantasy.config">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </AdditionalFiles>
+      <None Update="NLog.config">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+      <None Update="NLog.xsd">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+      <None Update="Fantasy.xsd">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+    </ItemGroup>
+    <ItemGroup>
+      <PackageReference Include="NLog" Version="6.0.5" />
+    </ItemGroup>
+    <ItemGroup>
+      <Folder Include="Generate\NetworkProtocol\" />
     </ItemGroup>
 
 </Project>

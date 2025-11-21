@@ -1,8 +1,19 @@
+using Fantasy.Assembly;
 using Fantasy.Async;
 using Fantasy.Event;
 
 namespace Fantasy
 {
+    public interface IOnFantasyInitEventA : ICustomInterface
+    {
+        
+    }
+
+    public class ATest : IOnFantasyInitEventA
+    {
+        
+    }
+    
     public struct TestRefAssemblyEventA
     {
         

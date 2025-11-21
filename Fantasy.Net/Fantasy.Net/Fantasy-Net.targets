@@ -1,7 +1,0 @@
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-
-    <!-- 自动为引用 Fantasy.Net 的项目添加 FANTASY_NET 预编译符号 -->
-    <PropertyGroup>
-        <DefineConstants>$(DefineConstants);FANTASY_NET</DefineConstants>
-    </PropertyGroup>
-</Project>

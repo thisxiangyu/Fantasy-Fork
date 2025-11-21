@@ -1,11 +1,7 @@
+using System.Collections.Generic;
 using Fantasy;
 using Fantasy.Async;
-using Fantasy.Entitas;
-using Fantasy.Entitas.Interface;
-using Fantasy.InnerMessage;
 using Fantasy.Network;
-using Fantasy.Unity;
-using Fantasy.Unity.Download;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -38,6 +34,8 @@ public class NormalMessage : MonoBehaviour
     
     private async FTask StartAsync()
     {
+        var list = new List<int>();
+        list.Clear();
         // 1、初始化框架
         await Fantasy.Platform.Unity.Entry.Initialize();
         // 2、创建一个Scene，这个Scene代表一个客户端的场景，客户端的所有逻辑都可以写这里
@@ -89,7 +87,7 @@ public class NormalMessage : MonoBehaviour
         SendRPCMessageButton.interactable = true;
         PushMessageButton.interactable = true;
     }
-
+    
     private void OnConnectFail()
     {
         Log.Debug("OnConnectFail");
@@ -99,7 +97,7 @@ public class NormalMessage : MonoBehaviour
         SendRPCMessageButton.interactable = false;
         PushMessageButton.interactable = false;
     }
-
+    
     private void OnConnectDisconnect()
     {
         Log.Debug("OnConnectDisconnect");
@@ -115,6 +113,7 @@ public class NormalMessage : MonoBehaviour
 
     private void OnSendMessageButtonClick()
     {
+        Log.Debug($"OnSendMessageButtonClick");
         SendMessageButton.interactable = false;
         _session.C2G_TestMessage("Hello C2G_TestMessage");
         SendMessageButton.interactable = true;

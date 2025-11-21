@@ -8,20 +8,11 @@ using static Fantasy.ExampleRoot;
 
 namespace Fantasy;
 
-public interface ITest : ICustomInterface
+public sealed class SaveEntity : Entity
 {
-    
+
 }
 
-public abstract class ATest : ITest
-{
-    
-}
-
-public class MyTest : ATest
-{
-    
-}
 public sealed class SubSceneTestComponent : Entity
 {
     public override void Dispose()
@@ -50,21 +41,6 @@ public sealed class OnCreateSceneEvent : AsyncEventSystem<OnCreateScene>
     /// <returns>A task representing the asynchronous operation.</returns>
     protected override async FTask Handler(OnCreateScene self)
     {
-        // var epoch1970 = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).Ticks / 10000;
-        //
-        // {
-        //     var now = TimeHelper.Transition(new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc));
-        //     var epochThisYear = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc).Ticks / 10000 - epoch1970;
-        //     var time = (uint)((now - epochThisYear) / 1000);
-        //     Log.Debug($"time = {time} now = {now} epochThisYear = {epochThisYear}");
-        // }
-        //
-        // {
-        //     var now = TimeHelper.Transition(new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc));
-        //     var epochThisYear = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc).Ticks / 10000 - epoch1970;
-        //     var time = (uint)((now - epochThisYear) / 1000);
-        //     Log.Debug($"time = {time} now = {now} epochThisYear = {epochThisYear}");
-        // }
         var scene = self.Scene;
 
         await FTask.CompletedTask;
@@ -72,54 +48,30 @@ public sealed class OnCreateSceneEvent : AsyncEventSystem<OnCreateScene>
         switch (scene.SceneType)
         {
             case 6666:
-            {
-                var subSceneTestComponent = scene.AddComponent<SubSceneTestComponent>();
-                Log.Debug("增加了SubSceneTestComponent");
-                // scene.EntityComponent.CustomSystem(subSceneTestComponent, CustomSystemType.RunSystem);
-                break;
-            }
+                {
+                    break;
+                }
             case SceneType.Addressable:
-            {
-                // scene.AddComponent<AddressableManageComponent>(); 
-                _addressableSceneRunTimeId = scene.RuntimeId;
-                break;
-            }
+                {
+                    _addressableSceneRunTimeId = scene.RuntimeId;
+                    break;
+                }
             case SceneType.Map:
-            {
-                Log.Debug($"Map Scene  SceneRuntimeId:{scene.RuntimeId}");
-                break;
-            }
+                {
+                    Log.Debug($"Map Scene  SceneRuntimeId:{scene.RuntimeId}");
+                    break;
+                }
             case SceneType.Chat:
-            {
-                break;
-            }
+                {
+                    break;
+                }
             case SceneType.Gate:
-            {
-                // var tasks = new Archetypes<FTask>(2000);
-                // var session = scene.GetSession(_addressableSceneRunTimeId);
-                // var sceneNetworkMessagingComponent = scene.NetworkMessagingComponent;
-                // var g2ATestRequest = new G2A_TestRequest();
-                //
-                // async FTask Call()
-                // {
-                //     await sceneNetworkMessagingComponent.CallInnerRouteBySession(session,_addressableSceneRunTimeId,g2ATestRequest);
-                // }
-                //
-                // for (int i = 0; i < 100000000000; i++)
-                // {
-                //     tasks.Clear();
-                //     for (int j = 0; j < tasks.Capacity; ++j)
-                //     {
-                //         tasks.Add(Call());
-                //     }
-                //     await FTask.WaitAll(tasks);
-                // }
-                
+            {              
                 // 执行自定义系统
                 var testCustomSystemComponent = scene.AddComponent<TestCustomSystemComponent>();
                 // scene.EntityComponent.CustomSystem(testCustomSystemComponent, CustomSystemType.RunSystem);
                 // // 测试配置表
-                // var instanceList = UnitConfigData.Instance.Archetypes;
+                // var instanceList = UnitConfigData.Instance.List;
                 // var unitConfig = instanceList[0];
                 // Log.Debug(instanceList[0].Dic[1]);
                 break;
@@ -129,7 +81,7 @@ public sealed class OnCreateSceneEvent : AsyncEventSystem<OnCreateScene>
         //测试FantasyDbSet
         if (scene.SceneConfigId == 1001)
         {
-            var TestFantasyDbSetRoot =  scene.AddComponent<ExampleRoot>();
+            var TestFantasyDbSetRoot = scene.AddComponent<ExampleRoot>();
             await TestFantasyDbSetRoot.StartTest<PostgreSQL>(TestWhat.FastDeploy, dutyId: 0);
             //await TestFantasyDbSetRoot.StartTest<PostgreSQL>(TestWhat.Insert, dutyId: 0);
             //await TestFantasyDbSetRoot.StartTest<PostgreSQL>(TestWhat.Query, dutyId: 0);
@@ -137,6 +89,6 @@ public sealed class OnCreateSceneEvent : AsyncEventSystem<OnCreateScene>
             //TestFantasyDbSetRoot.StartTest<MongoDb>(TestWhat.FastDeploy, dutyId: 2).Coroutine();
             //TestFantasyDbSetRoot.StartTest<MongoDb>(TestWhat.Insert, dutyId: 2).Coroutine();
             //TestFantasyDbSetRoot.TestAPI<MongoDb>(2);
-        }       
+        }
     }
 }
