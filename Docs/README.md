@@ -35,6 +35,11 @@ Unity 客户端开发的完整指南。
     - 基础 Unity 启动流程
     - HybridCLR 热更新环境配置
     - 常见问题解答
+- ✅ [02-FantasyRuntime.md](02-Unity/02-FantasyRuntime.md) - FantasyRuntime 组件使用指南
+    - FantasyRuntime 组件模式详解
+    - Runtime 静态类模式详解
+    - 多实例管理
+    - 最佳实践
 
 ---
 
@@ -125,8 +130,8 @@ Unity 客户端开发的完整指南。
 #### 核心系统
 - ✅ [01-ECS.md](04-Advanced/CoreSystems/01-ECS.md) - Entity-Component-System 详解
 - ✅ [02-ISupportedMultiEntity.md](04-Advanced/CoreSystems/02-ISupportedMultiEntity.md) - 多实例组件详解
-- [ ] 03-ISupportedDataBase.md - 数据库持久化详解
-- [ ] 04-Scene.md - Scene 和 SubScene 使用
+- ✅ [03-Scene.md](04-Advanced/CoreSystems/03-Scene.md) - Scene 和 SubScene 使用
+- [ ] 04-ISupportedDataBase.md - 数据库持久化详解
 - [ ] 05-Lifecycle.md - Entity 生命周期和 System 系统
 
 #### 网络开发
@@ -277,10 +282,10 @@ Unity 客户端开发的完整指南。
 | **服务器端指南** | 8 | 0 | 8 | 100% ✅ |
 | **客户端指南** | 1 | 0 | 1 | 100% ✅ |
 | **网络通信基础** | 2 | 0 | 2 | 100% ✅ |
-| **进阶主题** | 2 | 30 | 32 | 6% 🚧 |
-| **总计** | **15** | **30** | **45** | **33%** |
+| **进阶主题** | 3 | 29 | 32 | 9% 🚧 |
+| **总计** | **16** | **29** | **45** | **36%** |
 
-**最后更新**: 2025-11-14
+**最后更新**: 2025-11-20
 
 ---
 
@@ -293,6 +298,13 @@ Unity 客户端开发的完整指南。
 ---
 
 ## 📝 更新日志
+
+### 2025-11-20
+- ✅ 新增 Scene 使用指南 (04-Advanced/CoreSystems/03-Scene.md)
+- ✅ 新增 FantasyRuntime 使用指南 (02-Unity/02-FantasyRuntime.md)
+- ✅ 重新编写网络协议导出工具  使用指南 (01-Server/08-NetworkProtocolExporter.md)
+- ✅ 包含服务端配置自动创建和客户端手动创建的区别
+- ✅ 更新文档进度统计
 
 ### 2025-11-14
 - ✅ 新增 ECS 系统详解文档 (04-Advanced/CoreSystems/01-ECS.md)

@@ -172,6 +172,8 @@ namespace Fantasy.SourceGenerator.Generators
             builder.AppendLine("#endif", false);
             builder.AppendLine(
                 "Fantasy.Assembly.ICustomInterfaceRegistrar? customInterfaceRegistrar = null;");
+            builder.AppendLine(
+                "Fantasy.Assembly.IPoolCreatorGenerator? poolCreatorGeneratorRegistrar = null;");
             builder.AppendLine();
             
             // 尝试创建各个注册器（如果存在）replaceAssemblyName
@@ -188,6 +190,7 @@ namespace Fantasy.SourceGenerator.Generators
             GenerateTryCreateRegistrar(builder, $"{replaceAssemblyName}_FantasyConfig", "fantasyConfigRegistrar");
             builder.AppendLine("#endif", false);
             GenerateTryCreateRegistrar(builder, $"{replaceAssemblyName}_CustomInterface", "customInterfaceRegistrar");
+            GenerateTryCreateRegistrar(builder, $"{replaceAssemblyName}_PoolCreatorGenerator", "poolCreatorGeneratorRegistrar");
             
             builder.AppendLine();
 
@@ -207,7 +210,8 @@ namespace Fantasy.SourceGenerator.Generators
             builder.AppendLine("responseTypeRegistrar,");
             builder.AppendLine("sphereEventRegistrar,");
             builder.AppendLine("customInterfaceRegistrar,");
-            builder.AppendLine("fantasyConfigRegistrar);");
+            builder.AppendLine("fantasyConfigRegistrar,");
+            builder.AppendLine("poolCreatorGeneratorRegistrar);");
             builder.Unindent();
             builder.AppendLine("#endif", false);
             builder.AppendLine("#if FANTASY_UNITY", false);
@@ -222,7 +226,8 @@ namespace Fantasy.SourceGenerator.Generators
             builder.AppendLine("entityTypeCollectionRegistrar,");
             builder.AppendLine("opCodeRegistrar,");
             builder.AppendLine("responseTypeRegistrar,");
-            builder.AppendLine("customInterfaceRegistrar);");
+            builder.AppendLine("customInterfaceRegistrar,");
+            builder.AppendLine("poolCreatorGeneratorRegistrar);");
             builder.Unindent();
             builder.AppendLine("#endif", false);
             builder.EndMethod();

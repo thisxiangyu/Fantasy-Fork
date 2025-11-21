@@ -1,4 +1,3 @@
-using Fantasy.Assembly;
 using Fantasy.Async;
 using Fantasy.Database;
 using Fantasy.Entitas;
@@ -48,23 +47,23 @@ public sealed class OnCreateSceneEvent : AsyncEventSystem<OnCreateScene>
         switch (scene.SceneType)
         {
             case 6666:
-                {
-                    break;
-                }
+            {
+                break;
+            }
             case SceneType.Addressable:
-                {
-                    _addressableSceneRunTimeId = scene.RuntimeId;
-                    break;
-                }
+            {
+                _addressableSceneRunTimeId = scene.RuntimeId;
+                break;
+            }
             case SceneType.Map:
-                {
-                    Log.Debug($"Map Scene  SceneRuntimeId:{scene.RuntimeId}");
-                    break;
-                }
+            {
+                Log.Debug($"Map Scene  SceneRuntimeId:{scene.RuntimeId}");
+                break;
+            }
             case SceneType.Chat:
-                {
-                    break;
-                }
+            {
+                break;
+            }
             case SceneType.Gate:
             {              
                 // 执行自定义系统
