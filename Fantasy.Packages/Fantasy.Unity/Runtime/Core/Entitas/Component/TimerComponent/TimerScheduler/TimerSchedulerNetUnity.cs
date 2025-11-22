@@ -127,7 +127,19 @@ namespace Fantasy.Timer
                 _minTime = tillTime;
             }
         }
-        
+
+        /// <summary>
+        /// 获取TimerAction
+        /// </summary>
+        /// <param name="timerId">timerId</param>
+        /// <returns></returns>
+        public TimerAction? GetTimer(long timerId)
+        {
+            if (_timerActions.TryGetValue(timerId, out TimerAction timerAction))
+                return timerAction;
+            return null;
+        }
+
         /// <summary>
         /// 异步等待指定时间。
         /// </summary>
