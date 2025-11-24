@@ -127,6 +127,8 @@ public static class Entry
         // 初始化Log系统
         Log.Initialize(log);
         LogFantasyVersion();
+        // 注册当前框架内部程序集到框架中
+        typeof(Entry).Assembly.EnsureLoaded();
         // 加载Fantasy.config配置文件
         await ConfigLoader.InitializeFromXml(Path.Combine(AppContext.BaseDirectory, "Fantasy.config"));
         // 🔴 判断是否是 EF Core 设计时调用，是则直接返回( 防止一些DesignTime的命令, 比如生成数据库迁移 报错)

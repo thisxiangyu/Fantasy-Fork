@@ -5,6 +5,7 @@ using System.Linq;
 using Fantasy.Assembly;
 using Fantasy.Async;
 using Fantasy.DataStructure.Collection;
+using Fantasy.DataStructure.Dictionary;
 using Fantasy.Entitas;
 using Fantasy.Entitas.Interface;
 using Fantasy.Entitas.TypeMeta;
@@ -12,6 +13,7 @@ using Fantasy.InnerMessage;
 using Fantasy.Network;
 // ReSharper disable CheckNamespace
 // ReSharper disable ForCanBeConvertedToForeach
+// ReSharper disable ConditionalAccessQualifierIsNonNullableAccordingToAPIContract
 #pragma warning disable CS8625 // Cannot convert null literal to non-nullable reference type.
 #pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
 namespace Fantasy.Sphere;
@@ -24,8 +26,6 @@ public sealed class SphereEventComponent : Entity, IAssemblyLifecycle
     private bool _isClosed;
     
     #region AssemblyManifest
-    
-    private readonly HashSet<long> _assemblyManifests = new();
     
     /// <summary>
     /// 初始化SphereEventComponent，将其注册到程序集系统中
@@ -49,15 +49,15 @@ public sealed class SphereEventComponent : Entity, IAssemblyLifecycle
     {
         var tcs = FTask.Create(false);
         var assemblyManifestId = assemblyManifest.AssemblyManifestId;
+        
         Scene?.ThreadSynchronizationContext.Post(() =>
         {
-            // 如果程序集已加载，先卸载旧的
-            if (_assemblyManifests.Contains(assemblyManifestId))
-            {
-                OnUnLoadInner(assemblyManifest);
-            }
-            assemblyManifest.SphereEventRegistrar.Register(_sphereEvents);
-            _assemblyManifests.Add(assemblyManifestId);
+            var sphereEventRegistrar = assemblyManifest.SphereEventRegistrar;
+            _sphereEventMerger.Add(
+                assemblyManifestId,
+                sphereEventRegistrar.TypeHashCodes(),
+                sphereEventRegistrar.SphereEvent());
+            _sphereEvents = _sphereEventMerger.GetFrozenDictionary();
             tcs.SetResult();
         });
         await tcs;
@@ -71,23 +71,15 @@ public sealed class SphereEventComponent : Entity, IAssemblyLifecycle
     public async FTask OnUnload(AssemblyManifest assemblyManifest)
     {
         var tcs = FTask.Create(false);
+        var assemblyManifestId = assemblyManifest.AssemblyManifestId;
+        
         Scene?.ThreadSynchronizationContext.Post(() =>
         {
-            OnUnLoadInner(assemblyManifest);
+            _sphereEventMerger.Remove(assemblyManifestId);
+            _sphereEvents = _sphereEventMerger.GetFrozenDictionary();
             tcs.SetResult();
         });
         await tcs;
-    }
-    
-    /// <summary>
-    /// 卸载程序集的内部实现
-    /// 会清理该程序集注册的所有系统
-    /// </summary>
-    /// <param name="assemblyManifest">程序集清单对象，包含程序集的元数据和注册器</param>
-    private void OnUnLoadInner(AssemblyManifest assemblyManifest)
-    {
-        assemblyManifest.SphereEventRegistrar.UnRegister(_sphereEvents);
-        _assemblyManifests.Remove(assemblyManifest.AssemblyManifestId);
     }
 
     #endregion
@@ -104,7 +96,8 @@ public sealed class SphereEventComponent : Entity, IAssemblyLifecycle
     /// <summary>
     /// 本地订阅的事件
     /// </summary>
-    private readonly OneToManyHashSet<long, Func<Scene, SphereEventArgs, FTask>> _sphereEvents = new();
+    private Int64FrozenDictionary<List<Func<Scene, SphereEventArgs, FTask>>> _sphereEvents;
+    private readonly Int64MergerFrozenOneToManyList<Func<Scene, SphereEventArgs, FTask>> _sphereEventMerger = new();
 
     /// <summary>
     /// 订阅远程服务器的Sphere事件
@@ -369,7 +362,7 @@ public sealed class SphereEventComponent : Entity, IAssemblyLifecycle
         {
             await Unsubscribe(address, typeHashCode, true);
         }
-        _sphereEvents.Clear();
+        _sphereEvents = null;
         _remoteSphereEventLock.Dispose();
         _remoteSphereEventLock = null;
         // Remote
