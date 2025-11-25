@@ -1,5 +1,5 @@
-﻿#if FANTASY_NET
-using System.ComponentModel.DataAnnotations.Schema;
+﻿
+using System;
 
 namespace Fantasy.Database.Attributes
 {
@@ -111,4 +111,3 @@ namespace Fantasy.Database.Attributes
         }
     }
 }
-#endif

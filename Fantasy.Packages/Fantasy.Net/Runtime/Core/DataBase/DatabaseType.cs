@@ -1,7 +1,8 @@
 // ReSharper disable CheckNamespace
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedMember.Global
-#if FANTASY_NET
+
+using System;
 
 namespace Fantasy.Database
 {
@@ -9,7 +10,7 @@ namespace Fantasy.Database
     /// 数据库类型（通过位与计算, 支持多选）
     /// </summary>
     [Flags]
-    public enum DatabaseType: byte
+    public enum DatabaseType : byte
     {
         /// <summary>
         /// 无
@@ -29,4 +30,3 @@ namespace Fantasy.Database
         MongoDB = 1 << 1,
     }
 }
-#endif
