@@ -161,6 +161,31 @@ namespace Fantasy.Entitas
         #region Create
 
         /// <summary>
+        /// 创建一个实体,默认在对象池创建,执行组件事件。
+        /// </summary>
+        /// <param name="scene">所属的Scene</param>
+        /// <param name="type">实体的Type</param>
+        /// <returns></returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Entity Create(Scene scene, Type type)
+        {
+            return Create(scene, type, scene.EntityIdFactory.Create, true, true);
+        }
+
+        /// <summary>
+        /// 创建一个实体,默认执行组件事件。
+        /// </summary>
+        /// <param name="scene">所属的Scene</param>
+        /// <param name="type">实体的Type</param>
+        /// <param name="isPool">是否从对象池创建，如果选择的是，销毁的时候同样会进入对象池</param>
+        /// <returns></returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Entity Create(Scene scene, Type type, bool isPool)
+        {
+            return Create(scene, type, scene.EntityIdFactory.Create, isPool, true);
+        }
+
+        /// <summary>
         /// 创建一个实体
         /// </summary>
         /// <param name="scene">所属的Scene</param>
@@ -168,6 +193,7 @@ namespace Fantasy.Entitas
         /// <param name="isPool">是否从对象池创建，如果选择的是，销毁的时候同样会进入对象池</param>
         /// <param name="isRunEvent">是否执行实体事件</param>
         /// <returns></returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Entity Create(Scene scene, Type type, bool isPool, bool isRunEvent)
         {
             return Create(scene, type, scene.EntityIdFactory.Create, isPool, isRunEvent);
@@ -182,6 +208,7 @@ namespace Fantasy.Entitas
         /// <param name="isPool">是否从对象池创建，如果选择的是，销毁的时候同样会进入对象池</param>
         /// <param name="isRunEvent">是否执行实体事件</param>
         /// <returns></returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Entity Create(Scene scene, Type type, long id, bool isPool, bool isRunEvent)
         {
             if (!typeof(Entity).IsAssignableFrom(type))
@@ -219,6 +246,31 @@ namespace Fantasy.Entitas
             
             return entity;
         }
+
+        /// <summary>
+        /// 创建一个实体,默认在对象池创建,执行组件事件。
+        /// </summary>
+        /// <param name="scene">所属的Scene</param>
+        /// <typeparam name="T">要创建的实体泛型类型</typeparam>
+        /// <returns></returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static T Create<T>(Scene scene) where T : Entity, new()
+        {
+            return Create<T>(scene, scene.EntityIdFactory.Create, true, true);
+        }
+
+        /// <summary>
+        /// 创建一个实体,默认执行组件事件。
+        /// </summary>
+        /// <param name="scene">所属的Scene</param>
+        /// <param name="isPool">是否从对象池创建，如果选择的是，销毁的时候同样会进入对象池</param>
+        /// <typeparam name="T">要创建的实体泛型类型</typeparam>
+        /// <returns></returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static T Create<T>(Scene scene, bool isPool) where T : Entity, new()
+        {
+            return Create<T>(scene, scene.EntityIdFactory.Create, isPool, true);
+        }
         
         /// <summary>
         /// 创建一个实体
@@ -228,6 +280,7 @@ namespace Fantasy.Entitas
         /// <param name="isRunEvent">是否执行实体事件</param>
         /// <typeparam name="T">要创建的实体泛型类型</typeparam>
         /// <returns></returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static T Create<T>(Scene scene, bool isPool, bool isRunEvent) where T : Entity, new()
         {
             return Create<T>(scene, scene.EntityIdFactory.Create, isPool, isRunEvent);
@@ -242,6 +295,7 @@ namespace Fantasy.Entitas
         /// <param name="isRunEvent">是否执行实体事件</param>
         /// <typeparam name="T">要创建的实体泛型类型</typeparam>
         /// <returns></returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static T Create<T>(Scene scene, long id, bool isPool, bool isRunEvent) where T : Entity, new()
         {
             var entity = isPool ? scene.EntityPool.Rent<T>() : new T();
