@@ -42,6 +42,7 @@ namespace Fantasy.GenericExample
         }
 
         Type typeAB = typeof(AGenericEntity<ENUMA, ENUMB>);
+        Type typeAB_Copy = typeof(AGenericEntity<ENUMA, ENUMB>);
         Type typeAC = typeof(AGenericEntity<ENUMA, ENUMC>);
 
         public static void GenricFunc<T>(TestEntity entity) where T : Enum
@@ -118,6 +119,7 @@ namespace Fantasy
                 case SceneType.Gate:
                     {
                         // 执行自定义系统
+                        var genericEntityTest = Entity.Create<TestEntity>(scene);
                         var testCustomSystemComponent = scene.AddComponent<TestCustomSystemComponent>();
                         // scene.EntityComponent.CustomSystem(testCustomSystemComponent, CustomSystemType.RunSystem);
                         // // 测试配置表

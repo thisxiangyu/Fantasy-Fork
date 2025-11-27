@@ -63,9 +63,6 @@
         <None Include="build\Fantasy-Net.targets" Pack="true" PackagePath="build;buildTransitive" />
         <!-- MSBuild Modules -->
         <None Include="build\modules\*.targets" Pack="true" PackagePath="build\modules;buildTransitive\modules" />
-        <!-- 配置文件模板：供 CopyTemplate 模块使用 -->
-        <None Include="Fantasy.config" Pack="true" PackagePath="build;buildTransitive" />
-        <None Include="Fantasy.xsd" Pack="true" PackagePath="build;buildTransitive" />
         <!-- 包元数据文件 -->
         <None Include="icon.png" Pack="true" PackagePath="\" />
         <None Include="LICENSE" Pack="true" PackagePath="\" />
@@ -86,6 +83,7 @@
         <None Include="..\Fantasy.SourceGenerator\bin\$(Configuration)\netstandard2.0\Fantasy.SourceGenerator.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
     </ItemGroup>
     <ItemGroup>
+      <Folder Include="Migrations\" />
       <Folder Include="Runtime\Core\World\" />
     </ItemGroup>
     <ItemGroup>

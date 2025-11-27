@@ -32,7 +32,7 @@ namespace Fantasy
                 System.GC.Collect();
             }
             string baseDirectory = AppContext.BaseDirectory;
-            // 如果是EFCore设计时, 需要对路径进行修正
+            // 如果是EFCore设计时, 需要指定特定路径
             if (Entry.IsEFCoreDesignTime()) 
             { 
                 Console.WriteLine("EFCore Design Time ...");
@@ -42,9 +42,9 @@ namespace Fantasy
             var dllBytes = File.ReadAllBytes(Path.Combine(baseDirectory, $"{HotfixDll}.dll"));
             var pdbBytes = File.ReadAllBytes(Path.Combine(baseDirectory, $"{HotfixDll}.pdb"));
             var assembly = _assemblyLoadContext.LoadFromStream(new MemoryStream(dllBytes), new MemoryStream(pdbBytes));
-            // 强制触发 ModuleInitializer 执行
-            // AssemblyLoadContext.LoadFromStream 只加载程序集到内存，不会自动触发 ModuleInitializer
-            // 必须访问程序集中的类型才能触发初始化，这里通过反射调用生成的 AssemblyMarker
+            // 强制触发 Initializer 执行
+            // AssemblyLoadContext.LoadFromStream 只加载程序集到内存，不会自动触发 Initializer
+            // 必须访问程序集中的类型才能触发初始化，这里通过反射调用生成的方法
             // 注意：此方法仅用于热重载场景（JIT），Native AOT 不支持动态加载
             // 拿到Assembly就用EnsureLoaded()方法强制触发
             assembly.EnsureLoaded();

@@ -14,7 +14,7 @@ namespace Fantasy.Database
     /// <summary>
     /// 开发时DbContext工厂类, 这个类主要用于执行数据库迁移命令。
     /// Win平台, 在PowerShell输入 : 
-    /// dotnet ef migrations add MigrationTest --project "F:\Unity\Fantasy\Fantasy-Fork\Fantasy.Net\Fantasy.Net" --startup-project "F:\Unity\Fantasy\Fantasy-Fork\examples\Server\Entity" --context PgSession
+    /// dotnet ef migrations add MigrationTest --project "F:\Unity\Fantasy\Fantasy-Fork\Fantasy.Packages\Fantasy.Net" --startup-project "F:\Unity\Fantasy\Fantasy-Fork\examples\Server\Entity" --context PgSession
     /// (MigrationTest 是迁移名称, 可替换为自定义命名) 执行以上命令，EFCore 将会自动反射检测到本工厂内含方法，并生成迁移脚本到 Migrations 文件夹。
     /// </summary>
     public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<PgSession>
@@ -33,7 +33,7 @@ namespace Fantasy.Database
 
             // 找到 Fantasy.Config 并解析 ConnectionString
             var doc = new XmlDocument();
-            var configText = File.ReadAllText("../../../examples/Server/Main/Fantasy.config", Encoding.UTF8);
+            var configText = File.ReadAllText("../Entity/Fantasy.config", Encoding.UTF8);
             doc.LoadXml(configText);
             var root = doc.DocumentElement;
 
