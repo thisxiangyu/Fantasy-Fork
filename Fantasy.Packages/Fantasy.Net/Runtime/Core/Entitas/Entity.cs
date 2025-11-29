@@ -6,8 +6,12 @@ using Fantasy.Entitas.Interface;
 using Fantasy.IdFactory;
 using Fantasy.Pool;
 using MongoDB.Bson.Serialization.Attributes;
-using Newtonsoft.Json;
 using ProtoBuf;
+using NJ = Newtonsoft.Json;
+#if FANTASY_NET
+using MJ = System.Text.Json.Serialization;
+using System.ComponentModel.DataAnnotations.Schema;
+#endif
 // ReSharper disable ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
 // ReSharper disable MergeIntoPattern
 // ReSharper disable SuspiciousTypeConversion.Global
@@ -45,7 +49,11 @@ namespace Fantasy.Entitas
         /// 实体的RunTimeId
         /// </summary>
         [BsonIgnore]
-        [JsonIgnore]
+#if FANTASY_NET
+        [NotMapped]
+        [MJ.JsonIgnore]
+#endif
+        [NJ.JsonIgnore]
         [IgnoreDataMember]
         [ProtoIgnore]
         public long RuntimeId { get; protected set; }
@@ -53,7 +61,11 @@ namespace Fantasy.Entitas
         /// 当前实体是否已经被销毁
         /// </summary>
         [BsonIgnore]
-        [JsonIgnore]
+#if FANTASY_NET
+        [NotMapped]
+        [MJ.JsonIgnore]
+#endif
+        [NJ.JsonIgnore]
         [IgnoreDataMember]
         [ProtoIgnore]
         public bool IsDisposed => RuntimeId == 0;
@@ -61,7 +73,11 @@ namespace Fantasy.Entitas
         /// 当前实体所归属的Scene
         /// </summary>
         [BsonIgnore]
-        [JsonIgnore]
+#if FANTASY_NET
+        [NotMapped]
+        [MJ.JsonIgnore]
+#endif
+        [NJ.JsonIgnore]
         [IgnoreDataMember]
         [ProtoIgnore]
         public Scene Scene { get; protected set; }
@@ -69,7 +85,11 @@ namespace Fantasy.Entitas
         /// 实体的父实体
         /// </summary>
         [BsonIgnore]
-        [JsonIgnore]
+#if FANTASY_NET
+        [NotMapped]
+        [MJ.JsonIgnore]
+#endif
+        [NJ.JsonIgnore]
         [IgnoreDataMember]
         [ProtoIgnore]
         public Entity Parent { get; protected set; }
@@ -77,7 +97,11 @@ namespace Fantasy.Entitas
         /// 实体的真实Type
         /// </summary>
         [BsonIgnore]
-        [JsonIgnore]
+#if FANTASY_NET
+        [NotMapped]
+        [MJ.JsonIgnore]
+#endif
+        [NJ.JsonIgnore]
         [IgnoreDataMember]
         [ProtoIgnore]
         public Type Type { get; protected set; }
@@ -85,7 +109,11 @@ namespace Fantasy.Entitas
         /// 实体的真实Type的HashCode
         /// </summary>
         [BsonIgnore]
-        [JsonIgnore]
+#if FANTASY_NET
+        [NotMapped]
+        [MJ.JsonIgnore]
+#endif
+        [NJ.JsonIgnore]
         [IgnoreDataMember]
         [ProtoIgnore]
         public long TypeHashCode { get; private set; }
@@ -889,7 +917,11 @@ namespace Fantasy.Entitas
         /// 查询当前实体下的实现了ISupportedMultiEntity接口的实体
         /// </summary>
         [BsonIgnore]
-        [JsonIgnore]
+#if FANTASY_NET
+        [NotMapped]
+        [MJ.JsonIgnore]
+#endif
+        [NJ.JsonIgnore]
         [IgnoreDataMember]
         [ProtoIgnore]
         public IEnumerable<Entity> ForEachMultiEntity
@@ -911,7 +943,11 @@ namespace Fantasy.Entitas
         /// 查找当前实体下的所有实体，不包括实现ISupportedMultiEntity接口的实体
         /// </summary>
         [BsonIgnore]
-        [JsonIgnore]
+#if FANTASY_NET
+        [NotMapped]
+        [MJ.JsonIgnore]
+#endif
+        [NJ.JsonIgnore]
         [IgnoreDataMember]
         [ProtoIgnore]
         public IEnumerable<Entity> ForEachEntity

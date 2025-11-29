@@ -6,8 +6,12 @@ using Fantasy.Entitas.Interface;
 using Fantasy.IdFactory;
 using Fantasy.Pool;
 using MongoDB.Bson.Serialization.Attributes;
-using Newtonsoft.Json;
 using ProtoBuf;
+using NJ = Newtonsoft.Json;
+#if FANTASY_NET
+using MJ = System.Text.Json.Serialization;
+using System.ComponentModel.DataAnnotations.Schema;
+#endif
 // ReSharper disable ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
 // ReSharper disable MergeIntoPattern
 // ReSharper disable SuspiciousTypeConversion.Global
@@ -32,7 +36,7 @@ namespace Fantasy.Entitas
     public abstract partial class Entity : IEntity
     {
         #region Members
-        
+
         /// <summary>
         /// 实体的Id
         /// </summary>
@@ -45,7 +49,11 @@ namespace Fantasy.Entitas
         /// 实体的RunTimeId
         /// </summary>
         [BsonIgnore]
-        [JsonIgnore]
+#if FANTASY_NET
+        [NotMapped]
+        [MJ.JsonIgnore]
+#endif
+        [NJ.JsonIgnore]
         [IgnoreDataMember]
         [ProtoIgnore]
         public long RuntimeId { get; protected set; }
@@ -53,7 +61,11 @@ namespace Fantasy.Entitas
         /// 当前实体是否已经被销毁
         /// </summary>
         [BsonIgnore]
-        [JsonIgnore]
+#if FANTASY_NET
+        [NotMapped]
+        [MJ.JsonIgnore]
+#endif
+        [NJ.JsonIgnore]
         [IgnoreDataMember]
         [ProtoIgnore]
         public bool IsDisposed => RuntimeId == 0;
@@ -61,7 +73,11 @@ namespace Fantasy.Entitas
         /// 当前实体所归属的Scene
         /// </summary>
         [BsonIgnore]
-        [JsonIgnore]
+#if FANTASY_NET
+        [NotMapped]
+        [MJ.JsonIgnore]
+#endif
+        [NJ.JsonIgnore]
         [IgnoreDataMember]
         [ProtoIgnore]
         public Scene Scene { get; protected set; }
@@ -69,7 +85,11 @@ namespace Fantasy.Entitas
         /// 实体的父实体
         /// </summary>
         [BsonIgnore]
-        [JsonIgnore]
+#if FANTASY_NET
+        [NotMapped]
+        [MJ.JsonIgnore]
+#endif
+        [NJ.JsonIgnore]
         [IgnoreDataMember]
         [ProtoIgnore]
         public Entity Parent { get; protected set; }
@@ -77,7 +97,11 @@ namespace Fantasy.Entitas
         /// 实体的真实Type
         /// </summary>
         [BsonIgnore]
-        [JsonIgnore]
+#if FANTASY_NET
+        [NotMapped]
+        [MJ.JsonIgnore]
+#endif
+        [NJ.JsonIgnore]
         [IgnoreDataMember]
         [ProtoIgnore]
         public Type Type { get; protected set; }
@@ -85,7 +109,11 @@ namespace Fantasy.Entitas
         /// 实体的真实Type的HashCode
         /// </summary>
         [BsonIgnore]
-        [JsonIgnore]
+#if FANTASY_NET
+        [NotMapped]
+        [MJ.JsonIgnore]
+#endif
+        [NJ.JsonIgnore]
         [IgnoreDataMember]
         [ProtoIgnore]
         public long TypeHashCode { get; private set; }
@@ -93,9 +121,9 @@ namespace Fantasy.Entitas
         [BsonElement("t")] [BsonIgnoreIfNull] private EntityList<Entity> _treeDb;
         [BsonElement("m")] [BsonIgnoreIfNull] private EntityList<Entity> _multiDb;
 #endif
-        [BsonIgnore] [IgnoreDataMember] [ProtoIgnore] private EntitySortedDictionary<long, Entity> _tree;
-        [BsonIgnore] [IgnoreDataMember] [ProtoIgnore] private EntitySortedDictionary<long, Entity> _multi;
-        
+        [BsonIgnore][IgnoreDataMember][ProtoIgnore] private EntitySortedDictionary<long, Entity> _tree;
+        [BsonIgnore][IgnoreDataMember][ProtoIgnore] private EntitySortedDictionary<long, Entity> _multi;
+
         /// <summary>
         /// 获得父Entity
         /// </summary>
@@ -171,9 +199,9 @@ namespace Fantasy.Entitas
             {
                 throw new NotSupportedException($"Type:{type.FullName} must inherit from Entity");
             }
-            
+
             Entity entity = null;
-            
+
             if (isPool)
             {
                 entity = (Entity)scene.EntityPool.Rent(scene, type);
@@ -182,7 +210,7 @@ namespace Fantasy.Entitas
             {
                 entity = scene.PoolGeneratorComponent.Create<Entity>(type);
             }
-            
+
             entity.Scene = scene;
             entity.Type = type;
             entity.TypeHashCode = TypeHashCache.GetHashCode(type);
@@ -190,7 +218,7 @@ namespace Fantasy.Entitas
             entity.Id = id;
             entity.RuntimeId = scene.RuntimeIdFactory.Create(isPool);
             scene.AddEntity(entity);
-            
+
             if (isRunEvent)
             {
                 scene.EntityComponent.Awake(entity);
@@ -199,7 +227,7 @@ namespace Fantasy.Entitas
                 scene.EntityComponent.RegisterLateUpdate(entity);
 #endif
             }
-            
+
             return entity;
         }
 
@@ -227,7 +255,7 @@ namespace Fantasy.Entitas
         {
             return Create<T>(scene, scene.EntityIdFactory.Create, isPool, true);
         }
-        
+
         /// <summary>
         /// 创建一个实体
         /// </summary>
@@ -241,7 +269,7 @@ namespace Fantasy.Entitas
         {
             return Create<T>(scene, scene.EntityIdFactory.Create, isPool, isRunEvent);
         }
-        
+
         /// <summary>
         /// 创建一个实体
         /// </summary>
@@ -262,7 +290,7 @@ namespace Fantasy.Entitas
             entity.Id = id;
             entity.RuntimeId = scene.RuntimeIdFactory.Create(isPool);
             scene.AddEntity(entity);
-            
+
             if (isRunEvent)
             {
                 scene.EntityComponent.Awake(entity);
@@ -276,7 +304,7 @@ namespace Fantasy.Entitas
         }
 
         #endregion
-        
+
         #region AddComponent
 
         /// <summary>
@@ -353,7 +381,7 @@ namespace Fantasy.Entitas
             else
             {
                 var typeHashCode = component.TypeHashCode;
-                
+
                 if (_tree == null)
                 {
                     _tree = Scene.EntitySortedDictionaryPool.Rent();
@@ -363,7 +391,7 @@ namespace Fantasy.Entitas
                     Log.Error($"type:{type.FullName} If you want to add multiple components of the same type, please implement IMultiEntity");
                     return;
                 }
-                
+
                 _tree.Add(typeHashCode, component);
 #if FANTASY_NET
                 if (component is ISupportedDataBase)
@@ -373,7 +401,7 @@ namespace Fantasy.Entitas
                 } 
 #endif
             }
-            
+
             component.Parent = this;
             component.Scene = Scene;
         }
@@ -396,9 +424,9 @@ namespace Fantasy.Entitas
                 Log.Error($"component is Disposed {typeof(T).FullName}");
                 return;
             }
-            
+
             component.Parent?.RemoveComponent(component, false);
-            
+
             if (EntitySupportedChecker<T>.IsMulti)
             {
                 _multi ??= Scene.EntitySortedDictionaryPool.Rent();
@@ -414,7 +442,7 @@ namespace Fantasy.Entitas
             else
             {
                 var typeHashCode = component.TypeHashCode;
-                
+
                 if (_tree == null)
                 {
                     _tree = Scene.EntitySortedDictionaryPool.Rent();
@@ -424,7 +452,7 @@ namespace Fantasy.Entitas
                     Log.Error($"type:{typeof(T).FullName} If you want to add multiple components of the same type, please implement IMultiEntity");
                     return;
                 }
-                
+
                 _tree.Add(typeHashCode, component);
 #if FANTASY_NET
                 if (EntitySupportedChecker<T>.IsDataBase)
@@ -434,7 +462,7 @@ namespace Fantasy.Entitas
                 } 
 #endif
             }
-            
+
             component.Parent = this;
             component.Scene = Scene;
         }
@@ -474,7 +502,7 @@ namespace Fantasy.Entitas
             {
                 return false;
             }
-            
+
             return _tree.ContainsKey(TypeHashCache<T>.HashCode);
         }
 
@@ -527,7 +555,7 @@ namespace Fantasy.Entitas
             {
                 return null;
             }
-            
+
             return _tree.TryGetValue(TypeHashCache<T>.HashCode, out var component) ? (T)component : null;
         }
 
@@ -543,7 +571,7 @@ namespace Fantasy.Entitas
             {
                 return null;
             }
-            
+
             return _tree.GetValueOrDefault(TypeHashCache.GetHashCode(type));
         }
 
@@ -578,7 +606,7 @@ namespace Fantasy.Entitas
         #endregion
 
         #region RemoveComponent
-        
+
         /// <summary>
         /// 当前实体下删除一个实体
         /// </summary>
@@ -591,12 +619,12 @@ namespace Fantasy.Entitas
             {
                 throw new NotSupportedException($"{typeof(T).FullName} message:Cannot delete components that implement the ISupportedMultiEntity interface");
             }
-            
+
             if (_tree == null)
             {
                 return;
             }
-            
+
             var typeHashCode = TypeHashCache<T>.HashCode;
             if (!_tree.TryGetValue(typeHashCode, out var component))
             {
@@ -621,7 +649,7 @@ namespace Fantasy.Entitas
                 Scene.EntitySortedDictionaryPool.Return(_tree);
                 _tree = null;
             }
-            
+
             if (isDispose)
             {
                 component.Dispose();
@@ -662,7 +690,7 @@ namespace Fantasy.Entitas
                 Scene.EntitySortedDictionaryPool.Return(_multi);
                 _multi = null;
             }
-            
+
             if (isDispose)
             {
                 component.Dispose();
@@ -680,7 +708,7 @@ namespace Fantasy.Entitas
             {
                 return;
             }
-            
+
             if (component is ISupportedMultiEntity)
             {
                 if (_multi != null)
@@ -735,7 +763,7 @@ namespace Fantasy.Entitas
                     _tree = null;
                 }
             }
-            
+
             if (isDispose)
             {
                 component.Dispose();
@@ -754,7 +782,7 @@ namespace Fantasy.Entitas
             {
                 return;
             }
-            
+
             if (EntitySupportedChecker<T>.IsMulti)
             {
                 if (_multi != null)
@@ -809,7 +837,7 @@ namespace Fantasy.Entitas
                     _tree = null;
                 }
             }
-            
+
             if (isDispose)
             {
                 component.Dispose();
@@ -884,12 +912,16 @@ namespace Fantasy.Entitas
         #endregion
 
         #region ForEach
-        
+
         /// <summary>
         /// 查询当前实体下的实现了ISupportedMultiEntity接口的实体
         /// </summary>
         [BsonIgnore]
-        [JsonIgnore]
+#if FANTASY_NET
+        [NotMapped]
+        [MJ.JsonIgnore]
+#endif
+        [NJ.JsonIgnore]
         [IgnoreDataMember]
         [ProtoIgnore]
         public IEnumerable<Entity> ForEachMultiEntity
@@ -911,7 +943,11 @@ namespace Fantasy.Entitas
         /// 查找当前实体下的所有实体，不包括实现ISupportedMultiEntity接口的实体
         /// </summary>
         [BsonIgnore]
-        [JsonIgnore]
+#if FANTASY_NET
+        [NotMapped]
+        [MJ.JsonIgnore]
+#endif
+        [NJ.JsonIgnore]
         [IgnoreDataMember]
         [ProtoIgnore]
         public IEnumerable<Entity> ForEachEntity
@@ -942,11 +978,11 @@ namespace Fantasy.Entitas
             {
                 return;
             }
-            
+
             var scene = Scene;
             var runTimeId = RuntimeId;
             RuntimeId = 0;
-            
+
             if (_tree != null)
             {
                 foreach (var (_, entity) in _tree)
@@ -958,7 +994,7 @@ namespace Fantasy.Entitas
                 scene.EntitySortedDictionaryPool.Return(_tree);
                 _tree = null;
             }
-            
+
             if (_multi != null)
             {
                 foreach (var (_, entity) in _multi)
@@ -986,7 +1022,7 @@ namespace Fantasy.Entitas
             }
 #endif
             scene.EntityComponent.Destroy(this);
-            
+
             if (Parent != null && Parent != this && !Parent.IsDisposed)
             {
                 Parent.RemoveComponent(this, false);
@@ -1012,7 +1048,7 @@ namespace Fantasy.Entitas
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsPool()
         {
-            return IdFactoryHelper.RuntimeIdTool.GetIsPool(RuntimeId); 
+            return IdFactoryHelper.RuntimeIdTool.GetIsPool(RuntimeId);
         }
 
         /// <summary>
