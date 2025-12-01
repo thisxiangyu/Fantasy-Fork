@@ -117,7 +117,7 @@ namespace Fantasy.Database
                 throw new Exception($"Mongo logic-database {dbName} connection failed:\n{ex}");
             }
 
-            Serializer = SerializerManager.GetSerializer(FantasySerializerType.Bson);
+            Serializer = SerializerManager.BsonPack;
             return this;
         }
 

@@ -26,9 +26,13 @@
                         ReferenceOutputAssembly="false" />
     </ItemGroup>
 
+    <PropertyGroup>
+      <!-- SG调试输出避免被编译器升级为Error -->
+      <WarningsNotAsErrors>$(WarningsNotAsErrors);DebugFantasySG</WarningsNotAsErrors>
+    </PropertyGroup>
+
     <ItemGroup>
       <Folder Include="Benchmark\" />
-      <Folder Include="Generated\" />
       <Folder Include="Outer\NormalMessage\" />
     </ItemGroup>
 

@@ -2,7 +2,7 @@
 
     <PropertyGroup>
         <PackageId>Fantasy-Net</PackageId>
-        <PackageVersion>2025.2.1402</PackageVersion>
+        <PackageVersion>2025.2.1406</PackageVersion>
         <Title>Fantasy-Net</Title>
         <Authors>qq362946</Authors>
         <owners>qq362946</owners>
@@ -35,6 +35,11 @@
        <CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)\GeneratedFiles</CompilerGeneratedFilesOutputPath> 
     </PropertyGroup>
 
+    <PropertyGroup>
+      <!-- SG调试输出避免被编译器升级为Error -->
+      <WarningsNotAsErrors>$(WarningsNotAsErrors);DebugFantasySG</WarningsNotAsErrors>
+    </PropertyGroup>
+
     <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
       <DefineConstants>TRACE;FANTASY_NET</DefineConstants>
       <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -48,6 +53,7 @@
         <PrivateAssets>all</PrivateAssets>
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       </PackageReference>
+      <PackageReference Include="MemoryPack" Version="1.21.4" />
       <PackageReference Include="MongoDB.Bson" Version="3.4.3" />
       <PackageReference Include="MongoDB.Driver" Version="3.4.3" />
       <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />

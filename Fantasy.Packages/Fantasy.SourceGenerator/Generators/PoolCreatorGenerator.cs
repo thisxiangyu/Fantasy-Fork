@@ -15,7 +15,8 @@ namespace Fantasy.SourceGenerator.Generators
                     predicate: static (node, _) => PotentialSyntax(node),
                     transform: static (ctx, _) => GetPoolTypeInfo(ctx))
                 .Where(static info => info != null)
-                .Collect();
+                .Collect()
+                .Select(static (types, _) => types.Distinct().ToList());
             
             var compilationAndTypes = context.CompilationProvider.Combine(poolTypes);
             
@@ -42,7 +43,7 @@ namespace Fantasy.SourceGenerator.Generators
 
         private static bool PotentialSyntax(SyntaxNode node)
         {
-            //拿到非抽象类定义和闭合泛型使用
+            // 拿到非抽象类定义和闭合泛型使用
             return (node is ClassDeclarationSyntax classDecl &&
                 !classDecl.Modifiers.Any(m => m.IsKind(SyntaxKind.AbstractKeyword))) || 
                 node is GenericNameSyntax;
@@ -68,17 +69,23 @@ namespace Fantasy.SourceGenerator.Generators
         private static bool IsValidPoolType(INamedTypeSymbol s)
         {
             if (s.DeclaredAccessibility != Accessibility.Public || s.IsAbstract)
+            {
                 return false;
+            }
 
             if (s.IsOpenGeneric())
+            {
                 return false;
+            }
 
             var implementsIPool = s.AllInterfaces.Any(i =>
                 i.Name == "IPool" &&
                 i.ContainingNamespace.ToString() == "Fantasy.Pool");
 
             if (!implementsIPool)
+            {
                 return false;
+            }
 
             return s.Constructors.Any(c =>
                 c.Parameters.Length == 0 &&
@@ -104,7 +111,7 @@ namespace Fantasy.SourceGenerator.Generators
                 "Fantasy.Serialize"
             );
             builder.AppendLine();
-            builder.BeginNamespace("Fantasy.Generated");
+             builder.BeginDefaultNamespace();
             builder.AddXmlComment($"Auto-generated PoolCreatorGenerator class for {assemblyName}");
             builder.BeginClass(markerClassName, "internal sealed","global::Fantasy.Assembly.IPoolCreatorGenerator");
             // 开始定义RuntimeTypeHandles方法

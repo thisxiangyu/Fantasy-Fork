@@ -62,7 +62,7 @@ namespace Fantasy.Database
         {
             Scene = scene;
             Duty = duty;
-            Serializer = SerializerManager.GetSerializer(FantasySerializerType.Bson);
+            Serializer = SerializerManager.MemoryPack;
 
             if (DatabaseSetting.PostgreSQLCustomInitialize != null)
             {
