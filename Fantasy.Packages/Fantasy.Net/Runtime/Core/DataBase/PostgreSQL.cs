@@ -1,6 +1,7 @@
 ﻿#if FANTASY_NET
 using Fantasy.Async;
 using Fantasy.Entitas;
+using Fantasy.Helper;
 using Fantasy.InnerMessage;
 using Fantasy.Serialize;
 using Microsoft.EntityFrameworkCore;
@@ -8,6 +9,8 @@ using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Driver;
 using Npgsql;
 using System.Reflection.Emit;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using static Fantasy.Database.PgSession;
 
@@ -75,7 +78,22 @@ namespace Fantasy.Database
             }
             else try
             {
-                RawHandler = NpgsqlDataSource.Create(connectionString);
+                var builder = new NpgsqlDataSourceBuilder(connectionString);
+
+                JsonSerializerOptions jsonOptions = new()
+                {
+#if NET9_0_OR_GREATER
+                    AllowOutOfOrderMetadataProperties = true,
+#endif
+                    TypeInfoResolver = JsonHelper.ResolverWithPolymorphism, //开启多态鉴别
+                    ReferenceHandler = ReferenceHandler.Preserve,
+                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+                };
+
+                builder.EnableDynamicJson() // 允许动态jsonb
+                      .ConfigureJsonOptions(jsonOptions); //配置json选项
+                
+                RawHandler = builder.Build();
             }
             catch(Exception e) {
                 throw new Exception($" ( PgSQL Building ConnectionString Err : {connectionString} )\n {e}");

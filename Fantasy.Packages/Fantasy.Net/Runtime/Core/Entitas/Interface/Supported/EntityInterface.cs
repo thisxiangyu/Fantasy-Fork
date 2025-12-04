@@ -10,14 +10,6 @@ namespace Fantasy.Entitas.Interface
     {
     }
 
-    /// <summary>
-    /// 支持跟随父实体一起序列化-反序列化
-    /// </summary>
-    public interface IFollowSerialization
-    {
-
-    }
-
 #if FANTASY_NET
 
     /// <summary>

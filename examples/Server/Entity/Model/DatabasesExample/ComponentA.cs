@@ -5,9 +5,12 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Fantasy
 {
-    [DbSet(Relationship = ToParentIs.Component)]
-    public class ComponentA : Entity, IFollowSerialization
+    [DbSet]
+    public class ComponentA : Entity, IDbSet
     {
-  
+        public DbSetOptions? DbSetOpts => null;
+
+        public string A { get; set; } = "It is ComponentA";
+
     }
 }

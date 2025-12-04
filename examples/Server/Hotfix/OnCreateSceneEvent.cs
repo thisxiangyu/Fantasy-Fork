@@ -47,10 +47,10 @@ namespace Fantasy.GenericExample
 
         public static void GenricFunc<T>(TestEntity entity) where T : Enum
         {
-           var ab = Entity.Create<AGenericEntity<T, ENUMB>>(entity.Scene, true, true);
-           var ac = Entity.Create(entity.Scene,typeof(AGenericEntity<T, ENUMC>), true, true);
-            ab.Dispose();
-            ac.Dispose();
+           //var ab = Entity.Create<AGenericEntity<T, ENUMB>>(entity.Scene, true, true);
+           //var ac = Entity.Create(entity.Scene,typeof(AGenericEntity<T, ENUMC>), true, true);
+           // ab.Dispose();
+           // ac.Dispose();
         }
     }
 }
@@ -135,7 +135,7 @@ namespace Fantasy
             {
                 var TestFantasyDbSetRoot = scene.AddComponent<ExampleRoot>();
                 await TestFantasyDbSetRoot.StartTest<PostgreSQL>(TestWhat.FastDeploy, dutyId: 0);
-                //await TestFantasyDbSetRoot.StartTest<PostgreSQL>(TestWhat.Insert, dutyId: 0);
+                await TestFantasyDbSetRoot.StartTest<PostgreSQL>(TestWhat.Insert, dutyId: 0);
                 //await TestFantasyDbSetRoot.StartTest<PostgreSQL>(TestWhat.Query, dutyId: 0);
 
                 //TestFantasyDbSetRoot.StartTest<MongoDb>(TestWhat.FastDeploy, dutyId: 2).Coroutine();

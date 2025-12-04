@@ -4,9 +4,11 @@ using Fantasy.Entitas.Interface;
 
 namespace Fantasy
 {
-    [DbSet(Relationship = ToParentIs.Component)]
-    public class ComponentB : Entity, IFollowSerialization
+    [DbSet]
+    public class ComponentB : Entity, IDbSet
     {
+        public DbSetOptions? DbSetOpts => null;
 
+        public string B { get; set; } = "It is ComponentB";
     }
 }

@@ -6,7 +6,7 @@ using System.Collections.Generic;
 namespace Fantasy.Pool
 {
     /// <summary>
-    /// 静态的对象池系统，不支持多线程。
+    /// 普通的对象池系统，不支持多线程。
     /// </summary>
     /// <typeparam name="T"></typeparam>
     public static class Pool<T> where T : IPool, new()

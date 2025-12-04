@@ -36,7 +36,7 @@ namespace Fantasy
             if (Entry.IsEFCoreDesignTime()) 
             { 
                 Console.WriteLine("EFCore Design Time ...");
-                baseDirectory = "..\\..\\..\\examples\\Bin\\Debug\\net8.0\\";
+                baseDirectory = "..\\..\\..\\examples\\Bin\\Debug\\net9.0\\";
             }
             _assemblyLoadContext = new AssemblyLoadContext(HotfixDll, true);
             var dllBytes = File.ReadAllBytes(Path.Combine(baseDirectory, $"{HotfixDll}.dll"));

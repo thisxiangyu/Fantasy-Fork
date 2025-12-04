@@ -44,7 +44,7 @@ namespace Fantasy.Database.Helper
                     doSomething.Invoke(type, tableName, attr);
                 }
             }
-            TypeDbSetInfos.WarmUp(all);
+            TypeDbSetChecker.WarmUp(all);
             return all;
         }
         /// <summary>
@@ -76,7 +76,7 @@ namespace Fantasy.Database.Helper
                     await doSomething.Invoke(type, tableName, attr);
                 }
             }
-            TypeDbSetInfos.WarmUp(all);
+            TypeDbSetChecker.WarmUp(all);
             return all;
         }
 
@@ -85,7 +85,6 @@ namespace Fantasy.Database.Helper
         /// </summary>
         public static DbSetAttribute? GetDbSetAttribute(Type type)
         {
-
             if (type.IsAbstract)
                 return null;
 

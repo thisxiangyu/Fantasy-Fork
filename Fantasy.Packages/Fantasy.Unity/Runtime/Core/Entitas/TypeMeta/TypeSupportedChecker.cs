@@ -1,19 +1,19 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.Frozen;
 using Fantasy.Entitas.Interface;
+using Fantasy.DataStructure.Dictionary;
 
 namespace Fantasy.Entitas.TypeMeta
 {
     /// <summary>
     /// 类型支持特性信息静态信息缓存类
     /// </summary>
-    public static class TypeSupportedInfos
+    public static class TypeSupportedChecker
     {
         /// <summary>
         /// 类型支持特性的缓存信息
         /// </summary>
-        public static FrozenDictionary<long, TypeSupportedCache>? InfoByHash;
+        public static Int64FrozenDictionary<TypeSupportedCache>? InfoByHash;
 
         /// <summary>
         /// 预热，执行一次，就会缓存所有检查结果。
@@ -25,7 +25,7 @@ namespace Fantasy.Entitas.TypeMeta
             {
                 dict.Add(TypeHashCache.GetHashCode(type), WarmUpOne(type));
             }
-            InfoByHash = dict.ToFrozenDictionary(); //转为冻结字典
+            InfoByHash = new(dict); //转为冻结字典
         }
 
         /// <summary>
@@ -34,7 +34,6 @@ namespace Fantasy.Entitas.TypeMeta
         internal static TypeSupportedCache WarmUpOne(Type type) {
             TypeSupportedCache cache = new();
             cache.IsMulti = typeof(IMultiAppended).IsAssignableFrom(type);
-            cache.ShouldFollowSerialization = typeof(IFollowSerialization).IsAssignableFrom(type);
 #if FANTASY_NET
             cache.IsTransfer = typeof(ISupportedTransfer).IsAssignableFrom(type);
 #endif
@@ -81,14 +80,6 @@ namespace Fantasy.Entitas.TypeMeta
         /// 如果实体类型实现了 <see cref="IMultiAppended"/> 接口，则为 <c>true</c>；否则为 <c>false</c>。
         /// </value>
         public bool IsMulti { get; internal set; }
-        /// <summary>
-        /// 获取实体类型是否标记了 <see cref="IFollowSerialization"/> 。
-        /// 实现该接口的实体支持跟随父级序列化-反序列化。
-        /// </summary>
-        /// <value>
-        /// 如果实体类型标记了 <see cref="IFollowSerialization"/> ，则为 <c>true</c>；否则为 <c>false</c>。
-        /// </value>
-        public bool ShouldFollowSerialization { get; internal set; }
 #if FANTASY_NET
         /// <summary>
         /// 获取实体类型是否实现了 <see cref="ISupportedTransfer"/> 接口。
@@ -115,14 +106,6 @@ namespace Fantasy.Entitas.TypeMeta
         /// 如果实体类型实现了 <see cref="IMultiAppended"/> 接口，则为 <c>true</c>；否则为 <c>false</c>。
         /// </value>
         public static bool IsMulti => _info?.IsMulti ?? false;
-        /// <summary>
-        /// 获取实体类型是否标记了 <see cref="IFollowSerialization"/> 。
-        /// 实现该接口的实体支持跟随父级序列化-反序列化。
-        /// </summary>
-        /// <value>
-        /// 如果实体类型标记了 <see cref="IFollowSerialization"/> ，则为 <c>true</c>；否则为 <c>false</c>。
-        /// </value>
-        public static bool ShouldFollowSerialization => _info?.ShouldFollowSerialization ?? false;
 #if FANTASY_NET
         /// <summary>
         /// 获取实体类型是否实现了 <see cref="ISupportedTransfer"/> 接口。
@@ -138,11 +121,11 @@ namespace Fantasy.Entitas.TypeMeta
 
         static TypeSupportedChecker()
         {
-            var warmedUp = TypeSupportedInfos.TryGetInfo(typeof(T));
+            var warmedUp = TypeSupportedChecker.TryGetInfo(typeof(T));
             if(warmedUp!=null)
                 _info = warmedUp;
             else
-                _info = TypeSupportedInfos.WarmUpOne(typeof(T));
+                _info = TypeSupportedChecker.WarmUpOne(typeof(T));
         }
     }
 }

@@ -183,7 +183,7 @@ namespace Fantasy.Database
         #region Deployment
 
         /// <summary>
-        /// 快速部署, 一次性快速创建所有标记为 [Table] 或 [FTable] 的实体集合。
+        /// 快速部署, 一次性快速创建所有标记为要存入数据库的实体集合。
         /// (建议仅开发时使用,正式部署后请走严格的数据库迁移流程)
         /// </summary>
         /// <returns></returns>

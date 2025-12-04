@@ -42,10 +42,10 @@ public static class Entry
     /// <summary>
     /// 启动Fantasy.Net
     /// </summary>
-    public static async FTask Start(ILog log = null)
+    public static async FTask Start(ILog log = null,string fantasy_config = null)
     {
         // 初始化
-        var receipt =  await Initialize(log);
+        var receipt =  await Initialize(log,fantasy_config);
         if (receipt.isEFCoreDesignTime)
             return;
         // 启动Process
@@ -120,8 +120,9 @@ public static class Entry
     /// 框架初始化
     /// </summary>
     /// <param name="log">日志实例</param>
+    /// <param name="fantasy_config"></param>
     /// <returns></returns>
-    private static async FTask<InitializationReceipt> Initialize(ILog log = null)
+    private static async FTask<InitializationReceipt> Initialize(ILog log = null, string fantasy_config = null)
     {
         InitializationReceipt receipt = new();
         // 初始化Log系统
@@ -130,7 +131,8 @@ public static class Entry
         // 注册当前框架内部程序集到框架中
         typeof(Entry).Assembly.EnsureLoaded();
         // 加载Fantasy.config配置文件
-        await ConfigLoader.InitializeFromXml(Path.Combine(AppContext.BaseDirectory, "Fantasy.config"));
+        fantasy_config ??= Path.Combine(AppContext.BaseDirectory, "Fantasy.config");
+        await ConfigLoader.InitializeFromXml(fantasy_config);
         // 🔴 判断是否是 EF Core 设计时调用，是则直接返回( 防止一些DesignTime的命令, 比如生成数据库迁移 报错)
         if (IsEFCoreDesignTime())
         {

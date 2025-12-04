@@ -15,24 +15,32 @@ using static Fantasy.Helper.JsonHelper;
 using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
+using System.Buffers;
+
+#pragma warning disable CS8632
 #pragma warning disable CS8603
 
 namespace Fantasy.Helper
 {
     /// <summary>
-    /// 一个Json包装器, 用于包装额外的可解析标头或标尾信息到框架序列化的Json中
+    /// 一个Json包装器, 用于包装额外可解析的标头或标尾信息到框架序列化的Json中
     /// </summary>
-    public class JsonWrapper<T>
+    [Serializable]
+    public class JsonWrapper<T>: IDataAccessible
     {
         /// <summary>
-        /// 表示库类型
+        /// 表示序列化库提供方
         /// </summary>
 #if FANTASY_NET
         [System.Text.Json.Serialization.JsonPropertyName(MetaPropertyStr.L)]
 #endif
         [Newtonsoft.Json.JsonProperty(MetaPropertyStr.L)]
+#if FANTASY_NET
         public string? L { get; set; }
-
+#endif
+#if FANTASY_UNITY
+        public string? L;
+#endif
         /// <summary>
         /// 表示数据存放处
         /// </summary>
@@ -40,11 +48,33 @@ namespace Fantasy.Helper
         [System.Text.Json.Serialization.JsonPropertyName(MetaPropertyStr.D)]
 #endif
         [Newtonsoft.Json.JsonProperty(MetaPropertyStr.D)]
+#if FANTASY_NET
         public T? Data { get; set; }
+#endif
+#if FANTASY_UNITY
+        public T? Data;
+#endif
+
+        /// <summary>
+        /// 访问数据, 以object返回
+        /// </summary>
+        public object? AccessData() => Data;
+    }
+
+    /// <summary>
+    /// 数据可访问接口
+    /// </summary>
+    public interface IDataAccessible
+    {
+        /// 访问数据, 以object返回
+        object? AccessData();
     }
 
     /// <summary>
     /// Json序列化器的控制选项。Newtonsoft 和 Microsoft的库通用。
+    /// <para>
+    /// 注 : Unity仅支持缩进, 不支持其余设置。
+    /// </para>
     /// </summary>
     public struct JsonSettings
     {
@@ -106,18 +136,19 @@ namespace Fantasy.Helper
         {
 #if FANTASY_NET
             /// <summary>
-            /// .NET自带, 微软提供的Json库, 性能通常占优势
+            /// .NET自带, 微软提供的Json库, 性能占优势。
             /// </summary>
             Microsoft,
 #endif
 #if FANTASY_UNITY
             /// <summary>
-            /// Unity提供的Json库。注意: 其在 <see cref="JsonSettings"/> 的功能支持非常有限。
+            /// Unity提供的Json库, 用于支持各种Unity特供的类型序列化与反序列化。
+            /// 注意: 其在 <see cref="JsonSettings"/> 的功能支持非常有限。一些无效设置将被忽视。
             /// </summary>
             UnityJson,
 #endif
             /// <summary>
-            /// 第三方开发者Newtonsoft提供的Json库  
+            /// 第三方开发者Newtonsoft提供的Json库, 泛用性较好。
             /// </summary>
             Newtonsoft,
         }
@@ -178,24 +209,33 @@ namespace Fantasy.Helper
         private static readonly object _lock_N = new object();
 
         // Newtonsoft序列化器默认设置
-        private readonly static JsonSerializerSettings _defaultSettings = new()
+        private readonly static JsonSerializerSettings newtonsoftDefaultSettings = new()
         {
             Formatting = Formatting.Indented,
             ReferenceLoopHandling = ReferenceLoopHandling.Serialize
         };
 
-        // Microsoft序列化器默认设置 
 #if FANTASY_NET
-        private readonly static JsonSerializerOptions _defaultOptions = new()
+        // Microsoft序列化器默认设置 
+        private readonly static JsonSerializerOptions microsoftDefaultOptions = new()
         {
-            WriteIndented = true,
-            ReferenceHandler = ReferenceHandler.Preserve
+#if NET9_0_OR_GREATER
+            AllowOutOfOrderMetadataProperties = true,
+#endif
+            TypeInfoResolver = ResolverWithPolymorphism, //开启多态鉴别
+            ReferenceHandler = ReferenceHandler.Preserve,
         };
 
-        private static readonly IJsonTypeInfoResolver ResolverWithPolymorphism = JsonTypeInfoResolver.Combine(
+        /// <summary>
+        /// 开启多态鉴别
+        /// </summary>
+        public static readonly IJsonTypeInfoResolver ResolverWithPolymorphism = JsonTypeInfoResolver.Combine(
                             new EntityPolymorphismResolver()
-                        ); //开启多态鉴别
-        private static readonly IJsonTypeInfoResolver ResolverWithoutPolymorphism = JsonTypeInfoResolver.Combine(
+                        );
+        /// <summary>
+        /// 关闭多态鉴别
+        /// </summary>
+        public static readonly IJsonTypeInfoResolver ResolverWithoutPolymorphism = JsonTypeInfoResolver.Combine(
                        new DisablePolymorphismResolver()
                    ); //关闭多态鉴别
 
@@ -231,6 +271,9 @@ namespace Fantasy.Helper
 
             var opt = new JsonSerializerOptions
             {
+#if NET9_0_OR_GREATER
+                AllowOutOfOrderMetadataProperties = true,
+#endif
                 WriteIndented = settings.IsIndented,
                 ReferenceHandler = settings.NoCycles ? ReferenceHandler.IgnoreCycles : ReferenceHandler.Preserve,
                 TypeInfoResolver = settings.WriteTypeWhenNecessary ? ResolverWithPolymorphism : ResolverWithoutPolymorphism,
@@ -314,7 +357,7 @@ namespace Fantasy.Helper
         {
             // 默认直接用Newton的库
             if (settings == null)
-                return JsonConvert.SerializeObject(t, _defaultSettings);
+                return JsonConvert.SerializeObject(t, newtonsoftDefaultSettings);
 
             // 创建包装器
             var wrapper = new JsonWrapper<T>
@@ -346,7 +389,7 @@ namespace Fantasy.Helper
 #endif
 #if FANTASY_UNITY
                 case Library.UnityJson:
-                    json = JsonUtility.ToJson(wrapper); break;
+                    json = JsonUtility.ToJson(wrapper, settings.Value.IsIndented); break;
 #endif
                 case Library.Newtonsoft:
                     json = JsonConvert.SerializeObject(wrapper, MakeNewtonsoftSettings(settings.Value, isCacheThreadSafe));
@@ -358,6 +401,29 @@ namespace Fantasy.Helper
 
             return json;
         }
+
+#if FANTASY_NET
+        /// <summary>
+        /// 高性能Json的序列化, 将对象序列化为 JSON Utf8 字节。
+        /// <para>
+        /// 仅由<see cref="MicrosoftJsonSerializer"/>提供支持。
+        /// </para>
+        /// </summary>
+        /// <typeparam name="T">要序列化的对象类型。</typeparam>
+        /// <param name="t">要序列化的对象。</param>
+        /// <param name="opts">序列化器设置</param>
+        public static ReadOnlySpan<byte> ToJsonBytes<T>(this T t, JsonSerializerOptions? opts = null)
+        {
+            if(t==null)
+                return null;
+
+            var bufferWriter = new ArrayBufferWriter<byte>();
+            using var writer = new Utf8JsonWriter(bufferWriter);
+            MicrosoftJsonSerializer.Serialize(writer, t, microsoftDefaultOptions);
+            writer.Flush();
+            return bufferWriter.WrittenSpan;      
+        }
+#endif
 
         private static readonly ConcurrentDictionary<Type, Type> _wrapperCache = new();
 
@@ -400,6 +466,7 @@ namespace Fantasy.Helper
 #if FANTASY_UNITY
                 string libraryMark = libMarkElement.Value<string>();
 #endif
+
                 // 获取或构造闭合泛型 Wrapper<T> 类型
                 Type wrapperType = _wrapperCache.GetOrAdd(type, typeof(JsonWrapper<>).MakeGenericType(type));
 
@@ -410,8 +477,9 @@ namespace Fantasy.Helper
 #if FANTASY_NET
                             settings ??= new JsonSettings();
                             JsonSerializerOptions options = MakeMicrosoftOptions(settings.Value, isCacheThreadSafe);
-                            dynamic? wrapper = MicrosoftJsonSerializer.Deserialize(json, wrapperType, options);
-                            return wrapper?.Data;
+                            object? wrapper = MicrosoftJsonSerializer.Deserialize(json, wrapperType, options);
+                            return wrapper is IDataAccessible w ? w.AccessData() : null;
+
 #endif
 #if FANTASY_UNITY
                             throw new("Fantasy.Unity can not deserialize a JSON serialized by Microsoft`s System.Text.Json, you shall use Fantasy.Net or check your json file`s library selection.");
@@ -424,23 +492,23 @@ namespace Fantasy.Helper
 #endif
 #if FANTASY_UNITY
                             if (settings != null)
-                                Log.Warning("You are trying to use advanced JsonSettings whitch may not be supported by Unity Json Utility.");
+                                Log.Info("You are trying to use advanced JsonSettings whitch may not be supported by Unity Json Utility.");
                             
-                            dynamic? wrapper = JsonUtility.FromJson(json, wrapperType);
-                            return wrapper?.Data;
+                            var wrapper = JsonUtility.FromJson(json, wrapperType);
+                            return wrapper is IDataAccessible w ? w.AccessData() : null;
 #endif
                         }
                     case Mark.N:  //使用Newtonsoft库
                         {
                             settings ??= new JsonSettings();
                             JsonSerializerSettings options = MakeNewtonsoftSettings(settings.Value, isCacheThreadSafe);
-                            dynamic? wrapper = JsonConvert.DeserializeObject(json, wrapperType, options);
-                            return wrapper?.Data;
+                            object? wrapper = JsonConvert.DeserializeObject(json, wrapperType, options);
+                            return wrapper is IDataAccessible w ? w.AccessData() : null;
                         }
                     default: throw new Exception("Unexpected: Detected unknown Json library mark. Deserialize failed. ");
                 }
             }
-            else  // --- 处理未包装的JSON  ---
+            else  // --- 处理未经包装的JSON  ---
             {
                 settings ??= new JsonSettings();
                 JsonSerializerSettings options = MakeNewtonsoftSettings(settings.Value, isCacheThreadSafe);
@@ -463,7 +531,7 @@ namespace Fantasy.Helper
                     }
                     catch (Exception)
                     {
-                        // 都失败
+                        // 全都失败
                         throw
                         new Exception($"Deserialize UnWrapped Type Failed for {type.Name}. Msg: \n {ex.Message}", ex);
                     }
@@ -526,7 +594,7 @@ namespace Fantasy.Helper
                     foreach (var one in allEntityTypes)
                     {
                         info.PolymorphismOptions.DerivedTypes.Add(
-                           new JsonDerivedType(one, one.FullName ?? one.Name)
+                           new JsonDerivedType(one, one.FullName!)
                        );
                     }
                 }

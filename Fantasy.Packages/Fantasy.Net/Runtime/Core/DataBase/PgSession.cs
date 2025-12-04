@@ -6,12 +6,14 @@ using Dapper;
 using Fantasy.Assembly;
 using Fantasy.Async;
 using Fantasy.Database.Attributes;
-using Fantasy.Database.DTO;
+using Fantasy.Database.DataTransfer;
 using Fantasy.Database.Helper;
 using Fantasy.DataStructure.Collection;
 using Fantasy.Entitas;
 using Fantasy.Entitas.TypeMeta;
 using Fantasy.Helper;
+using Fantasy.Pool;
+using MemoryPack;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -105,6 +107,11 @@ namespace Fantasy.Database
             }
         }
 
+        private JsonSettings _jsonSettings = new JsonSettings(
+                library: Library.Microsoft, 
+                isIndented: false,
+                writeTypeWhenNecessary: true);
+
         /// <summary>
         ///  " EntityTable" 映射模型构建阶段。
         ///  在 DbContext 首次实例化的时候会自动检查是否建构过模型，如果检测到从未建构过，OnModelCreating 就会生效。  
@@ -133,13 +140,27 @@ namespace Fantasy.Database
                 EntityTypeBuilder? entityBuilder = default;
                 if (attr.IsAsDocument)
                 {
-                    //文档建表 (通过影子实体, 这段逻辑会在EF模型中创建一个“Dictionry~2”类型的模型内实体 )
-                    entityBuilder = modelBuilder.Entity($"{schemaStr}.{tableName}Doc");
+                    //文档建表 (通过 SharedTypeEntity, 这段逻辑会在EF模型中创建一个模型内共享类型实体 )
+                    if (typeof(Entity).IsAssignableFrom(type))
+                        entityBuilder = modelBuilder.SharedTypeEntity<EntityDocumentDTC>($"{type.FullName}_Shadow");
+                    else
+                        entityBuilder = modelBuilder.SharedTypeEntity<DocumentDTC>($"{type.FullName}_Shadow");
+                    
                     entityBuilder.ToTable($"{tableName}_Doc", schemaStr);
-                    entityBuilder.Property<long>("Id");
-                    entityBuilder.HasKey("Id");
-                    entityBuilder.Property<byte[]>("Bytes").HasColumnType("bytea").IsRequired(false);
-                    entityBuilder.Property<string>("Json").HasColumnType("jsonb").IsRequired(false);
+
+                    if (typeof(Entity).IsAssignableFrom(type))
+                    {
+                        entityBuilder.HasKey(DbSetProperty.ParentType, DbSetProperty.ParentId);
+                    }
+                    else
+                    {
+                        entityBuilder.Property<int>("Id").UseIdentityColumn(); // 数据库自增
+                        entityBuilder.HasKey("Id");
+                    }
+
+                    entityBuilder.Property<object?>(DbSetProperty.DocAsJson).HasColumnType("jsonb").IsRequired(false);
+                    //Note : 暂不支持, 因为byte[]在EFCore中不知道能否池化
+                    //entityBuilder.Property<byte[]?>(DbSetProperty.DocAsBytes).HasColumnType("bytea").IsRequired(false);
                 }
                 else
                 {
@@ -148,29 +169,25 @@ namespace Fantasy.Database
 
                     if(typeof(Entity).IsAssignableFrom(type))
                     {
-                        JsonSettings JsonSettings = new JsonSettings();
-                        JsonSettings.Library = Library.Microsoft;
-                        JsonSettings.IsIndented = false;
-                        JsonSettings.WriteTypeWhenNecessary = true;
-
-                        //承载Embedded实体的影子属性
+                        //承载Embedded实体的影子属性, 自定义序列化转化逻辑
                         entityBuilder.Property<EntityList<Entity>>(DbSetProperty.JsonSingle).HasColumnType("jsonb")
-                            .HasConversion(
-                                           entityList => entityList.ToJson( JsonSettings, true),
-                                           jsonStr => jsonStr.Deserialize<EntityList<Entity>>(JsonSettings, true)
+                            .HasConversion( 
+                                           entityList => entityList.ToJson(_jsonSettings, true),
+                                           jsonStr => jsonStr.Deserialize<EntityList<Entity>>(_jsonSettings, true)
                                            )
                             .IsRequired(false);
                         entityBuilder.Property<EntityList<Entity>>(DbSetProperty.JsonMulti).HasColumnType("jsonb")
-                            .HasConversion(
-                                           entityList => entityList.ToJson( JsonSettings, true),
-                                           jsonStr => jsonStr.Deserialize<EntityList<Entity>>(JsonSettings, true)
+                            .HasConversion( 
+                                           entityList => entityList.ToJson(_jsonSettings, true),
+                                           jsonStr => jsonStr.Deserialize<EntityList<Entity>>(_jsonSettings, true)
                                            )
                             .IsRequired(false);
-                        entityBuilder.Property<byte[]>(DbSetProperty.BytesSingle).HasColumnType("bytea")
-                            .IsRequired(false);
-                        entityBuilder.Property<byte[]>(DbSetProperty.BytesMulti).HasColumnType("bytea")
-                            .IsRequired(false);
-                    }                    
+                        //Note : 暂不支持, 因为byte[]在EFCore中不知道能否池化
+                        //entityBuilder.Property<byte[]>(DbSetProperty.BytesSingle).HasColumnType("bytea")
+                        //    .IsRequired(false);
+                        //entityBuilder.Property<byte[]>(DbSetProperty.BytesMulti).HasColumnType("bytea")
+                        //    .IsRequired(false);
+                    }
                 }
 
                 if (typeof(Entity).IsAssignableFrom(type))
@@ -237,8 +254,8 @@ namespace Fantasy.Database
         /// Sql 操作倾向模式选择, 默认选择是 EFCore, 倾向于使用 EFCore。
         /// !! 需特别注意, 调用属于 IDbSession接口中的查询方法时， 使用Dapper模式, 会有一定的性能提升, 但这样就导致默认不会被 EFCore 框架自动跟踪属性变化了 !!
         /// </summary>
-        public PreferSqlMode Mode { get; set; } = PreferSqlMode.EFCore;    
-     
+        public PreferSqlMode Mode { get; set; } = PreferSqlMode.EFCore;
+
         #region Table
 
         /// <summary>
@@ -1919,29 +1936,60 @@ namespace Fantasy.Database
         {
             if (entity == null)
             {
-                throw new($" Null parent {entity.Id} can not Insert.");
+                throw new($" Null entity can not Insert.");
             }
 
-            if (!TypeDbSetChecker<T>.IsDbSet() || TypeDbSetChecker<T>.IsEmbedded())
+            if (!TypeDbSetChecker<T>.IsDbSet || TypeDbSetChecker<T>.IsEmbedded)
             {
-                Log.Warning($"Can not Insert {entity.Id} due to type \"{typeof(T)}\" is not with [DbSet] or is set as Embedded. It`s been ignoured.");
-                return;
+                throw new($"Can not Insert {entity.Id} due to type \"{typeof(T)}\" is not with [DbSet] or is set as Embedded. ");
             }
+            //if(entity is not IDbSet dbSet || entity.IsEmbeddedDbSet())
+            //{
+            //    throw new($"Can not Insert {entity.Id} due to type \"{typeof(T)}\" is not with [DbSet] or is set as Embedded. ");
+            //}
 
             try
             {
-                Set<T>().Add(entity);
-                var parent = entity.Parent;
+                EntityDocumentDTC? docData = null;
+                int singleCount = entity.ForEachAllSingle.Count();
+                int enbbedCount = 0;
+                foreach (var single in entity.ForEachAllSingle)
+                {
+                    if (single.IsAnnotatedAsEmbedded())
+                        enbbedCount++;
+                }
+                Log.Debug($"{entity.Type.Name}中有{singleCount}个single(s),其中{enbbedCount}个嵌入");
+                Log.Debug($"{entity.Type.Name}转为Json: \n{entity.ToJson(new JsonSettings(Library.Microsoft),true)}");
+                if (TypeDbSetChecker<T>.IsAsDoc)
+                {
+                    //----------文档式存储----------
+                    docData = MultiThreadPoolStackBased.Rent<EntityDocumentDTC>();
+                    docData.ParentId = entity.Parent.Id;
+                    docData.ParentType = entity.Parent.TypeHashCode;
+                    docData.Json = entity;
 
-                //更新影子属性的值
-                Entry(entity).Property<long>(DbSetProperty.ParentType).CurrentValue = parent.TypeHashCode;
-                Entry(entity).Property<long>(DbSetProperty.ParentId).CurrentValue = parent.Id;
-                //Entry(entity).Property<EntityList<Entity>>(DbSetProperty.JsonSingle).CurrentValue = 1;
-                //Entry(entity).Property<EntityList<Entity>>(DbSetProperty.JsonMulti).CurrentValue = 1;
-                //Entry(entity).Property<byte[]>(DbSetProperty.BytesSingle).CurrentValue = 1;
-                //Entry(entity).Property<byte[]>(DbSetProperty.BytesMulti).CurrentValue = 1;
+                    var shadowDbSet = Set<EntityDocumentDTC>(TypeDbSetChecker<T>.ShadowName!);
+                    shadowDbSet.Add(docData);
+                }
+                else
+                {
+                    //----------表格式存储----------
+                    Set<T>().Add(entity);
+                    var parent = entity.Parent;
+                    //更新影子属性的值
+                    Entry(entity).Property<long>(DbSetProperty.ParentType).CurrentValue = parent.TypeHashCode;
+                    Entry(entity).Property<long>(DbSetProperty.ParentId).CurrentValue = parent.Id;
+                    Entry(entity).Property<EntityList<Entity>>(DbSetProperty.JsonSingle).CurrentValue = entity._singleDb;
+                    Entry(entity).Property<EntityList<Entity>>(DbSetProperty.JsonMulti).CurrentValue = entity._multiDb;
+                    //Note: 暂时不支持二进制存储
+                    //Entry(entity).Property<byte[]>(DbSetProperty.BytesSingle).CurrentValue = 1;
+                    //Entry(entity).Property<byte[]>(DbSetProperty.BytesMulti).CurrentValue = 1;
+                }
 
                 var count = await SaveChangesAsync();
+
+                if(docData != null)
+                    MultiThreadPoolStackBased.Return(docData);
             }
             catch (Exception ex) { 
                 throw new($"{pg.GetDatabaseType} Insert-Err ({entity.Type}:{entity.Id}) !\n {ex} ");
@@ -1971,7 +2019,7 @@ namespace Fantasy.Database
                     continue;
                 }
 
-                if (!TypeDbSetChecker<T>.IsDbSet() || TypeDbSetChecker<T>.IsEmbedded())
+                if (!TypeDbSetChecker<T>.IsDbSet || TypeDbSetChecker<T>.IsEmbedded)
                 {
                     Log.Warning($"InsertBatch: Skipped entity {entity.Id} due to type \"{typeof(T)}\" not a DbSet or marked as Embedded.");
                     continue;

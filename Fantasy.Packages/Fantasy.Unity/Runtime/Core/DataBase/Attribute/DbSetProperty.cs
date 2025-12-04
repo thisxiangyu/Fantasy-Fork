@@ -18,23 +18,31 @@ namespace Fantasy.Database.Attributes
         /// <summary>
         /// 独一份的子实体存储字段
         /// </summary>
-        public static string JsonSingle = "_json_single";
+        public static string JsonSingle = "_s";
         /// <summary>
         /// 多份的子实体存储属性
         /// </summary>
-        public static string JsonMulti = "_json_multi";
+        public static string JsonMulti = "_m";
         /// <summary>
         /// 独一份的子实体字节存储字段
         /// </summary>
-        public static string BytesSingle = "_bytes_single";
+        public static string BytesSingle = "_bytes_s";
         /// <summary>
         /// 多份的子实体字节存储属性
         /// </summary>
-        public static string BytesMulti = "_bytes_multi";
+        public static string BytesMulti = "_bytes_m";
         /// <summary>
         /// 多实体查询的行按照什么属性拆分, 默认为Id
         /// </summary>
         public static string MultiEntitiesRowSplitOn = "Id";
+        /// <summary>
+        /// 字节式文档
+        /// </summary>
+        public static string DocAsBytes = "Bytes";
+        /// <summary>
+        /// Json式文档
+        /// </summary>
+        public static string DocAsJson = "Json";
     }
 }
 #endif

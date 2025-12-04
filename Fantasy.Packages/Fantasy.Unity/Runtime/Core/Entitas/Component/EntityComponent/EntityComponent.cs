@@ -215,8 +215,6 @@ namespace Fantasy.Entitas
         /// <param name="entity">需要唤醒的实体</param>
         public void Awake(Entity entity)
         {
-            if (_awakeSystems == null)
-                Log.Warning("_awakeSystems is null");
             if (!_awakeSystems.TryGetValue(entity.Type.TypeHandle, out var awakeSystem))
             {
                 return;

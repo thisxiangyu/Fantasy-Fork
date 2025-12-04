@@ -7,9 +7,11 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Fantasy
 {
-    [DbSet(Name = "FantasyDbSetExample", Relationship = ToParentIs.Child, WithNamespace = true)]
-    public class ExampleRoot : Entity, IMultiAppended
+    [DbSet(Name = "FantasyDbSetExample", WithNamespace = true)]
+    public class ExampleRoot : Entity, IMultiAppended, IDbSet
     {
+        public DbSetOptions DbSetOpts => new() { Name = "FantasyDbSetExample", WithNamespace = true };
+
         public int TestIntField { get; set; }
 
         public int TestStringField { get; set; }
@@ -26,19 +28,16 @@ namespace Fantasy
             var child02 = componentA.GetOrAddComponent<Child>();
             var child03 = componentA.GetOrAddComponent<Child>();
             var b2 = componentA.GetOrAddComponent<ComponentB>();
-            var c2 = componentA.GetOrAddComponent<ComponentC>();
+            var c2 = componentA.GetOrAddComponent<ComponentC_AsEmbeddDoc>();
+            var componentC = c2.GetOrAddComponent<ComponentC_AsEmbeddDoc>();
+            var grandChild = componentC.GetOrAddComponent<Grandchild_AsDoc>();
 
             var a2 = child01.GetOrAddComponent<ComponentA>();
             var b3 = child02.GetOrAddComponent<ComponentB>();
 
-            var componentC = child03.GetOrAddComponent<ComponentC>();
-            var grandChild = componentC.GetOrAddComponent<Grandchild>();
             var a3 = grandChild.GetOrAddComponent<ComponentA>();
             var b4 = grandChild.GetOrAddComponent<ComponentB>();
-            var c3 = grandChild.GetOrAddComponent<ComponentC>();
-
-            Log.Debug("[FantasyDbSet] 测试: 实体树已构造,");
-            Log.Debug("\r\n        ///     Root\r\n        ///     ├─ ComponentA\r\n        ///     │  ├─ Child01\r\n        ///     │  │  └─ ComponentA\r\n        ///     │  ├─ Child02\r\n        ///     │  │  └─ ComponentB\r\n        ///     │  └─ Child03\r\n        ///     │     └─ ComponentC\r\n        ///     │        └─ Grandchild\r\n        ///     │           ├─ ComponentA\r\n        ///     │           ├─ ComponentB\r\n        ///     │           └─ ComponentC\r\n        ///     └─ ComponentB");
+            var c3 = grandChild.GetOrAddComponent<ComponentC_AsEmbeddDoc>();
 
             var db = Scene.World.GetDatabase<T>(dutyId);
 
@@ -71,28 +70,25 @@ namespace Fantasy
                             if (dbSession == null)
                                 throw new("Failed to use dbSession.");
 
-                            //开启事务
+                            //测试事务性
                             using var transaction = await dbSession.Database.BeginTransactionAsync();
                             try
                             {
-                                await dbSession.InsertBatch(this.ForEachMulti<Child>());
-                                await dbSession.Insert(this);
+                                //await dbSession.InsertBatch(componentA.ForEachMulti<Child>());
+                                //await dbSession.Insert(this);
                                 await dbSession.Insert(componentA);
-                                await dbSession.Insert(componentB);
-                                await dbSession.Insert(componentC);
+                                //await dbSession.Insert(componentB);
                                 await dbSession.Insert(grandChild);
-                                await dbSession.Insert(a2);
-                                await dbSession.Insert(a3);
-                                await dbSession.Insert(b2);
-                                await dbSession.Insert(b3);
-                                await dbSession.Insert(b4);
-                                await dbSession.Insert(c2);
-                                await dbSession.Insert(c3);
-                                //await dbSession.Insert(c3); //测试重复Id会不会报错
+                                //await dbSession.Insert(a2);
+                                //await dbSession.Insert(a3);
+                                //await dbSession.Insert(b2);
+                                //await dbSession.Insert(b3);
+                                //await dbSession.Insert(b4);
+                                await transaction.CommitAsync();   // 提交事务
                             }
                             catch
                             {
-                                // 回滚事务
+                                Log.Warning("--------------事务回滚了--------------");
                                 await transaction.RollbackAsync();
                                 throw;
                             }
@@ -113,7 +109,7 @@ namespace Fantasy
                             if (dbSession == null)
                                 throw new("Failed to use dbSession.");
 
-                            var notExist = await dbSession.Query<ComponentC>(id: 10000); //测试失败查询
+                            var notExist = await dbSession.Query<ComponentC_AsEmbeddDoc>(id: 10000); //测试失败查询
 
                             if (notExist == null)
                                 Log.Info($"id:{10000} ComponentC 不存在.");
@@ -130,9 +126,9 @@ namespace Fantasy
                             foreach (var child in children)
                             {
                                 var result1 = await dbSession.QueryAppend<ComponentA, ComponentB>(child); //双重查询且附加
-                                Log.Info($"查到 child {child.Id} 有 {result1.Item1.Count()}个 ComponentA 和 {result1.Item2.Count()}个 ComponentB");
+                                Log.Info($"查到 component_a 的 child {child.Id} 有 {result1.Item1.Count()}个 ComponentA 和 {result1.Item2.Count()}个 ComponentB");
                             }
-                            var result2 = await dbSession.QueryAppend<Child,ComponentB,ComponentC>(component_a!); //三重查询且附加
+                            //var result2 = await dbSession.QueryAppend<Child,ComponentB,ComponentC_EmbeddDoc>(component_a!); //三重查询且附加
                             Log.Debug("--------------------PgSQL API测试结束--------------------");
                         }
                         break;

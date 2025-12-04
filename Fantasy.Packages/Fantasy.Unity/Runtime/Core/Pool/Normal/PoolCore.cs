@@ -10,7 +10,7 @@ using Fantasy.DataStructure.Collection;
 namespace Fantasy.Pool
 {
     /// <summary>
-    /// 对象池抽象接口，用于创建和管理可重复使用的对象实例。
+    /// 对象池抽象类，用于创建和管理可重复使用的对象实例。
     /// </summary>
     public abstract class PoolCore : IDisposable
     {
