@@ -140,7 +140,8 @@ Unity 客户端开发的完整指南。
 #### 网络开发
 - ✅ [07-Address消息.md](04-Advanced/NetworkDevelopment/06-Address消息.md) - Address 消息 - 服务器间实体通信
 - ✅ [08-Roaming.md](04-Advanced/NetworkDevelopment/08-Roaming.md) - Roaming 漫游消息 - 分布式实体路由
-- [ ] 09-SphereEvent.md - SphereEvent 跨服域事件系统
+- ✅ [09-SphereEvent.md](04-Advanced/NetworkDevelopment/09-SphereEvent.md) - SphereEvent 跨服域事件系统
+- ✅ [10-HttpServerConfiguration.md](04-Advanced/NetworkDevelopment/10-HttpServerConfiguration.md) - HTTP 服务器配置事件使用指南
 
 #### 高级特性
 - [ ] 11-Timer.md - Timer 系统

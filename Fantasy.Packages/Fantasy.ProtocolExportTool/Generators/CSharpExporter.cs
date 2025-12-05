@@ -153,7 +153,7 @@ public sealed class CSharpExporter(
                  """;
     }
 
-    protected override string GenerateOuterMessages(IReadOnlyList<MessageDefinition> messageDefinitions)
+    protected override string GenerateOuterMessages(SyntaxElementByIfDefine _outerCustomNamespaces,IReadOnlyList<MessageDefinition> messageDefinitions)
     {
         return messageDefinitions.Count == 0 ? string.Empty : $$"""
                                                                 using ProtoBuf;
@@ -163,6 +163,7 @@ public sealed class CSharpExporter(
                                                                 using Fantasy;
                                                                 using Fantasy.Network.Interface;
                                                                 using Fantasy.Serialize;
+                                                                {{_outerCustomNamespaces.ToCodeString()}}
                                                                 #pragma warning disable CS8625 // Cannot convert null literal to non-nullable reference type.
                                                                 #pragma warning disable CS8618
                                                                 // ReSharper disable InconsistentNaming
@@ -183,7 +184,7 @@ public sealed class CSharpExporter(
                                                                 """;
     }
 
-    protected override string GenerateInnerMessages(IReadOnlyList<MessageDefinition> messageDefinitions)
+    protected override string GenerateInnerMessages(SyntaxElementByIfDefine _innerCustomNamespaces,IReadOnlyList<MessageDefinition> messageDefinitions)
     {
         return messageDefinitions.Count == 0 ? string.Empty : $$"""
                                                                 using ProtoBuf;
@@ -194,6 +195,7 @@ public sealed class CSharpExporter(
                                                                 using Fantasy;
                                                                 using Fantasy.Network.Interface;
                                                                 using Fantasy.Serialize;
+                                                                {{_innerCustomNamespaces.ToCodeString()}}
                                                                 // ReSharper disable InconsistentNaming
                                                                 // ReSharper disable CollectionNeverUpdated.Global
                                                                 // ReSharper disable RedundantTypeArgumentsOfMethod
@@ -342,7 +344,7 @@ public sealed class CSharpExporter(
             
             if (messageDefinition.HasOpCode)
             {
-                members.Add($"public uint OpCode() {{ return {opcodeName}.{messageDefinition.Name}; }} ");
+                members.Add($"        public uint OpCode() {{ return {opcodeName}.{messageDefinition.Name}; }} ");
             }
             
             if (IsRequestType(messageDefinition.MessageType))
@@ -416,10 +418,46 @@ public sealed class CSharpExporter(
                 builder.AppendLine("    /// </summary>");
             }
 
+            if(messageDefinition.CustomClassAttributesByIfDefine.Count > 0)
+            {
+                foreach (var kv in messageDefinition.CustomClassAttributesByIfDefine)
+                {
+                    bool ifAnyCondition = !string.IsNullOrWhiteSpace(kv.Key); // 是否有条件编译符
+                    
+                    if (ifAnyCondition)
+                        builder.AppendLine($"#if {kv.Key}");
+
+                    foreach (string attr in kv.Value)
+                    {
+                        builder.AppendLine($"    {attr}");
+                    }
+
+                    if (ifAnyCondition)
+                        builder.AppendLine($"#endif");                    
+                }
+            }
+
             if (!string.IsNullOrEmpty(messageDefinition.Protocol.ClassAttribute))
             {
-                builder.AppendLine($"    [Serializable]\n" +
-                                   $"    {messageDefinition.Protocol.ClassAttribute}");
+                if (messageDefinition.Fields.Any())
+                {
+                    builder.AppendLine($"    [Serializable]\n" +
+                                       $"    {messageDefinition.Protocol.ClassAttribute}");
+                }
+                else
+                {
+                    if (IsResponseType(messageDefinition.MessageType) || messageDefinition.Protocol.ProtocolName != "ProtoBuf")
+                    {
+                        builder.AppendLine($"    [Serializable]\n" +
+                                           $"    {messageDefinition.Protocol.ClassAttribute}");
+                    }
+                    else
+                    {
+                        // 针对Protobuf空消息：使用 EmptyMessageSerializer
+                        builder.AppendLine($"    [Serializable]\n" +
+                                           $"    [ProtoContract(Serializer = typeof(global::Fantasy.Serialize.EmptyMessageSerializer<{messageDefinition.Name}>))]");
+                    }
+                }
             }
             
             if (string.IsNullOrEmpty(messageDefinition.InterfaceType))
