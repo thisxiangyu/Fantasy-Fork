@@ -48,6 +48,8 @@
     <ItemGroup>
       <PackageReference Include="CommandLineParser" Version="2.9.1" />
       <FrameworkReference Include="Microsoft.AspNetCore.App" />
+      <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.15.0" />
+      <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.15.0" />
       <PackageReference Include="Dapper" Version="2.1.66" />
       <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.1.0" />
       <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.1">
@@ -70,6 +72,9 @@
         <None Include="build\Fantasy-Net.targets" Pack="true" PackagePath="build;buildTransitive" />
         <!-- MSBuild Modules -->
         <None Include="build\modules\*.targets" Pack="true" PackagePath="build\modules;buildTransitive\modules" />
+        <Compile Remove="Runtime\Security\**" />
+        <EmbeddedResource Remove="Runtime\Security\**" />
+        <None Remove="Runtime\Security\**" />
         <!-- 包元数据文件 -->
         <None Include="icon.png" Pack="true" PackagePath="\" />
         <None Include="LICENSE" Pack="true" PackagePath="\" />
@@ -92,6 +97,11 @@
     <ItemGroup>
       <Folder Include="Migrations\" />
       <Folder Include="Runtime\Core\World\" />
+      <Folder Include="Runtime\Product\Authentication\Solutions\FaceID\" />
+      <Folder Include="Runtime\Product\Authentication\Solutions\QRCode\" />
+      <Folder Include="Runtime\Product\Authentication\Solutions\Email\" />
+      <Folder Include="Runtime\Product\Payment\Solutions\" />
+      <Folder Include="Runtime\Product\Payment\Utilities\" />
     </ItemGroup>
     <ItemGroup>
         <!-- 获取 Fantasy.SourceGenerator 的输出 DLL -->

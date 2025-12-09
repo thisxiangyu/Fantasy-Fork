@@ -92,7 +92,7 @@ namespace Fantasy.Helper
         /// <typeparam name="T">数组元素的类型。</typeparam>
         /// <param name="array">要选择的数组。</param>
         /// <returns>随机选择的数组元素。</returns>
-        public static T RandomArray<T>(this T[] array)
+        public static T RandomElement<T>(this T[] array)
         {
             return array[RandomNumber(0, array.Count())];
         }
@@ -103,7 +103,7 @@ namespace Fantasy.Helper
         /// <typeparam name="T">列表元素的类型。</typeparam>
         /// <param name="array">要选择的列表。</param>
         /// <returns>随机选择的列表元素。</returns>
-        public static T RandomArray<T>(this List<T> array)
+        public static T RandomElement<T>(this List<T> array)
         {
             return array[RandomNumber(0, array.Count())];
         }
