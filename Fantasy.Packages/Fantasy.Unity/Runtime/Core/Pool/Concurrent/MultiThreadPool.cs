@@ -40,11 +40,11 @@ namespace Fantasy.Pool
     }
 
     /// <summary>
-    /// 基于<see cref="Stack{T}"/>的线程安全静态通用对象池。
-    /// (比基于<see cref="Queue{T}"/>的实现<see cref="MultiThreadPool"/>略快)。
-    /// 缓存友好, 但是不具备公平性(池中对象不会被平等地利用)。
+    /// 基于<see cref="MultiThreadPoolStack"/>的线程安全静态通用对象池。
+    /// (比基于<see cref="MultiThreadPoolQueue"/>的实现<see cref="MultiThreadPool"/>略快)。
+    /// 缓存友好, 且能更好地在开发时暴露池对象未清理干净的问题, 但是不具备公平性(池中对象不会被平等地利用)。
     /// </summary>
-    internal static class MultiThreadPoolStackBased
+    internal static class MultiThreadPoolStacks
     {
         private static readonly ConcurrentDictionary<Type, MultiThreadPoolStack> ObjectPools =
             new ConcurrentDictionary<Type, MultiThreadPoolStack>();

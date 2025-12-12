@@ -1955,7 +1955,7 @@ namespace Fantasy.Database
                 int enbbedCount = 0;
                 foreach (var single in entity.ForEachAllSingle)
                 {
-                    if (single.IsEmbeddedInAttri())
+                    if (single.IsAnnotatedAsEmbedded())
                         enbbedCount++;
                 }
                 Log.Debug($"{entity.Type.Name}中有{singleCount}个single(s),其中{enbbedCount}个嵌入");
@@ -1963,7 +1963,7 @@ namespace Fantasy.Database
                 if (TypeDbSetChecker<T>.IsAsDoc)
                 {
                     //----------文档式存储----------
-                    docData = MultiThreadPoolStackBased.Rent<EntityDocumentDTC>();
+                    docData = MultiThreadPoolStacks.Rent<EntityDocumentDTC>();
                     docData.ParentId = entity.Parent.Id;
                     docData.ParentType = entity.Parent.TypeHashCode;
                     docData.Json = entity;
@@ -1989,7 +1989,7 @@ namespace Fantasy.Database
                 var count = await SaveChangesAsync();
 
                 if(docData != null)
-                    MultiThreadPoolStackBased.Return(docData);
+                    MultiThreadPoolStacks.Return(docData);
             }
             catch (Exception ex) { 
                 throw new($"{pg.GetDatabaseType} Insert-Err ({entity.Type}:{entity.Id}) !\n {ex} ");

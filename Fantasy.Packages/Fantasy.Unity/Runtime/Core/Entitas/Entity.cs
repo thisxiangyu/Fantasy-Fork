@@ -39,7 +39,7 @@ namespace Fantasy.Entitas
     public abstract partial class Entity : IEntity
     {
         #region Members
-
+        
         /// <summary>
         /// 实体的Id
         /// </summary>
@@ -116,9 +116,7 @@ namespace Fantasy.Entitas
         /// <summary>
         /// 实体的真实Type的编码
         /// </summary>
-        [BsonIgnore]
-        [IgnoreDataMember]
-        [ProtoIgnore]
+        [BsonIgnore][IgnoreDataMember][ProtoIgnore]
 #if FANTASY_NET
         [NotMapped]
         [MJ.JsonIgnore]
@@ -182,7 +180,7 @@ namespace Fantasy.Entitas
 #endif
         [NJ.JsonIgnore]
         private EntitySortedDictionary<long, Entity> _multi;
-
+        
         /// <summary>
         /// 获得父Entity
         /// </summary>
@@ -267,9 +265,9 @@ namespace Fantasy.Entitas
             {
                 throw new NotSupportedException($"Type:{type.FullName} must inherit from Child");
             }
-
+            
             Entity entity = null;
-
+            
             if (isPool)
             {
                 entity = (Entity)scene.EntityPool.Rent(scene, type);
@@ -278,7 +276,7 @@ namespace Fantasy.Entitas
             {
                 entity = scene.PoolGeneratorComponent.Create<Entity>(type);
             }
-
+            
             entity.Scene = scene;
             entity.Type = type;
             entity.TypeHashCode = TypeHashCache.GetHashCode(type);
@@ -286,7 +284,7 @@ namespace Fantasy.Entitas
             entity.Id = id;
             entity.RuntimeId = scene.RuntimeIdFactory.Create(isPool);
             scene.AddEntity(entity);
-
+            
             if (isRunEvent)
             {
                 scene.EntityComponent.Awake(entity);
@@ -295,7 +293,7 @@ namespace Fantasy.Entitas
                 scene.EntityComponent.RegisterLateUpdate(entity);
 #endif
             }
-
+            
             return entity;
         }
 
@@ -323,7 +321,7 @@ namespace Fantasy.Entitas
         {
             return Create<T>(scene, scene.EntityIdFactory.Create, isPool, true);
         }
-
+        
         /// <summary>
         /// 创建一个实体
         /// </summary>
@@ -337,7 +335,7 @@ namespace Fantasy.Entitas
         {
             return Create<T>(scene, scene.EntityIdFactory.Create, isPool, isRunEvent);
         }
-
+        
         /// <summary>
         /// 创建一个实体
         /// </summary>
@@ -358,7 +356,7 @@ namespace Fantasy.Entitas
             entity.Id = id;
             entity.RuntimeId = scene.RuntimeIdFactory.Create(isPool);
             scene.AddEntity(entity);
-
+            
             if (isRunEvent)
             {
                 scene.EntityComponent.Awake(entity);
@@ -457,7 +455,7 @@ namespace Fantasy.Entitas
             else
             {
                 var typeHashCode = subEntity.TypeHashCode;
-
+                
                 if (_single == null)
                 {
                     _single = Scene.EntitySortedDictionaryPool.Rent();
@@ -467,7 +465,7 @@ namespace Fantasy.Entitas
                     Log.Error($"type:{type.FullName} If you want to append multiple entites of the same type, please implement IMultiAppended");
                     return;
                 }
-
+                
                 _single.Add(typeHashCode, subEntity);
 #if FANTASY_NET
                 if (subEntity.IsAnnotatedAsEmbedded())
@@ -500,17 +498,17 @@ namespace Fantasy.Entitas
                 Log.Error($"SubEntity is Disposed {typeof(T).FullName}");
                 return;
             }
-
+            
             subEntity.Parent?.RemoveComponent(subEntity, false);
-
+            
             if (TypeSupportedChecker<T>.IsMulti)
             {
                 _multi ??= Scene.EntitySortedDictionaryPool.Rent();
-                try
-                {
-                    _multi.Add(subEntity.Id, subEntity);
+                try 
+                { 
+                    _multi.Add(subEntity.Id, subEntity); 
                 }
-                catch (Exception ex)
+                catch( Exception ex)
                 {
                     throw new Exception($"A same id {subEntity.Id} of {subEntity.Type} is existing in {GetType()} : {ex}");
                 }
@@ -525,7 +523,7 @@ namespace Fantasy.Entitas
             else
             {
                 var typeHashCode = subEntity.TypeHashCode;
-
+                
                 if (_single == null)
                 {
                     _single = Scene.EntitySortedDictionaryPool.Rent();
@@ -535,7 +533,7 @@ namespace Fantasy.Entitas
                     Log.Error($"type:{typeof(T).FullName} If you want to append multiple entites of the same type, please implement IMultiAppended");
                     return;
                 }
-
+                
                 _single.Add(typeHashCode, subEntity);
 #if FANTASY_NET
                 if (TypeDbSetChecker<T>.IsEmbedded)
@@ -545,7 +543,7 @@ namespace Fantasy.Entitas
                 } 
 #endif
             }
-
+            
             subEntity.Parent = this;
             subEntity.Scene = Scene;
         }
@@ -585,7 +583,7 @@ namespace Fantasy.Entitas
             {
                 return false;
             }
-
+            
             return _single.ContainsKey(TypeHashCache<T>.HashCode);
         }
 
@@ -638,7 +636,7 @@ namespace Fantasy.Entitas
             {
                 return null;
             }
-
+            
             return _single.TryGetValue(TypeHashCache<T>.HashCode, out var subEntity) ? (T)subEntity : null;
         }
 
@@ -654,7 +652,7 @@ namespace Fantasy.Entitas
             {
                 return null;
             }
-
+            
             return _single.GetValueOrDefault(TypeHashCache.GetHashCode(type));
         }
 
@@ -689,7 +687,7 @@ namespace Fantasy.Entitas
         #endregion
 
         #region RemoveSubEntity
-
+        
         /// <summary>
         /// 当前实体下删除一个子实体
         /// </summary>
@@ -702,12 +700,12 @@ namespace Fantasy.Entitas
             {
                 throw new NotSupportedException($"{typeof(T).FullName} message:Cannot delete entity that implement the IMultiAppended interface");
             }
-
+            
             if (_single == null)
             {
                 return;
             }
-
+            
             var typeHashCode = TypeHashCache<T>.HashCode;
             if (!_single.TryGetValue(typeHashCode, out var subEntity))
             {
@@ -732,7 +730,7 @@ namespace Fantasy.Entitas
                 Scene.EntitySortedDictionaryPool.Return(_single);
                 _single = null;
             }
-
+            
             if (isDispose)
             {
                 subEntity.Dispose();
@@ -773,7 +771,7 @@ namespace Fantasy.Entitas
                 Scene.EntitySortedDictionaryPool.Return(_multi);
                 _multi = null;
             }
-
+            
             if (isDispose)
             {
                 subEntity.Dispose();
@@ -791,7 +789,7 @@ namespace Fantasy.Entitas
             {
                 return;
             }
-
+            
             if (subEntity is IMultiAppended)
             {
                 if (_multi != null)
@@ -846,7 +844,7 @@ namespace Fantasy.Entitas
                     _single = null;
                 }
             }
-
+            
             if (isDispose)
             {
                 subEntity.Dispose();
@@ -865,7 +863,7 @@ namespace Fantasy.Entitas
             {
                 return;
             }
-
+            
             if (TypeSupportedChecker<T>.IsMulti)
             {
                 if (_multi != null)
@@ -920,7 +918,7 @@ namespace Fantasy.Entitas
                     _single = null;
                 }
             }
-
+            
             if (isDispose)
             {
                 subEntity.Dispose();
@@ -995,7 +993,7 @@ namespace Fantasy.Entitas
         #endregion
 
         #region ForEach
-
+        
         /// <summary>
         /// 查询当前实体下的实现了IMultiAppended接口的实体
         /// </summary>
@@ -1035,7 +1033,7 @@ namespace Fantasy.Entitas
 
             foreach (var (_, entity) in _multi)
             {
-                if (entity is T res)
+                if(entity is T res)
                     yield return res;
             }
         }
@@ -1079,11 +1077,11 @@ namespace Fantasy.Entitas
             {
                 return;
             }
-
+            
             var scene = Scene;
             var runTimeId = RuntimeId;
             RuntimeId = 0;
-
+            
             if (_single != null)
             {
                 foreach (var (_, entity) in _single)
@@ -1095,7 +1093,7 @@ namespace Fantasy.Entitas
                 scene.EntitySortedDictionaryPool.Return(_single);
                 _single = null;
             }
-
+            
             if (_multi != null)
             {
                 foreach (var (_, entity) in _multi)
@@ -1123,7 +1121,7 @@ namespace Fantasy.Entitas
             }
 #endif
             scene.EntityComponent.Destroy(this);
-
+            
             if (Parent != null && Parent != this && !Parent.IsDisposed)
             {
                 Parent.RemoveComponent(this, false);
@@ -1149,7 +1147,7 @@ namespace Fantasy.Entitas
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsPool()
         {
-            return IdFactoryHelper.RuntimeIdTool.GetIsPool(RuntimeId);
+            return IdFactoryHelper.RuntimeIdTool.GetIsPool(RuntimeId); 
         }
 
         /// <summary>

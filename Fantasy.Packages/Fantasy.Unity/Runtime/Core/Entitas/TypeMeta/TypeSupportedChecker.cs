@@ -21,7 +21,7 @@ namespace Fantasy.Entitas.TypeMeta
         public static void WarmUp(IEnumerable<Type> types)
         {
             Dictionary<long, TypeSupportedCache> dict = new();
-            foreach(var type in types)
+            foreach (var type in types)
             {
                 dict.Add(TypeHashCache.GetHashCode(type), WarmUpOne(type));
             }
@@ -31,7 +31,8 @@ namespace Fantasy.Entitas.TypeMeta
         /// <summary>
         /// 预热单个
         /// </summary>
-        internal static TypeSupportedCache WarmUpOne(Type type) {
+        internal static TypeSupportedCache WarmUpOne(Type type)
+        {
             TypeSupportedCache cache = new();
             cache.IsMulti = typeof(IMultiAppended).IsAssignableFrom(type);
 #if FANTASY_NET
@@ -43,8 +44,9 @@ namespace Fantasy.Entitas.TypeMeta
         /// <summary>
         /// 获取类型的支持特性信息
         /// </summary>
-        public static TypeSupportedCache GetInfo(Type type) {
-            if(InfoByHash == null)
+        public static TypeSupportedCache GetInfo(Type type)
+        {
+            if (InfoByHash == null)
                 // 如果还没预热，抛异常
                 throw new InvalidOperationException($"TypeSupportedInfos is not warmuped.");
 
@@ -122,7 +124,7 @@ namespace Fantasy.Entitas.TypeMeta
         static TypeSupportedChecker()
         {
             var warmedUp = TypeSupportedChecker.TryGetInfo(typeof(T));
-            if(warmedUp!=null)
+            if (warmedUp != null)
                 _info = warmedUp;
             else
                 _info = TypeSupportedChecker.WarmUpOne(typeof(T));
