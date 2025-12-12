@@ -187,6 +187,11 @@ namespace Fantasy.Timer
                 AddTimer(ref timerAction);
                 result = await tcs;
             }
+            catch (Exception ex)
+            {
+                Log.Error($"TimerSchedulerNet.WaitAsync failed: timerId={timerId}, time={time}, exception={ex}");
+                throw;
+            }
             finally
             {
                 cancellationToken?.Remove(CancelActionVoid);
@@ -213,7 +218,7 @@ namespace Fantasy.Timer
             var timerId = GetId;
             var tcs = FTask<bool>.Create();
             var timerAction = new TimerAction(timerId, TimerType.OnceWaitTimer, now, tillTime - now, tcs);
-            
+
             void CancelActionVoid()
             {
                 if (Remove(timerId))
@@ -221,7 +226,7 @@ namespace Fantasy.Timer
                     tcs.SetResult(false);
                 }
             }
-            
+
             bool result;
 
             try
@@ -229,6 +234,11 @@ namespace Fantasy.Timer
                 cancellationToken?.Add(CancelActionVoid);
                 AddTimer(ref timerAction);
                 result = await tcs;
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"TimerSchedulerNet.WaitTillAsync failed: timerId={timerId}, tillTime={tillTime}, now={now}, waitTime={tillTime - now}, exception={ex}");
+                throw;
             }
             finally
             {

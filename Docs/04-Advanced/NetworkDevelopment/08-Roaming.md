@@ -178,17 +178,40 @@ message Map2G_GetPlayerResponse // IRoamingResponse
 **核心 API：**
 
 ```csharp
-// 1. 创建 Roaming 组件
-RoamingComponent session.CreateRoaming(long roamingId, bool isAutoDispose, int delayRemove);
+// 1. 创建 Roaming 组件（简单版本，直接返回组件）
+SessionRoamingComponent session.CreateRoaming(long roamingId, bool isAutoDispose, int delayRemove);
 
-// 2. 链接到后端服务器
+// 2. 创建 Roaming 组件（详细版本，返回状态信息）
+CreateRoamingResult session.TryCreateRoaming(long roamingId, bool isAutoDispose, int delayRemove);
+
+// 3. 链接到后端服务器
 uint roaming.Link(Session session, SceneConfig sceneConfig, int roamingType);
 ```
 
-**完整示例：**
+**CreateRoamingResult 结构体：**
 
 ```csharp
-// Gate 服务器：处理客户端的登录请求
+public readonly struct CreateRoamingResult
+{
+    // 创建状态
+    public readonly CreateRoamingStatus Status;
+
+    // 漫游组件实例（如果创建失败则为null）
+    public readonly SessionRoamingComponent Roaming;
+}
+
+public enum CreateRoamingStatus
+{
+    NewCreated,              // 新创建的漫游组件
+    AlreadyExists,           // 使用已存在的漫游组件
+    SessionAlreadyHasRoaming // 错误：当前Session已经创建了不同roamingId的漫游组件
+}
+```
+
+**完整示例（使用 CreateRoaming）：**
+
+```csharp
+// Gate 服务器：处理客户端的登录请求 - 简单版本
 public class C2G_LoginRequestHandler : MessageRPC<C2G_LoginRequest, G2C_LoginResponse>
 {
     protected override async FTask Run(
@@ -201,11 +224,17 @@ public class C2G_LoginRequestHandler : MessageRPC<C2G_LoginRequest, G2C_LoginRes
         // roamingId: 漫游的唯一标识，通常使用玩家 ID
         // isAutoDispose: Session 断开时是否自动断开漫游功能
         // delayRemove: 延迟多久执行断开（毫秒）
-        var roaming = session.CreateRoaming(
+        var roaming = await session.CreateRoaming(
             roamingId: request.PlayerId,
             isAutoDispose: true,
             delayRemove: 1000
         );
+
+        if (roaming == null)
+        {
+            response.ErrorCode = ErrorCode.RoamingCreateFailed;
+            return;
+        }
 
         // 步骤 2：链接到 Chat 服务器
         var chatConfig = SceneConfigData.Instance.GetSceneBySceneType(SceneType.Chat)[0];
@@ -222,6 +251,65 @@ public class C2G_LoginRequestHandler : MessageRPC<C2G_LoginRequest, G2C_LoginRes
     }
 }
 ```
+
+**完整示例（使用 TryCreateRoaming）：**
+
+```csharp
+// Gate 服务器：处理客户端的登录请求 - 详细版本
+public class C2G_LoginRequestHandler : MessageRPC<C2G_LoginRequest, G2C_LoginResponse>
+{
+    protected override async FTask Run(
+        Session session,
+        C2G_LoginRequest request,
+        G2C_LoginResponse response,
+        Action reply)
+    {
+        // 步骤 1：创建 Roaming 组件，获取详细状态
+        var result = await session.TryCreateRoaming(
+            roamingId: request.PlayerId,
+            isAutoDispose: true,
+            delayRemove: 1000
+        );
+
+        // 根据状态进行不同处理
+        switch (result.Status)
+        {
+            case CreateRoamingStatus.NewCreated:
+                Log.Info($"✅ 为玩家 {request.PlayerId} 创建新的漫游组件");
+                break;
+
+            case CreateRoamingStatus.AlreadyExists:
+                Log.Info($"⚠️ 玩家 {request.PlayerId} 的漫游组件已存在，复用现有组件");
+                break;
+
+            case CreateRoamingStatus.SessionAlreadyHasRoaming:
+                Log.Error($"❌ Session 已经创建了其他 roamingId 的漫游组件");
+                response.ErrorCode = ErrorCode.SessionAlreadyHasRoaming;
+                return;
+        }
+
+        // 步骤 2：链接到 Chat 服务器
+        var chatConfig = SceneConfigData.Instance.GetSceneBySceneType(SceneType.Chat)[0];
+        var errorCode = await result.Roaming.Link(session, chatConfig, RoamingType.ChatRoamingType);
+
+        if (errorCode != 0)
+        {
+            response.ErrorCode = errorCode;
+            return;
+        }
+
+        Log.Info($"✅ 为玩家 {request.PlayerId} 建立到Chat的漫游路由");
+        await FTask.CompletedTask;
+    }
+}
+```
+
+**两种方法的选择：**
+
+| 方法 | 适用场景 | 优点 | 缺点 |
+|------|---------|------|------|
+| `CreateRoaming()` | 简单场景，不需要详细状态 | 代码简洁，直接获取组件 | 无法区分新创建还是已存在 |
+| `TryCreateRoaming()` | 需要详细状态判断的场景 | 可以根据不同状态做不同处理 | 代码稍复杂 |
 
 ---
 
@@ -465,7 +553,9 @@ public class G2Chat_GetDataRequestHandler : RoamingRPC<ChatPlayer, G2Chat_GetDat
 
 ### Terminus 向客户端发送消息
 
-Chat 服务器可以通过 Terminus 主动向客户端发送消息：
+Chat 服务器可以通过 Terminus 主动向客户端发送消息。有两种方式：
+
+#### 方式 1：使用 TerminusHelper 扩展方法（推荐）
 
 ```csharp
 // Chat 服务器代码
@@ -473,15 +563,68 @@ public class ChatPlayerLogic
 {
     public void NotifyClient(ChatPlayer chatPlayer, string notification)
     {
-        // 获取 ChatPlayer 关联的 Terminus
-        var terminus = chatPlayer.GetComponent<TerminusFlagComponent>()?.Terminus;
-        if (terminus == null)
+        // 使用扩展方法直接从实体发送消息
+        chatPlayer.Send(new Chat2C_Notification
+        {
+            Content = notification
+        });
+
+        Log.Info("✅ 向客户端发送通知");
+    }
+
+    // 发送漫游消息到其他服务器
+    public void SendToMapServer(ChatPlayer chatPlayer, int mapRoamingType)
+    {
+        // 发送单向消息
+        chatPlayer.Send(mapRoamingType, new Chat2Map_TestMessage
+        {
+            Data = "Hello Map"
+        });
+    }
+
+    // 调用其他服务器的 RPC
+    public async FTask CallMapServer(ChatPlayer chatPlayer, int mapRoamingType)
+    {
+        var response = await chatPlayer.Call(mapRoamingType, new Chat2Map_GetDataRequest
+        {
+            PlayerId = chatPlayer.PlayerId
+        });
+
+        if (response.ErrorCode == 0)
+        {
+            Log.Info("✅ 从 Map 服务器获取数据成功");
+        }
+    }
+}
+```
+
+**TerminusHelper 提供的扩展方法：**
+
+| 方法 | 说明 |
+|------|------|
+| `entity.Send<T>(message)` | 向客户端发送单向消息 |
+| `entity.Send<T>(roamingType, message)` | 向指定漫游类型的服务器发送单向消息 |
+| `entity.Call<T>(roamingType, request)` | 向指定漫游类型的服务器发送 RPC 请求 |
+| `entity.StartTransfer(targetSceneAddress)` | 传送实体到目标场景 |
+| `entity.GetLinkTerminus()` | 获取实体关联的 Terminus |
+| `entity.TryGetLinkTerminus(out terminus)` | 安全地获取实体关联的 Terminus |
+
+#### 方式 2：通过 Terminus 发送（高性能场景）
+
+```csharp
+// Chat 服务器代码 - 性能优化版本
+public class ChatPlayerLogic
+{
+    public void NotifyClientOptimized(ChatPlayer chatPlayer, string notification)
+    {
+        // 先获取 Terminus，避免重复查找
+        if (!chatPlayer.TryGetLinkTerminus(out var terminus))
         {
             Log.Error("❌ Terminus 不存在");
             return;
         }
 
-        // 直接发送消息给客户端
+        // 直接使用 Terminus 发送
         terminus.Send(new Chat2C_Notification
         {
             Content = notification
@@ -489,19 +632,74 @@ public class ChatPlayerLogic
 
         Log.Info("✅ 向客户端发送通知");
     }
+
+    // 频繁发送消息时的最佳实践
+    public void SendMultipleMessages(ChatPlayer chatPlayer)
+    {
+        // 一次获取，多次使用，避免重复查找组件
+        if (!chatPlayer.TryGetLinkTerminus(out var terminus))
+        {
+            return;
+        }
+
+        terminus.Send(new Chat2C_Message1 { });
+        terminus.Send(new Chat2C_Message2 { });
+        terminus.Send(new Chat2C_Message3 { });
+    }
 }
 ```
+
+**性能对比：**
+
+| 场景 | 推荐方式 | 原因 |
+|------|---------|------|
+| 单次发送 | `entity.Send()` | 代码简洁，性能差异可忽略 |
+| 频繁发送（如每帧） | 先获取 `Terminus`，再调用 `terminus.Send()` | 避免重复查找组件，性能更优 |
+| 发送多条消息 | 先获取 `Terminus`，再多次调用 | 一次查找，多次使用 |
 
 ---
 
 ### Terminus 传送
 
-将玩家实体从一个服务器传送到另一个服务器：
+将玩家实体从一个服务器传送到另一个服务器。
+
+#### 发起传送
+
+有两种方式发起传送：
+
+**方式 1：使用实体扩展方法（推荐）**
+
+```csharp
+// 将 MapPlayer 从 Map1 传送到 Map2
+public async FTask TransferPlayer(MapPlayer mapPlayer, long targetSceneAddress)
+{
+    var errorCode = await mapPlayer.StartTransfer(targetSceneAddress);
+
+    if (errorCode == 0)
+    {
+        Log.Info("✅ 玩家传送成功");
+        // 注意：传送成功后，当前 mapPlayer 实例已被销毁
+    }
+    else
+    {
+        Log.Error($"❌ 玩家传送失败: {errorCode}");
+    }
+}
+```
+
+**方式 2：通过 Terminus 传送**
 
 ```csharp
 // 将玩家从 Map1 传送到 Map2
-public async FTask TransferPlayer(Terminus terminus, long targetSceneAddress)
+public async FTask TransferPlayer(MapPlayer mapPlayer, long targetSceneAddress)
 {
+    // 获取 Terminus
+    if (!mapPlayer.TryGetLinkTerminus(out var terminus))
+    {
+        Log.Error("❌ Terminus 不存在");
+        return;
+    }
+
     var errorCode = await terminus.StartTransfer(targetSceneAddress);
 
     if (errorCode == 0)
@@ -515,13 +713,132 @@ public async FTask TransferPlayer(Terminus terminus, long targetSceneAddress)
 }
 ```
 
-**传送机制：**
+#### 监听传送完成事件
 
-1. 锁定 Terminus，暂停消息发送
-2. 序列化 Terminus 和关联实体
-3. 发送到目标服务器
-4. 目标服务器恢复实体并解锁
-5. 原服务器销毁实体
+在目标服务器上，可以监听 `OnTerminusTransferComplete` 事件来处理传送完成后的逻辑：
+
+```csharp
+// Map 服务器：监听 Terminus 传送完成事件
+public sealed class OnTerminusTransferCompleteHandler : AsyncEventSystem<OnTerminusTransferComplete>
+{
+    protected override async FTask Handler(OnTerminusTransferComplete self)
+    {
+        var mapPlayer = self.LinkEntity as MapPlayer;
+        if (mapPlayer == null)
+        {
+            Log.Warning("❌ 传送完成但实体类型不匹配");
+            return;
+        }
+
+        Log.Info($"✅ MapPlayer {mapPlayer.PlayerId} 传送到当前服务器完成");
+
+        // 传送完成后的初始化逻辑
+        mapPlayer.OnTransferComplete();
+
+        // 通知客户端传送完成
+        mapPlayer.Send(new Map2C_TransferCompleteNotification
+        {
+            NewSceneId = self.Scene.SceneConfig.Id
+        });
+
+        await FTask.CompletedTask;
+    }
+}
+```
+
+**OnTerminusTransferComplete 事件参数：**
+
+| 属性 | 类型 | 说明 |
+|------|------|------|
+| `Scene` | `Scene` | 传送目标场景 |
+| `Terminus` | `Terminus` | 完成传送的 Terminus 实例 |
+| `LinkEntity` | `Entity` | Terminus 关联的实体（如 MapPlayer） |
+
+#### 传送机制详解
+
+**传送流程：**
+
+1. **锁定 Terminus**：调用 `StartTransfer()` 后，框架锁定 Terminus，暂停所有消息发送
+2. **序列化**：序列化 Terminus 和关联的实体数据
+3. **发送到目标**：通过 `I_TransferTerminusRequest` 将数据发送到目标服务器
+4. **目标服务器接收**：目标服务器调用 `TransferComplete()` 恢复数据
+5. **反序列化**：恢复 Terminus 和关联实体
+6. **解锁**：解锁 Terminus，恢复消息发送
+7. **触发事件**：触发 `OnTerminusTransferComplete` 事件
+8. **原服务器清理**：原服务器销毁 Terminus 和关联实体
+
+**传送注意事项：**
+
+- ⚠️ 传送完成后，原服务器上的实体会被销毁，不要继续使用原实例
+- ⚠️ 如果有其他组件引用了传送的实体，需要提前记录 ID，传送后重新查找
+- ⚠️ 传送过程中会锁定消息发送，如果传送失败会自动解锁
+- ✅ 客户端的连接不会断开，框架会自动更新路由
+- ✅ 传送后客户端发送的消息会自动路由到新服务器
+
+**完整示例：**
+
+```csharp
+// 玩家切换地图的完整流程
+public class MapTransferLogic
+{
+    // 原 Map 服务器：发起传送
+    public async FTask<uint> TransferToNewMap(MapPlayer mapPlayer, int targetMapId)
+    {
+        // 1. 保存玩家数据
+        await mapPlayer.SaveToDatabase();
+
+        // 2. 获取目标 Map 服务器配置
+        var targetMapConfig = SceneConfigData.Instance.GetSceneBySceneType(targetMapId)[0];
+
+        // 3. 通知客户端开始传送
+        mapPlayer.Send(new Map2C_TransferStartNotification
+        {
+            TargetMapId = targetMapId
+        });
+
+        // 4. 发起传送
+        var errorCode = await mapPlayer.StartTransfer(targetMapConfig.Address);
+
+        if (errorCode != 0)
+        {
+            Log.Error($"❌ 传送失败: {errorCode}");
+            // 传送失败，通知客户端
+            mapPlayer.Send(new Map2C_TransferFailedNotification
+            {
+                ErrorCode = errorCode
+            });
+        }
+
+        return errorCode;
+    }
+
+    // 目标 Map 服务器：传送完成处理
+    public class OnTransferCompleteHandler : AsyncEventSystem<OnTerminusTransferComplete>
+    {
+        protected override async FTask Handler(OnTerminusTransferComplete self)
+        {
+            var mapPlayer = self.LinkEntity as MapPlayer;
+            if (mapPlayer == null) return;
+
+            // 1. 加载新地图数据
+            await mapPlayer.LoadMapData(self.Scene);
+
+            // 2. 设置玩家在新地图的初始位置
+            mapPlayer.SetSpawnPosition();
+
+            // 3. 通知客户端传送完成
+            mapPlayer.Send(new Map2C_TransferCompleteNotification
+            {
+                MapId = self.Scene.SceneConfig.Id,
+                Position = mapPlayer.Position
+            });
+
+            Log.Info($"✅ 玩家 {mapPlayer.PlayerId} 传送到地图 {self.Scene.SceneConfig.Id} 完成");
+            await FTask.CompletedTask;
+        }
+    }
+}
+```
 
 ---
 
@@ -610,6 +927,94 @@ var player2 = await terminus.LinkTerminusEntity<Player>(autoDispose: true); // �
 
 ---
 
+### Q7: 什么时候使用 TerminusHelper 扩展方法？什么时候直接使用 Terminus？
+
+**使用 TerminusHelper 扩展方法（`entity.Send()`）：**
+
+- ✅ 单次发送消息
+- ✅ 代码简洁性优先
+- ✅ 非性能敏感场景
+
+**直接使用 Terminus（`terminus.Send()`）：**
+
+- ✅ 频繁发送消息（如每帧、循环中）
+- ✅ 一次性发送多条消息
+- ✅ 性能敏感场景
+
+**示例对比：**
+
+```csharp
+// 场景 1：单次发送 - 推荐使用扩展方法
+public void SendNotification(ChatPlayer player)
+{
+    player.Send(new Chat2C_Notification { Content = "Hello" });
+}
+
+// 场景 2：频繁发送 - 推荐先获取 Terminus
+public void UpdateLoop(ChatPlayer player)
+{
+    // 获取一次，多次使用
+    if (!player.TryGetLinkTerminus(out var terminus))
+    {
+        return;
+    }
+
+    for (int i = 0; i < 100; i++)
+    {
+        terminus.Send(new Chat2C_Update { Frame = i });
+    }
+}
+
+// 场景 3：每帧更新 - 推荐缓存 Terminus
+public class ChatPlayerComponent : Entity
+{
+    private Terminus _terminus;
+
+    public void OnAwake()
+    {
+        // 初始化时获取并缓存
+        Parent.TryGetLinkTerminus(out _terminus);
+    }
+
+    public void OnUpdate()
+    {
+        // 每帧使用缓存的 Terminus
+        _terminus?.Send(new Chat2C_FrameUpdate { });
+    }
+}
+```
+
+---
+
+### Q8: OnTerminusTransferComplete 事件什么时候触发？
+
+`OnTerminusTransferComplete` 事件在 Terminus 传送完成后，目标服务器上触发：
+
+```
+原服务器                     目标服务器
+   |                            |
+   | StartTransfer()            |
+   |--------------------------->|
+   |                            | TransferComplete()
+   |                            | 1. 反序列化 Terminus 和实体
+   |                            | 2. 解锁 Terminus
+   |                            | 3. 触发 OnTerminusTransferComplete ⭐
+   |                            |
+   |<---------------------------|
+   | 销毁 Terminus 和实体        |
+```
+
+**使用场景：**
+
+- ✅ 传送完成后的数据加载（如加载新地图数据）
+- ✅ 实体状态初始化（如设置出生点位置）
+- ✅ 通知客户端传送完成
+- ✅ 记录传送日志
+
+**注意：** 该事件仅在目标服务器触发，原服务器不会触发。
+
+---
+
 ## 相关文档
 
 - [06-Address消息.md](06-Address消息.md) - Address 消息 - 服务器间实体通信
@@ -626,6 +1031,7 @@ Roaming 漫游系统的核心优势：
 2. **自动路由**：框架根据 RoamingType 自动转发消息
 3. **支持传送**：实体可以在服务器间传送，路由自动更新
 4. **简化架构**：客户端无需知道后端服务器地址
+5. **便捷接口**：TerminusHelper 提供扩展方法，简化消息发送和传送操作
 
 **使用步骤回顾：**
 
@@ -633,3 +1039,25 @@ Roaming 漫游系统的核心优势：
 2. 客户端登录时建立路由（一次性）
 3. 发送消息（自动转发）
 4. 处理消息（使用 Roaming 处理器）
+
+**核心 API 速查：**
+
+| API | 返回值 | 说明 | 使用场景 |
+|-----|--------|------|---------|
+| `session.CreateRoaming()` | `SessionRoamingComponent` | Gate 创建 Roaming 组件（简单版本） | 不需要详细状态时 |
+| `session.TryCreateRoaming()` | `CreateRoamingResult` | Gate 创建 Roaming 组件（详细版本，包含状态） | 需要判断创建状态时 |
+| `roaming.Link()` | `uint` | 建立到后端服务器的路由 | 客户端登录时 |
+| `terminus.LinkTerminusEntity()` | `FTask<T>` | 关联业务实体到 Terminus | OnCreateTerminus 事件中 |
+| `entity.Send(message)` | `void` | 向客户端发送消息 | 服务器主动推送 |
+| `entity.Send(roamingType, message)` | `void` | 向其他服务器发送消息 | 服务器间通信 |
+| `entity.Call(roamingType, request)` | `FTask<IResponse>` | 向其他服务器发送 RPC | 服务器间 RPC |
+| `entity.StartTransfer(address)` | `FTask<uint>` | 传送实体到目标服务器 | 跨服传送 |
+| `entity.GetLinkTerminus()` | `Terminus` | 获取关联的 Terminus | 性能优化场景 |
+| `entity.TryGetLinkTerminus(out t)` | `bool` | 安全获取关联的 Terminus | 性能优化场景 |
+
+**性能优化建议：**
+
+- 📌 单次发送：使用 `entity.Send()` 扩展方法，代码简洁
+- 📌 频繁发送：先获取 Terminus，避免重复查找组件
+- 📌 每帧更新：初始化时缓存 Terminus，每帧直接使用
+- 📌 传送操作：使用 `OnTerminusTransferComplete` 事件处理传送完成逻辑
