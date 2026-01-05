@@ -97,11 +97,12 @@ namespace Fantasy.SourceGenerator.Generators
                 {
                     builder.AddUsings(
                         "System",
-                        "UnityEngine"
+                        "UnityEngine",
+                        "System.Runtime.CompilerServices"
                     );
                     break;
                 }
-                case 3: // Unity 但没有使用Unity相关的程序集
+                case 3: // 纯客户端
                 {
                     builder.AddUsings(
                         "System",
@@ -166,7 +167,7 @@ namespace Fantasy.SourceGenerator.Generators
                     builder.BeginMethod("public static void Initialize()");
                     break;
                 }
-                case 3: // Unity 但没有使用Unity相关的程序集
+                case 3: // 纯客户端
                 {
                     builder.AddXmlComment("Module initializer - automatically called when assembly is loaded");
                     builder.AddXmlComment("Triggers static constructors of all MemoryPackable types to register formatters");

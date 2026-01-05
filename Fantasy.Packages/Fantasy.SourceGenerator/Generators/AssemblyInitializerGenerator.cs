@@ -67,7 +67,7 @@ namespace Fantasy.SourceGenerator.Generators
                     );
                     break;
                 }
-                case 3: // Unity 但没有使用Unity相关的程序集
+                case 3: // 纯客户端
                 {
                     builder.AddUsings(
                         "System",
@@ -121,7 +121,7 @@ namespace Fantasy.SourceGenerator.Generators
                     builder.BeginMethod("public static void Initialize()");
                     break;
                 }
-                case 3:     // Unity 但没有使用Unity相关的程序集
+                case 3:     // 纯客户端
                 {
                     builder.AddXmlComment("Module initializer - automatically called when assembly is loaded");
                     builder.BeginMethod("public static void Initialize()");

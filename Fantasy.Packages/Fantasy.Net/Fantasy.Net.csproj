@@ -83,6 +83,7 @@
 
     <ItemGroup>
       <PackageReference Include="System.IO.Pipelines" Version="9.0.10" />
+      <PackageReference Include="ZXing.Net" Version="0.16.11" />
     </ItemGroup>
 
     <!-- Source Generator Reference -->
