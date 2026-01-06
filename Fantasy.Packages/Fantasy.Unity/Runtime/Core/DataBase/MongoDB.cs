@@ -42,7 +42,7 @@ namespace Fantasy.Database
         /// <summary>
         /// 序列化器
         /// </summary>
-        public ISerialize Serializer { get; private set; }
+        public BsonPackHelper Serializer { get; private set; }
         /// <summary>
         /// 所有集合名
         /// </summary>

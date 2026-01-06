@@ -75,8 +75,11 @@ public sealed class SphereEventComponent : Entity, IAssemblyLifecycle
         
         Scene?.ThreadSynchronizationContext.Post(() =>
         {
-            _sphereEventMerger.Remove(assemblyManifestId);
-            _sphereEvents = _sphereEventMerger.GetFrozenDictionary();
+            if (_sphereEventMerger.Remove(assemblyManifestId))
+            {
+                _sphereEvents = _sphereEventMerger.GetFrozenDictionary();
+            }
+            
             tcs.SetResult();
         });
         await tcs;

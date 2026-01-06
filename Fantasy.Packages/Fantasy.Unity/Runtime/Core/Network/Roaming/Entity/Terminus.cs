@@ -3,9 +3,12 @@ using Fantasy.Async;
 using Fantasy.Entitas;
 using Fantasy.InnerMessage;
 using Fantasy.Network.Interface;
+using LightProto;
+using MemoryPack;
 using MongoDB.Bson.Serialization.Attributes;
 // ReSharper disable UnassignedField.Global
 // ReSharper disable ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
+// ReSharper disable CheckNamespace
 #pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
 #pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
 #pragma warning disable CS8603 // Possible null reference return.
@@ -49,7 +52,8 @@ public struct OnTerminusTransferComplete
 /// <summary>
 /// 漫游终端实体
 /// </summary>
-public sealed class Terminus : Entity
+[MemoryPackable]
+public sealed partial class Terminus : Entity
 {
     /// <summary>
     /// 当前漫游终端的TerminusId。
@@ -64,39 +68,38 @@ public sealed class Terminus : Entity
     /// <summary>
     /// 当前漫游终端的类型。
     /// </summary>
-    [BsonElement("r")]
     public int RoamingType { get; internal set; }
     /// <summary>
     /// 漫游转发Session所在的Scene的Address。
     /// </summary>
-    [BsonElement("s")]
     public long ForwardSceneAddress{ get; internal set; }
     /// <summary>
     /// 漫游转发Session的Address。
     /// 不知道原理千万不要手动赋值这个。
     /// </summary>
-    [BsonElement("f")]
     public long ForwardSessionAddress{ get; internal set; }
     /// <summary>
     /// 关联的玩家实体
     /// </summary>
-    [BsonElement("e")]
     public Entity? TerminusEntity { get; private set; }
     /// <summary>
     /// 漫游消息锁。
     /// </summary>
-    [BsonIgnore]
+    [ProtoIgnore]
+    [MemoryPackIgnore]
     internal CoroutineLock? RoamingMessageLock;
     /// <summary>
     /// 是否停止发送转发代码到Roaming
     /// </summary>
-    [BsonIgnore]
+    [ProtoIgnore]
+    [MemoryPackIgnore]
     internal bool StopForwarding;
     /// <summary>
     /// 存放其他漫游终端的Id。
     /// 通过这个Id可以发送消息给它。
     /// </summary>
-    [BsonIgnore]
+    [ProtoIgnore]
+    [MemoryPackIgnore]
     private readonly Dictionary<int, long> _roamingTerminusId = new Dictionary<int, long>();
 
     /// <summary>
@@ -198,37 +201,52 @@ public sealed class Terminus : Entity
     private async FTask LinkEntity(Entity entity, bool autoDispose)
     {
         var isLocked = false;
+        var syncRoaming = TerminusId != 0;
+        var entityRuntimeId = entity.RuntimeId;
         
         try
         {
-            // 连接之前要先锁定避免中间会有消息发送
-            var lockErrorCode = await Lock();
-
-            if (lockErrorCode != 0)
+            if (syncRoaming)
             {
-                // 锁定失败，关联实体操作中止
-                Log.Error($"Failed to lock Terminus {Id} before linking entity. ErrorCode: {lockErrorCode}. Link operation aborted.");
-                return;
+                // 连接之前要先锁定避免中间会有消息发送
+                var lockErrorCode = await Lock();
+
+                if (lockErrorCode != 0)
+                {
+                    // 锁定失败，关联实体操作中止
+                    Log.Error($"Failed to lock Terminus {Id} before linking entity. ErrorCode: {lockErrorCode}. Link operation aborted.");
+                    return;
+                }
             }
 
             isLocked = true;
             TerminusEntity = entity;
-            TerminusId = TerminusEntity.RuntimeId;
+            TerminusId = entityRuntimeId;
+            
             // 给当前实体添加组件用来代表是已经关联了Terminus
+            
             entity.AddComponent<TerminusFlagComponent>().Terminus = this;
+            
             // 只有autoDispose = true的时候当前Terminus添加组件来代表已经关联了Entity
+            
             if (autoDispose)
             {
                 AddComponent<TerminusEntityFlagComponent>().LinkEntity = entity;
             }
-            // 操作完成执行解锁
-            await UnLock();
+
+            if (syncRoaming)
+            {
+                // 操作完成执行解锁
+                await UnLock();
+            }
+            
             isLocked = false;
         }
         catch (Exception e)
         {
             Log.Error(e);
-            if (isLocked)
+            
+            if (syncRoaming && isLocked)
             {
                 await UnLock();
             }

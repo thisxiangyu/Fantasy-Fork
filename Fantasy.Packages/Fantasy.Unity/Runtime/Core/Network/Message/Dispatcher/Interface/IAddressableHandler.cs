@@ -2,6 +2,8 @@
 using Fantasy.Async;
 using Fantasy.Entitas;
 using Fantasy.InnerMessage;
+using Fantasy.Pool;
+
 // ReSharper disable InconsistentNaming
 // ReSharper disable CheckNamespace
 
@@ -40,7 +42,7 @@ public abstract class Addressable<TEntity, TMessage> : IAddressMessageHandler wh
 
         if (entity is not TEntity tEntity)
         {
-            Log.Error($"{this.GetType().Name} Route type conversion error: {entity.GetType().Name} to {typeof(TEntity).Name}");
+            Log.Error($"{this.GetType().Name} Addressable type conversion error: {entity.GetType().Name} to {typeof(TEntity).Name}");
             return;
         }
 
@@ -59,7 +61,8 @@ public abstract class Addressable<TEntity, TMessage> : IAddressMessageHandler wh
         }
         finally
         {
-            session.Send(new AddressResponse(), typeof(AddressResponse), rpcId);
+            session.Send(MessageObjectPool<AddressResponse>.Rent(), rpcId);
+            tAddressMessage.Dispose();
         }
     }
 
@@ -80,7 +83,7 @@ public abstract class Addressable<TEntity, TMessage> : IAddressMessageHandler wh
 public abstract class AddressableRPC<TEntity, TAddressRequest, TAddressResponse> : IAddressMessageHandler
     where TEntity : Entity
     where TAddressRequest : IAddressableRequest
-    where TAddressResponse : IAddressableResponse, new()
+    where TAddressResponse : AMessage, IAddressableResponse, new()
 {
     /// <summary>
     /// 获取消息类型。
@@ -110,12 +113,12 @@ public abstract class AddressableRPC<TEntity, TAddressRequest, TAddressResponse>
         if (entity is not TEntity tEntity)
         {
             Log.Error(
-                $"{this.GetType().Name} Route type conversion error: {entity.GetType().Name} to {typeof(TEntity).Name}");
+                $"{this.GetType().Name} Addressable type conversion error: {entity.GetType().Name} to {typeof(TEntity).Name}");
             return;
         }
 
         var isReply = false;
-        var response = new TAddressResponse();
+        var response = MessageObjectPool<TAddressResponse>.Rent();
 
         void Reply()
         {
@@ -151,6 +154,7 @@ public abstract class AddressableRPC<TEntity, TAddressRequest, TAddressResponse>
         finally
         {
             Reply();
+            tAddressRequest.Dispose();
         }
     }
 

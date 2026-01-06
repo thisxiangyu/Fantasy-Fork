@@ -3,7 +3,7 @@ using NJ = Newtonsoft.Json;
 using MongoDB.Bson.Serialization.Attributes;
 using MemoryPack;
 using System.Runtime.Serialization;
-using ProtoBuf;
+using LightProto;
 #if FANTASY_NET
 using MJ = System.Text.Json.Serialization;
 using System.ComponentModel.DataAnnotations.Schema;

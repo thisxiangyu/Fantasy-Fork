@@ -53,16 +53,20 @@ namespace Fantasy.Entitas.TypeMeta
                 if (cache.DbSetAttri.IsEmbedded)
                     cache.DbSetAttri.IsAsDocument = true;
 
-                if(cache.DbSetAttri.IsAsBytes && !Attribute.IsDefined(type, typeof(MemoryPackableAttribute)))
+                if (cache.DbSetAttri.IsAsBytes && !Attribute.IsDefined(type, typeof(MemoryPackableAttribute)))
                 {
                     Log.Warning($"You are trying to save a class({type}) that is not marked with [MemoryPackable] as a binary DbSet. This is not allowed by the framework. " +
                         "Please check whether the code is missing this attribute; otherwise, serialization will fall back to JSON handling." +
                         $"\n(你尝试将一个没有标记为[MemoryPackable]的类({type})存为二进制DbSet, 这是不被框架允许的.请确认代码是否遗漏了该标签,否则序列化时将会退回Json处理.)");
-                    cache.DbSetAttri.IsAsBytes = false; 
+                    cache.DbSetAttri.IsAsBytes = false;
                 }
 
                 dict.Add(TypeHashCache.GetHashCode(type), cache);
             }
+
+            if (dict.Count == 0)
+                dict.Add(-1, new()); //如果没有任何数据, 则添加一个无效数据, 避免为空
+
             InfoByHash = new(dict); //转为冻结字典
         }
 

@@ -170,16 +170,16 @@ namespace Fantasy.Database
                     if(typeof(Entity).IsAssignableFrom(type))
                     {
                         //承载Embedded实体的影子属性, 自定义序列化转化逻辑
-                        entityBuilder.Property<EntityList<Entity>>(DbSetProperty.JsonSingle).HasColumnType("jsonb")
+                        entityBuilder.Property<EntityTreeCollection>(DbSetProperty.JsonSingle).HasColumnType("jsonb")
                             .HasConversion( 
                                            entityList => entityList.ToJson(_jsonSettings, true),
-                                           jsonStr => jsonStr.Deserialize<EntityList<Entity>>(_jsonSettings, true)
+                                           jsonStr => jsonStr.Deserialize<EntityTreeCollection>(_jsonSettings, true)
                                            )
                             .IsRequired(false);
-                        entityBuilder.Property<EntityList<Entity>>(DbSetProperty.JsonMulti).HasColumnType("jsonb")
+                        entityBuilder.Property<EntityMultiCollection>(DbSetProperty.JsonMulti).HasColumnType("jsonb")
                             .HasConversion( 
                                            entityList => entityList.ToJson(_jsonSettings, true),
-                                           jsonStr => jsonStr.Deserialize<EntityList<Entity>>(_jsonSettings, true)
+                                           jsonStr => jsonStr.Deserialize<EntityMultiCollection>(_jsonSettings, true)
                                            )
                             .IsRequired(false);
                         //Note : 暂不支持, 因为byte[]在EFCore中不知道能否池化
@@ -1979,8 +1979,8 @@ namespace Fantasy.Database
                     //更新影子属性的值
                     Entry(entity).Property<long>(DbSetProperty.ParentType).CurrentValue = parent.TypeHashCode;
                     Entry(entity).Property<long>(DbSetProperty.ParentId).CurrentValue = parent.Id;
-                    Entry(entity).Property<EntityList<Entity>>(DbSetProperty.JsonSingle).CurrentValue = entity._singleDb;
-                    Entry(entity).Property<EntityList<Entity>>(DbSetProperty.JsonMulti).CurrentValue = entity._multiDb;
+                    Entry(entity).Property<EntityTreeCollection>(DbSetProperty.JsonSingle).CurrentValue = entity.GetCollectionForSingle();
+                    Entry(entity).Property<EntityMultiCollection>(DbSetProperty.JsonMulti).CurrentValue = entity.GetCollectionForMulti();
                     //Note: 暂时不支持二进制存储
                     //Entry(entity).Property<byte[]>(DbSetProperty.BytesSingle).CurrentValue = 1;
                     //Entry(entity).Property<byte[]>(DbSetProperty.BytesMulti).CurrentValue = 1;

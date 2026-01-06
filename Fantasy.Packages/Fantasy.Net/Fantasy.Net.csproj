@@ -2,7 +2,7 @@
 
     <PropertyGroup>
         <PackageId>Fantasy-Net</PackageId>
-        <PackageVersion>2025.2.1410</PackageVersion>
+        <PackageVersion>2025.2.1419</PackageVersion>
         <Title>Fantasy-Net</Title>
         <Authors>qq362946</Authors>
         <owners>qq362946</owners>
@@ -29,7 +29,7 @@
       <DefineConstants>TRACE;FANTASY_NET</DefineConstants>
       <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
       <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-      <DocumentationFile>bin\Debug\net8.0\Fantasy.Net.xml</DocumentationFile>
+      <DocumentationFile></DocumentationFile>
       <!-- 启用 Source Generator 文件输出（可选，用于调试） -->
        <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles> 
        <CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)\GeneratedFiles</CompilerGeneratedFilesOutputPath> 
@@ -56,13 +56,12 @@
         <PrivateAssets>all</PrivateAssets>
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       </PackageReference>
-      <PackageReference Include="MemoryPack" Version="1.21.4" />
+      <PackageReference Include="MemoryPack.Core" Version="1.21.4" />
       <PackageReference Include="MongoDB.Bson" Version="3.4.3" />
       <PackageReference Include="MongoDB.Driver" Version="3.4.3" />
       <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
       <PackageReference Include="Npgsql" Version="9.0.4" />
       <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
-      <PackageReference Include="protobuf-net" Version="3.2.56" />
     </ItemGroup>
 
     <ItemGroup>
@@ -97,7 +96,7 @@
     </ItemGroup>
     <ItemGroup>
       <Folder Include="Migrations\" />
-      <Folder Include="Runtime\Core\Entitas\Component\EventComponent\EventAwaiter\" />
+      <Folder Include="Runtime\Core\Serialize\Pack\" />
       <Folder Include="Runtime\Core\World\" />
       <Folder Include="Runtime\Product\Authentication\Solutions\FaceID\" />
       <Folder Include="Runtime\Product\Authentication\Solutions\QRCode\" />

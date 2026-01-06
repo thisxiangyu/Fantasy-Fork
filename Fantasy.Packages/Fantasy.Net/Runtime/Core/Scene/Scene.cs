@@ -111,8 +111,6 @@ namespace Fantasy
         #region Pool
 
         internal EntityPool EntityPool;
-        internal EntityListPool<Entity> EntityListPool;
-        internal EntitySortedDictionaryPool<long, Entity> EntitySortedDictionaryPool;
         internal EventAwaiterPool EventAwaiterPool;
 
         #endregion
@@ -131,10 +129,6 @@ namespace Fantasy
         /// Scene下的ESC系统组件
         /// </summary>
         public EntityComponent EntityComponent { get; internal set; }
-        /// <summary>
-        /// Scene下的网络消息对象池组件
-        /// </summary>
-        public MessagePoolComponent MessagePoolComponent { get; internal set; }
         /// <summary>
         /// Scene下的协程锁组件
         /// </summary>
@@ -172,15 +166,12 @@ namespace Fantasy
         private async FTask Initialize()
         {
             EntityPool = new EntityPool();
-            EntityListPool = new EntityListPool<Entity>();
-            EntitySortedDictionaryPool = new EntitySortedDictionaryPool<long, Entity>();
             EventAwaiterPool = new EventAwaiterPool();
             EntityComponent = await Create<EntityComponent>(this, false, false).Initialize();
             SceneUpdate = EntityComponent;
 #if FANTASY_UNITY
             SceneLateUpdate = EntityComponent;
 #endif
-            MessagePoolComponent = Create<MessagePoolComponent>(this,false,true);
             EventComponent = await Create<EventComponent>(this,false,true).Initialize();
             TimerComponent = Create<TimerComponent>(this, false, true).Initialize();
             CoroutineLockComponent = Create<CoroutineLockComponent>(this, false, true).Initialize();
@@ -253,8 +244,6 @@ namespace Fantasy
 #endif
                     EntityComponent.Dispose();
                     EntityPool.Dispose();
-                    EntityListPool.Dispose();
-                    EntitySortedDictionaryPool.Dispose();
                     EventAwaiterPool.Dispose();
                     break;
                 }
@@ -274,13 +263,10 @@ namespace Fantasy
             RuntimeIdFactory = null;
 
             EntityPool = null;
-            EntityListPool = null;
-            EntitySortedDictionaryPool = null;
             EventAwaiterPool = null;
             EntityComponent = null;
             TimerComponent = null;
             EventComponent = null;
-            MessagePoolComponent = null;
             CoroutineLockComponent = null;
             MessageDispatcherComponent = null;
             PoolGeneratorComponent = null;

@@ -10,6 +10,13 @@ namespace Fantasy.Entitas.Interface
     {
     }
 
+    /// <summary>
+    /// Entity支持数据库/序列化
+    /// </summary>
+    public interface ISupportedSerialize
+    {
+    }
+
 #if FANTASY_NET
 
     /// <summary>

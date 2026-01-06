@@ -739,7 +739,7 @@ namespace Fantasy.Database
                 return;
             }
 
-            var clone = mongo.Serializer.Clone(entity);
+            var clone = mongo.Serializer.CloneEntity(entity);
 
             using (await mongo.FlowLock.Wait(clone.Id))
             {
@@ -764,7 +764,7 @@ namespace Fantasy.Database
                 return;
             }
 
-            var clone = mongo.Serializer.Clone(entity);
+            var clone = mongo.Serializer.CloneEntity(entity);
 
             using (await mongo.FlowLock.Wait(clone.Id))
             {
@@ -787,7 +787,7 @@ namespace Fantasy.Database
                 return;
             }
 
-            T clone = mongo.Serializer.Clone(entity);
+            T clone = mongo.Serializer.CloneEntity(entity);
 
             using (await mongo.FlowLock.Wait(clone.Id))
             {
@@ -812,7 +812,7 @@ namespace Fantasy.Database
 
             foreach (var entity in entities)
             {
-                listPool.Add(mongo.Serializer.Clone(entity));
+                listPool.Add(mongo.Serializer.CloneEntity(entity));
             }
 
             using (await mongo.FlowLock.Wait(id))
@@ -850,7 +850,7 @@ namespace Fantasy.Database
                 return;
             }
 
-            var clone = mongo.Serializer.Clone(entity);
+            var clone = mongo.Serializer.CloneEntity(entity);
 
             using (await mongo.FlowLock.Wait(entity.Id))
             {

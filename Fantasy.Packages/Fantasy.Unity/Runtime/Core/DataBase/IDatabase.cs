@@ -82,11 +82,6 @@ namespace Fantasy.Database
         public int Duty { get; }
 
         /// <summary>
-        /// 序列化器
-        /// </summary>
-        public ISerialize Serializer { get; }
-
-        /// <summary>
         /// 初始化数据库。
         /// </summary>
         IDatabase Initialize(Scene scene, ref ServiceCollection servicec, int duty, string connectionString, string dbName);

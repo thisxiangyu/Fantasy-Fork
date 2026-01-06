@@ -18,16 +18,23 @@ public struct OnCreateTerminus
     /// </summary>
     public readonly Scene Scene;
     /// <summary>
+    /// 获取传递过来的参数
+    /// </summary>
+    public readonly Entity? Args;
+    /// <summary>
     /// 获取与事件关联的Terminus。
     /// </summary>
     public readonly Terminus Terminus;
+
     /// <summary>
     /// 初始化一个新的 OnCreateTerminus 实例。
     /// </summary>
     /// <param name="scene"></param>
     /// <param name="terminus"></param>
-    public OnCreateTerminus(Scene scene, Terminus terminus)
+    /// <param name="args"></param>
+    public OnCreateTerminus(Scene scene, Terminus terminus, Entity? args)
     {
+        Args = args;
         Scene = scene;
         Terminus = terminus;
     }
@@ -65,8 +72,9 @@ public sealed class TerminusComponent : Entity
     /// <param name="roamingType"></param>
     /// <param name="forwardSessionAddress"></param>
     /// <param name="forwardSceneAddress"></param>
+    /// <param name="args"></param>
     /// <returns></returns>
-    internal (uint, Terminus) Create(long roamingId, int roamingType, long forwardSessionAddress, long forwardSceneAddress)
+    internal async FTask<(uint, Terminus)> Create(long roamingId, int roamingType, long forwardSessionAddress, long forwardSceneAddress, Entity? args)
     {
         if (roamingId == 0)
         {
@@ -79,13 +87,22 @@ public sealed class TerminusComponent : Entity
         }
 
         var terminus = Entity.Create<Terminus>(Scene, roamingId, false, true);
+        
         terminus.IsDisposeTerminus = false;
         terminus.RoamingType = roamingType;
-        terminus.TerminusId = terminus.RuntimeId;
         terminus.ForwardSceneAddress = forwardSceneAddress;
         terminus.ForwardSessionAddress = forwardSessionAddress;
         terminus.RoamingMessageLock = Scene.CoroutineLockComponent.Create(terminus.Type.TypeHandle.Value.ToInt64());
+        
         _terminals.Add(terminus.Id, terminus);
+        
+        await Scene.EventComponent.PublishAsync(new OnCreateTerminus(Scene, terminus, args));
+        
+        if (terminus.TerminusId == 0)
+        {
+            terminus.TerminusId = terminus.RuntimeId;
+        }
+        
         return (0U, terminus);
     }
 

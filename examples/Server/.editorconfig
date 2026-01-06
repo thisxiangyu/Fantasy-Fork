@@ -1,0 +1,4 @@
+﻿[*.cs]
+
+# FANTASY003_MemoryPackable: SessionRoamingComponent.Link Entity argument must be MemoryPackable and partial
+dotnet_diagnostic.FANTASY003_MemoryPackable.severity = none
