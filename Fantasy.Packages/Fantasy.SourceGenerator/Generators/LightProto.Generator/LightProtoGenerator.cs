@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -9,64 +8,27 @@ using CSharpExtensions = Microsoft.CodeAnalysis.CSharp.CSharpExtensions;
 
 namespace LightProto.Generator;
 
-[Generator]
+[Generator(LanguageNames.CSharp)]
 public class LightProtoGenerator : IIncrementalGenerator
 {
-    private const string NewLine = "\n";
+    const string NewLine = "\r\n";
+    const string ProtoContractAttributeFullName = "LightProto.ProtoContractAttribute";
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        var namedTypeSymbols = context.SyntaxProvider.CreateSyntaxProvider(
+        var symbols = context.SyntaxProvider.ForAttributeWithMetadataName(
+            ProtoContractAttributeFullName,
             predicate: (node, _) =>
                 node
                     is ClassDeclarationSyntax
                         or StructDeclarationSyntax
                         or InterfaceDeclarationSyntax
                         or RecordDeclarationSyntax,
-            transform: (ctx, _) => ctx.SemanticModel.GetDeclaredSymbol(ctx.Node)
+            transform: (ctx, _) => ctx.TargetSymbol
         );
 
-        // Deduplicate symbols to handle partial classes correctly
-        var distinctSymbols = namedTypeSymbols
-            .Where(symbol => symbol is not null)
-            .Collect()
-            .SelectMany((symbols, _) =>
-                symbols.Distinct<ISymbol>(SymbolEqualityComparer.Default));
+        var typesAndCompilation = symbols.Combine(context.CompilationProvider);
 
-        var protoContracts = distinctSymbols.Where(
-            (symbol) =>
-            {
-                if (symbol is not INamedTypeSymbol namedTypeSymbol)
-                {
-                    return false;
-                }
-
-                // Check if the type has ProtoContract attribute
-                bool hasProtoContract = namedTypeSymbol.GetAttributes().Any(attr =>
-                    attr.AttributeClass?.ToDisplayString() == "LightProto.ProtoContractAttribute");
-
-                // Check if the type inherits from AMessage abstract class
-                bool inheritsFromAMessage = false;
-                var baseType = namedTypeSymbol.BaseType;
-                while (baseType != null)
-                {
-                    var baseTypeName = baseType.ToDisplayString();
-                    if (baseTypeName == "Fantasy.Network.Interface.AMessage" ||
-                        baseType.Name == "AMessage")
-                    {
-                        inheritsFromAMessage = true;
-                        break;
-                    }
-                    baseType = baseType.BaseType;
-                }
-
-                // Must have BOTH ProtoContract attribute AND inherit from AMessage
-                return hasProtoContract && inheritsFromAMessage;
-            }
-        );
-        var typesAndCompilation = protoContracts.Combine(context.CompilationProvider);
-
-        // Generate individual message implementations
         context.RegisterSourceOutput(
             typesAndCompilation,
             (spc, pair) =>
@@ -74,14 +36,14 @@ public class LightProtoGenerator : IIncrementalGenerator
                 var (type, compilation) = pair;
                 try
                 {
-                    var contract = GetProtoContract(compilation, type);
+                    var contract = GetProtoContract(compilation, type, spc);
                     if (contract is null)
                     {
                         return;
                     }
 
                     // Generate the basic IMessage implementation
-                    var sourceCode = GenerateBasicProtobufMessage(contract);
+                    var sourceCode = GenerateBasicProtobufMessage(contract, spc);
                     var fileName = $"{type}.g.cs";
                     spc.AddSource(fileName, SourceText.From(sourceCode, Encoding.UTF8));
                 }
@@ -109,7 +71,7 @@ public class LightProtoGenerator : IIncrementalGenerator
                             new DiagnosticDescriptor(
                                 "LIGHT_PROTO_000",
                                 "Unknown Exception",
-                                e.ToString().Replace("\r\n", " ").Replace("\n", " "),
+                                e.ToString().Replace(NewLine, " "),
                                 "Unknown",
                                 DiagnosticSeverity.Error,
                                 isEnabledByDefault: true
@@ -132,29 +94,31 @@ public class LightProtoGenerator : IIncrementalGenerator
         return prediction() ? ifTrue() : ifFalse();
     }
 
-    [SuppressMessage("MicrosoftCodeAnalysisCorrectness", "RS1035:不要使用禁用于分析器的 API")]
-    private string GenerateBasicProtobufMessage(ProtoContract contract)
+    private string GenerateBasicProtobufMessage(ProtoContract contract, SourceProductionContext spc)
     {
         var targetType = contract.Type;
         var compilation = contract.Compilation;
         var namespaceDeclare = targetType.ContainingNamespace.IsGlobalNamespace
             ? ""
-            : $"namespace {targetType.ContainingNamespace.ToDisplayString()}";
+            : $"namespace {targetType.ContainingNamespace.ToDisplayString()} {{";
         var className = targetType.Name;
 
         var typeDeclarationString = targetType.IsValueType
             ? targetType.IsRecord
-                ? "public partial record struct"
-                : "public partial struct"
+                ? "partial record struct"
+                : "partial struct"
             : targetType.IsRecord
-                ? "public partial record"
+                ? "partial record"
                 : targetType.TypeKind == TypeKind.Interface
                     ? "public sealed partial class"
-                    : "public partial class";
+                    : "partial class";
         var proxyFor = contract.ProxyFor;
         bool skipConstructor = contract.SkipConstructor;
         var implicitFields = contract.ImplicitFields;
-
+        var net8OrGreater =
+            contract.TypeDeclaration.SyntaxTree.Options.PreprocessorSymbolNames.Contains(
+                "NET8_0_OR_GREATER"
+            );
         var sourceBuilder = new StringBuilder();
 
         sourceBuilder.AppendLine(
@@ -165,13 +129,11 @@ public class LightProtoGenerator : IIncrementalGenerator
               )}} at {{DateTime.Now:yyyy-MM-dd HH:mm:ss}}
               // </auto-generated>
 
-              #pragma warning disable 1591, 0612, 3021, 8981, CS9035, CS0109, CS8669, CS1570
+              #pragma warning disable 1591, 0612, 3021, 8981, CS9035, CS0109, CS8669, CS1570, CS0219, RS0016, RS0041
               using System;
               using System.Linq;
               using LightProto;
-              using Fantasy.Pool;
               {{namespaceDeclare}}
-              {
               """
         );
 
@@ -221,8 +183,8 @@ public class LightProtoGenerator : IIncrementalGenerator
                               () => $"public static IProtoWriter<{proxyFor?.ToDisplayString() ?? className}> ProtoWriter {{get;}} = new LightProtoWriter();", 
                               () => $"public static new IProtoWriter<{proxyFor?.ToDisplayString()??className}> ProtoWriter => {baseParserTypeName}.ProtoWriter;")
                       }}
-                      public static new IProtoReader<MemberStruct> MemberStructReader {get; } = new MemberStructLightProtoReader();
-                      public static new IProtoWriter<MemberStruct> MemberStructWriter {get; } = new MemberStructLightProtoWriter();
+                      internal static new IProtoReader<MemberStruct> MemberStructReader {get; } = new MemberStructLightProtoReader();
+                      internal static new IProtoWriter<MemberStruct> MemberStructWriter {get; } = new MemberStructLightProtoWriter();
                       
                       {{
                           Invoke(baseType is null, 
@@ -230,7 +192,7 @@ public class LightProtoGenerator : IIncrementalGenerator
                                   return string.Join(NewLine+GetIntendedSpace(1), Gen());
                                   IEnumerable<string> Gen()
                                   {
-                                      yield return $"public sealed class LightProtoReader:IProtoReader<{proxyFor?.ToDisplayString() ?? className}>";
+                                      yield return $"internal sealed class LightProtoReader:IProtoReader<{proxyFor?.ToDisplayString() ?? className}>";
                                       yield return "{";
                                       yield return "    public bool IsMessage => true;";
                                       yield return "    public WireFormat.WireType WireType => WireFormat.WireType.LengthDelimited;";
@@ -242,7 +204,7 @@ public class LightProtoGenerator : IIncrementalGenerator
                                   return string.Join(NewLine+GetIntendedSpace(1), Gen());
                                   IEnumerable<string> Gen()
                                   {
-                                      yield return $"public sealed new class LightProtoReader:IProtoReader<{proxyFor?.ToDisplayString() ?? className}>";
+                                      yield return $"internal sealed new class LightProtoReader:IProtoReader<{proxyFor?.ToDisplayString() ?? className}>";
                                       yield return "{";
                                       yield return "    public bool IsMessage => true;";
                                       yield return "    public WireFormat.WireType WireType => WireFormat.WireType.LengthDelimited;";
@@ -258,7 +220,7 @@ public class LightProtoGenerator : IIncrementalGenerator
                                   return string.Join(NewLine+GetIntendedSpace(1), Gen());
                                   IEnumerable<string> Gen()
                                   {
-                                      yield return $"public sealed class LightProtoWriter:IProtoWriter<{proxyFor?.ToDisplayString() ?? className}>";
+                                      yield return $"internal sealed class LightProtoWriter:IProtoWriter<{proxyFor?.ToDisplayString() ?? className}>";
                                       yield return "{";
                                       yield return $"    public bool IsMessage => true;";
                                       yield return $"    public WireFormat.WireType WireType => WireFormat.WireType.LengthDelimited;";
@@ -273,7 +235,7 @@ public class LightProtoGenerator : IIncrementalGenerator
                                       return string.Join(NewLine+GetIntendedSpace(1), Gen());
                                       IEnumerable<string> Gen()
                                       {
-                                          yield return $"public sealed class LightProtoWriter:IProtoWriter<{proxyFor?.ToDisplayString() ?? className}>";
+                                          yield return $"internal sealed class LightProtoWriter:IProtoWriter<{proxyFor?.ToDisplayString() ?? className}>";
                                           yield return "{";
                                           yield return $"    public bool IsMessage => true;";
                                           yield return $"    public WireFormat.WireType WireType => WireFormat.WireType.LengthDelimited;";
@@ -289,7 +251,7 @@ public class LightProtoGenerator : IIncrementalGenerator
                               })
                       }}
                       
-                      public new struct MemberStruct
+                      internal new struct MemberStruct
                       {
                           {{string.Join(NewLine + GetIntendedSpace(1),
                               protoMembers.Select(member => $"public {member.Type} {member.Name};"))
@@ -333,28 +295,13 @@ public class LightProtoGenerator : IIncrementalGenerator
                                           }
                                           else
                                           {
-                                              // 检查是否是引用类型，只有引用类型才使用对象池
-                                              bool usePool = targetType.TypeKind == TypeKind.Class;
-
-                                              if (usePool)
+                                              yield return $"    var parsed = new {className}()";
+                                              yield return "    {";
+                                              foreach (var member in protoMembers)
                                               {
-                                                  yield return $"    var parsed = MessageObjectPool<{className}>.Rent();";
-                                                  foreach (var member in protoMembers)
-                                                  {
-                                                      yield return $"    parsed.{member.Name} = _{member.Name};";
-                                                  }
+                                                  yield return $"        {member.Name}={member.Name},";
                                               }
-                                              else
-                                              {
-                                                  yield return $"    var parsed = new {className}()";
-                                                  yield return "    {";
-                                                  foreach (var member in protoMembers)
-                                                  {
-                                                      yield return $"        {member.Name} = _{member.Name},";
-                                                  }
-                                                  yield return "    };";
-                                              }
-
+                                              yield return "    };";
                                               yield return "    return parsed;";
                                               yield return "}";
                                           }
@@ -376,27 +323,11 @@ public class LightProtoGenerator : IIncrementalGenerator
                                           {
                                               yield return $"    if(memberStruct.{member.Contract.Type.Name}_MemberStruct.HasValue) return {member.Contract.Type}.MemberStruct.ToMessage(rootMemberStruct,memberStruct.{member.Contract.Type.Name}_MemberStruct.Value);";
                                           }
-
-                                          // 检查是否是引用类型，只有引用类型才使用对象池
-                                          bool usePool = targetType.TypeKind == TypeKind.Class;
-
-                                          if (usePool)
+                                          yield return $"    var parsed = new {className}()";
+                                          yield return "    {";
+                                          foreach(var member in protoMembers)
                                           {
-                                              yield return $"    var parsed = MessageObjectPool<{className}>.Rent();";
-                                              foreach(var member in protoMembers)
-                                              {
-                                                  yield return $"    parsed.{member.Name} = memberStruct.{member.Name};";
-                                              }
-                                          }
-                                          else
-                                          {
-                                              yield return $"    var parsed = new {className}()";
-                                              yield return "    {";
-                                              foreach(var member in protoMembers)
-                                              {
-                                                  yield return $"        {member.Name} = memberStruct.{member.Name},";
-                                              }
-                                              yield return "    };";
+                                              yield return $"        {member.Name}=memberStruct.{member.Name},";
                                           }
 
                                           var currentBaseType = baseType;
@@ -422,7 +353,7 @@ public class LightProtoGenerator : IIncrementalGenerator
                                                   memberStructName += $".{derivedType.Name}_MemberStruct.Value";
                                               }
                                                   
-                                              var baseProtoMembers = GetProtoContract(compilation, derivedType)!.Members;
+                                              var baseProtoMembers = GetProtoContract(compilation, derivedType, spc)!.Members;
                                               foreach(var member in baseProtoMembers)
                                               {
                                                   yield return $"        {member.Name}={memberStructName}.{member.Name},";
@@ -436,7 +367,7 @@ public class LightProtoGenerator : IIncrementalGenerator
                                   })
                           }}
                       }
-                      public sealed new class MemberStructLightProtoWriter:IProtoWriter<MemberStruct>
+                      internal sealed new class MemberStructLightProtoWriter:IProtoWriter<MemberStruct>
                       {
                           public bool IsMessage => true;
                           public WireFormat.WireType WireType => WireFormat.WireType.LengthDelimited;
@@ -524,7 +455,7 @@ public class LightProtoGenerator : IIncrementalGenerator
                           }
                       }
                       
-                      public sealed new class MemberStructLightProtoReader:IProtoReader<MemberStruct>
+                      internal sealed new class MemberStructLightProtoReader:IProtoReader<MemberStruct>
                       {
                           public bool IsMessage => true;
                           public WireFormat.WireType WireType => WireFormat.WireType.LengthDelimited;
@@ -674,7 +605,7 @@ public class LightProtoGenerator : IIncrementalGenerator
                       public static IProtoReader<{{proxyFor?.ToDisplayString()??className}}> ProtoReader {get; } = new LightProtoReader();
                       public static IProtoWriter<{{proxyFor?.ToDisplayString()??className}}> ProtoWriter {get; } = new LightProtoWriter();
 
-                      public sealed class LightProtoWriter:IProtoWriter<{{proxyFor?.ToDisplayString()??className}}>
+                      internal sealed class LightProtoWriter:IProtoWriter<{{proxyFor?.ToDisplayString()??className}}>
                       {
                           public bool IsMessage => true;
                           public WireFormat.WireType WireType => WireFormat.WireType.LengthDelimited;
@@ -758,7 +689,7 @@ public class LightProtoGenerator : IIncrementalGenerator
                           }
                       }
                       
-                      public sealed class LightProtoReader:IProtoReader<{{proxyFor?.ToDisplayString()??className}}>
+                      internal sealed class LightProtoReader:IProtoReader<{{proxyFor?.ToDisplayString()??className}}>
                       {
                           public bool IsMessage => true;
                           public WireFormat.WireType WireType => WireFormat.WireType.LengthDelimited;
@@ -777,11 +708,10 @@ public class LightProtoGenerator : IIncrementalGenerator
                           public {{proxyFor?.ToDisplayString()??className}} ParseFrom(ref ReaderContext input)
                           {
                               {{string.Join(NewLine + GetIntendedSpace(3),
-                                  protoMembers.Select(member => $"{member.Type} _{member.Name} = {member.Initializer};"))
+                                  protoMembers.Select(member => $"{member.Type} _{member.Name} = default;"))
                               }}
                               {{string.Join(NewLine + GetIntendedSpace(3),
-                                  protoMembers.Where(member=>member.IsProtoMemberRequired)
-                                      .Select(member => $"bool _{member.Name}HasValue = false;"))
+                                  protoMembers.Select(member => $"bool _{member.Name}HasValue = false;"))
                               }}
                               uint tag;
                               while ((tag = input.ReadTag()) != 0)
@@ -814,8 +744,7 @@ public class LightProtoGenerator : IIncrementalGenerator
                                                   if (TryGetInternalTypeName(member.Type, member.DataFormat,member.StringIntern, out var name))
                                                   {
                                                       yield return $"{{";
-                                                      if(member.IsProtoMemberRequired)
-                                                          yield return $"    _{member.Name}HasValue = true;";
+                                                      yield return $"    _{member.Name}HasValue = true;";
                                                       yield return $"    _{member.Name} = input.Read{name}();";
                                                       yield return $"    break;";
                                                       yield return $"}}";
@@ -823,8 +752,7 @@ public class LightProtoGenerator : IIncrementalGenerator
                                                   else if (IsCollectionType(compilation, member.Type)||IsDictionaryType(compilation, member.Type))
                                                   {
                                                       yield return $"{{";
-                                                      if(member.IsProtoMemberRequired)
-                                                          yield return $"    _{member.Name}HasValue = true;";
+                                                      yield return $"    _{member.Name}HasValue = true;";
                                                       yield return $"    _{member.Name} = {member.Name}_ProtoReader.ParseFrom(ref input);";
                                                       yield return $"    break;";
                                                       yield return $"}}";
@@ -832,8 +760,7 @@ public class LightProtoGenerator : IIncrementalGenerator
                                                   else
                                                   {
                                                       yield return $"{{";
-                                                      if(member.IsProtoMemberRequired)
-                                                          yield return $"    _{member.Name}HasValue = true;";
+                                                      yield return $"    _{member.Name}HasValue = true;";
                                                       yield return $"    _{member.Name} = {member.Name}_ProtoReader.ParseMessageFrom(ref input);";
                                                       yield return $"    break;";
                                                       yield return $"}}";
@@ -861,7 +788,7 @@ public class LightProtoGenerator : IIncrementalGenerator
                               }}
                               {{string.Join(NewLine + GetIntendedSpace(3),
                                   protoMembers.SelectMany(member => {
-                                      return Gen();
+                                      return net8OrGreater ? [] : Gen();
                                       IEnumerable<string> Gen()
                                       {
                                           if (member.IsReadOnly && (IsCollectionType(compilation, member.Type)||IsDictionaryType(compilation, member.Type)))
@@ -896,95 +823,132 @@ public class LightProtoGenerator : IIncrementalGenerator
             );
             IEnumerable<string> GenSkipConstructor()
             {
-                yield return $"var parsed = ({className})System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof({className}));";
+                if (net8OrGreater)
+                {
+                    yield return $"var parsed = ({className})System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof({className}));";
+                }
+                else
+                {
+                    yield return $"var parsed = ({className})System.Runtime.Serialization.FormatterServices.GetUninitializedObject(typeof({className}));";
+                }
                 foreach (var member in protoMembers)
                 {
-                    if (
-                        member.IsReadOnly
-                        && (
-                            IsCollectionType(compilation, member.Type)
-                            || IsDictionaryType(compilation, member.Type)
-                        )
-                    )
+                    if (member.IsReadOnly || member.IsInitOnly)
                     {
-                        throw LightProtoGeneratorException.ReadOnlyWhenSkipConstructor(
-                            member.Name,
-                            member.DeclarationSyntax.GetLocation()
-                        );
-                    }
-                    else if (member.IsInitOnly)
-                    {
-                        throw LightProtoGeneratorException.InitOnlyWhenSkipConstructor(
-                            member.Name,
-                            member.DeclarationSyntax.GetLocation()
-                        );
+                        if (net8OrGreater)
+                        {
+                            foreach (var p in AssignReadonlyMemberByUnsafeAccessor(contract, member))
+                            {
+                                yield return p;
+                            }
+                        }
+                        else
+                        {
+                            throw LightProtoGeneratorException.InitOnlyOrReadOnlyWhenSkipConstructor(
+                                member.Name,
+                                member.DeclarationSyntax.GetLocation()
+                            );
+                        }
                     }
                     else
                     {
-                        yield return $"parsed.{member.Name} = _{member.Name};";
+                        yield return $"if (_{member.Name}HasValue) parsed.{member.Name} = _{member.Name};";
                     }
                 }
             }
 
             IEnumerable<string> GenGeneralConstructor()
             {
-                // 检查是否是引用类型，只有引用类型才使用对象池
-                bool usePool = targetType.TypeKind == TypeKind.Class;
-
-                if (usePool)
+                if (!contract.Type.Constructors.Any(x => x.Parameters.Length == 0))
                 {
-                    yield return $"var parsed = MessageObjectPool<{className}>.Rent();";
-
-                    foreach (var member in protoMembers)
-                    {
-                        if (
-                            member.IsReadOnly
-                            && (
-                                IsCollectionType(compilation, member.Type)
-                                || IsDictionaryType(compilation, member.Type)
-                            )
-                        )
-                        {
-                            yield return $"// {member.Name} is readonly";
-                        }
-                        else
-                        {
-                            yield return $"parsed.{member.Name} = _{member.Name};";
-                        }
-                    }
+                    throw LightProtoGeneratorException.No_Parameterless_Constructor(
+                        contract.Type.ToDisplayString(),
+                        contract.TypeDeclaration.GetLocation()
+                    );
                 }
-                else
-                {
-                    yield return $"var parsed = new {className}()";
-                    yield return $"{{";
 
-                    foreach (var member in protoMembers)
+                yield return $"var parsed = new {className}()";
+                yield return $"{{";
+                
+                var unsafeAccessorMember = new List<ProtoMember>();
+
+                foreach (var member in protoMembers)
+                {
+                    if (member.IsReadOnly)
                     {
-                        if (
-                            member.IsReadOnly
-                            && (
-                                IsCollectionType(compilation, member.Type)
-                                || IsDictionaryType(compilation, member.Type)
-                            )
+                        if (net8OrGreater)
+                        {
+                            unsafeAccessorMember.Add(member);
+                            yield return $"    // {member.Name} is readonly use UnsafeAccessor to assign value";
+                        }
+                        else if (
+                            IsCollectionType(compilation, member.Type)
+                            || IsDictionaryType(compilation, member.Type)
                         )
                         {
                             yield return $"    // {member.Name} is readonly";
                         }
                         else
                         {
-                            yield return $"    {member.Name} = _{member.Name},";
+                            throw LightProtoGeneratorException.ReadOnlyMemberCannotInitialize(
+                                $"{contract.Type}.{member.Name}",
+                                member.DeclarationSyntax.GetLocation()
+                            );
                         }
                     }
+                    else
+                    {
+                        yield return $"    {member.Name} = _{member.Name}HasValue ? _{member.Name} : {member.Initializer},";
+                    }
+                }
 
-                    yield return $"}};";
+                yield return $"}};";
+                foreach (var member in unsafeAccessorMember)
+                {
+                    foreach (var p in AssignReadonlyMemberByUnsafeAccessor(contract, member))
+                        yield return p;
                 }
             }
         }
         var nestedClassStructure = GenerateNestedClassStructure(targetType, classBody);
         sourceBuilder.AppendLine(nestedClassStructure);
-        sourceBuilder.AppendLine("}");
+        if (targetType.ContainingNamespace.IsGlobalNamespace == false)
+        {
+            sourceBuilder.Append(@"}");
+        }
         return sourceBuilder.ToString();
     }
+    
+    private static IEnumerable<string> AssignReadonlyMemberByUnsafeAccessor(
+        ProtoContract contract,
+        ProtoMember member
+    )
+    {
+        var fieldName = $"<{member.Name}>k__BackingField";
+        if (contract.Type.GetMembers(fieldName).Length > 0)
+        {
+            // OK
+        }
+        else if (contract.Type.GetMembers(member.Name).OfType<IFieldSymbol>().Any())
+        {
+            fieldName = member.Name;
+        }
+        else
+        {
+            throw LightProtoGeneratorException.CannotFindReadonlyMemberFieldName(
+                $"{contract.Type}.{member.Name}",
+                contract.TypeDeclaration.GetLocation()
+            );
+        }
+
+        yield return $"if (_{member.Name}HasValue) {{";
+        yield return $"    [System.Runtime.CompilerServices.UnsafeAccessor(System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = \"{fieldName}\")]";
+        yield return $"    static extern ref {member.Type} Get_{member.Name}_Field({contract.Type} message);";
+        yield return $"    ref var ref_{member.Name} = ref Get_{member.Name}_Field(parsed);";
+        yield return $"    ref_{member.Name} = _{member.Name};";
+        yield return $"}}";
+    }
+
 
     private INamedTypeSymbol GetRootProtoBaseClass(INamedTypeSymbol type)
     {
@@ -1107,13 +1071,16 @@ public class LightProtoGenerator : IIncrementalGenerator
 
         var check = $"{messageName}.{member.Name} != null";
 
-        if (HasCountProperty(member.Type))
+        if (IsCollectionType(member.Compilation, member.Type) || IsDictionaryType(member.Compilation, member.Type))
         {
-            return $"{check} && {messageName}.{member.Name}.Count > 0";
-        }
-        if (HasLengthProperty(member.Type))
-        {
-            return $"{check} && {messageName}.{member.Name}.Length > 0";
+            if (HasCountProperty(member.Type))
+            {
+                return $"{check} && {messageName}.{member.Name}.Count > 0";
+            }
+            if (HasLengthProperty(member.Type))
+            {
+                return $"{check} && {messageName}.{member.Name}.Length > 0";
+            }
         }
 
         return check;
@@ -1602,7 +1569,7 @@ public class LightProtoGenerator : IIncrementalGenerator
 
         var isProtoContract = parser
             .GetAttributes()
-            .Any(o => o.AttributeClass?.ToDisplayString() == "LightProto.ProtoContractAttribute");
+            .Any(o => o.AttributeClass?.ToDisplayString() == ProtoContractAttributeFullName);
 
         var memberTypeDisplayString = memberType
             .WithNullableAnnotation(NullableAnnotation.None)
@@ -1850,45 +1817,16 @@ public class LightProtoGenerator : IIncrementalGenerator
         {
             return false;
         }
-
-        if (memberType.TypeKind == TypeKind.Enum)
-        {
-            return false;
-        }
-
-        // Check if the type has ProtoContract attribute
-        bool hasProtoContract = memberType
-            .GetAttributes()
-            .Any(o =>
-                o.AttributeClass?.ToDisplayString() == "LightProto.ProtoContractAttribute"
+        return memberType.TypeKind != TypeKind.Enum
+                && memberType
+                    .GetAttributes()
+                    .Any(o => o.AttributeClass?.ToDisplayString() == ProtoContractAttributeFullName)
+            || (
+                memberType is INamedTypeSymbol namedType
+                && namedType.AllInterfaces.Any(i =>
+                    i.ToDisplayString().StartsWith("LightProto.IProtoParser<")
+                )
             );
-
-        // Check if inherits from AMessage abstract class or implements IProtoParser
-        if (memberType is INamedTypeSymbol namedType)
-        {
-            var baseType = namedType.BaseType;
-            while (baseType != null)
-            {
-                var baseTypeName = baseType.ToDisplayString();
-                if (baseTypeName == "Fantasy.Network.Interface.AMessage" ||
-                    baseType.Name == "AMessage")
-                {
-                    // Must have BOTH ProtoContract attribute AND inherit from AMessage
-                    return hasProtoContract;
-                }
-                baseType = baseType.BaseType;
-            }
-
-            // Also check for IProtoParser
-            if (namedType.AllInterfaces.Any(i =>
-                i.ToDisplayString().StartsWith("LightProto.IProtoParser<")))
-            {
-                return true;
-            }
-        }
-
-        // Fallback: only ProtoContract attribute without AMessage
-        return hasProtoContract;
     }
 
     static bool IsArrayType(ITypeSymbol type)
@@ -2029,15 +1967,25 @@ public class LightProtoGenerator : IIncrementalGenerator
         return null;
     }
 
-    private ITypeSymbol? GetProxyFor(IEnumerable<AttributeData> attributeDatas)
+    private ITypeSymbol? GetProxyFor(ImmutableArray<AttributeData> attributeDatas)
     {
-        var proxyAttr = attributeDatas.FirstOrDefault(o =>
-            o.AttributeClass?.ToDisplayString() == "LightProto.ProtoSurrogateForAttribute"
-        );
-
-        if (proxyAttr?.ConstructorArguments.Length > 0)
+        if (
+            attributeDatas.FirstOrDefault(o =>
+                o.AttributeClass?.ToDisplayString()
+                    .StartsWith("LightProto.ProtoSurrogateForAttribute<") == true
+            ) is
+            { } proxyAttr2
+        )
         {
-            // For typeof(Type) parameters, Value is directly an ITypeSymbol
+            return proxyAttr2.AttributeClass!.TypeArguments[0];
+        }
+        if (
+            attributeDatas.FirstOrDefault(o =>
+                o.AttributeClass?.ToDisplayString() == ("LightProto.ProtoSurrogateForAttribute")
+            ) is
+            { } proxyAttr
+        )
+        {
             return proxyAttr.ConstructorArguments[0].Value as ITypeSymbol;
         }
 
@@ -2053,7 +2001,17 @@ public class LightProtoGenerator : IIncrementalGenerator
     {
         public Compilation Compilation { get; set; } = null!;
         public INamedTypeSymbol Type { get; set; } = null!;
-        public TypeDeclarationSyntax TypeDeclaration { get; set; } = null!;
+        
+        // 存储所有 partial 声明
+        public List<TypeDeclarationSyntax> TypeDeclarations { get; set; } = new();
+        
+        // 为了向后兼容，保留这个属性（返回第一个声明）
+        public TypeDeclarationSyntax TypeDeclaration 
+        { 
+            get => TypeDeclarations.FirstOrDefault()!;
+            set => TypeDeclarations = new List<TypeDeclarationSyntax> { value };
+        }
+        
         public List<ProtoMember> Members { get; set; } = new();
         public ImplicitFields ImplicitFields { get; set; }
         public uint ImplicitFirstTag { get; set; }
@@ -2066,48 +2024,35 @@ public class LightProtoGenerator : IIncrementalGenerator
             new();
     }
 
-    private ProtoContract? GetProtoContract(Compilation compilation, ISymbol? type)
+    private ProtoContract? GetProtoContract(
+        Compilation compilation,
+        ISymbol? type,
+        SourceProductionContext spc
+    )
     {
         if (type is not INamedTypeSymbol targetType)
         {
             return null;
         }
-
         // Look for ProtoContract attribute
         var protoContractAttr = targetType
             .GetAttributes()
             .FirstOrDefault(attr =>
-                attr.AttributeClass?.ToDisplayString() == "LightProto.ProtoContractAttribute"
+                attr.AttributeClass?.ToDisplayString() == ProtoContractAttributeFullName
             );
 
-        // Check if the type inherits from AMessage abstract class
-        bool inheritsFromAMessage = false;
-        var baseType = targetType.BaseType;
-        while (baseType != null)
-        {
-            var baseTypeName = baseType.ToDisplayString();
-            if (baseTypeName == "Fantasy.Network.Interface.AMessage" ||
-                baseType.Name == "AMessage")
-            {
-                inheritsFromAMessage = true;
-                break;
-            }
-            baseType = baseType.BaseType;
-        }
-
-        // Must have BOTH ProtoContract attribute AND inherit from AMessage
-        if (!inheritsFromAMessage || protoContractAttr == null)
+        if (protoContractAttr is null)
             return null;
 
         ImplicitFields implicitFields = (ImplicitFields)(
-            protoContractAttr?
+            protoContractAttr
                 .NamedArguments.FirstOrDefault(arg => arg.Key == "ImplicitFields")
                 .Value.Value
             ?? ImplicitFields.None
         );
 
         uint implicitFirstTag = uint.TryParse(
-            protoContractAttr?
+            protoContractAttr
                 .NamedArguments.FirstOrDefault(arg => arg.Key == "ImplicitFirstTag")
                 .Value.Value?.ToString(),
             out var _implicitFirstTag
@@ -2116,18 +2061,25 @@ public class LightProtoGenerator : IIncrementalGenerator
             : 1;
 
         var skipConstructor =
-            protoContractAttr?
+            protoContractAttr
                 .NamedArguments.FirstOrDefault(arg => arg.Key == "SkipConstructor")
                 .Value.Value?.ToString() == "True";
-
-        // Get all partial declarations for the type
+        
+        // 收集所有 partial 声明
         var typeDeclarations = targetType.DeclaringSyntaxReferences
             .Select(r => r.GetSyntax() as TypeDeclarationSyntax)
-            .Where(t => t is not null)
+            .Where(d => d is not null)
+            .Cast<TypeDeclarationSyntax>()
             .ToList();
 
-        // Use the first declaration for location reporting
-        var typeDeclaration = typeDeclarations.FirstOrDefault()!;
+        if (typeDeclarations.Count == 0)
+        {
+            // 没有找到任何类型声明，返回 null
+            return null;
+        }
+
+        // 使用第一个声明作为主声明（用于错误报告等）
+        var typeDeclaration = typeDeclarations[0];
 
         var proxyFor = GetProxyFor(targetType.GetAttributes());
 
@@ -2196,7 +2148,7 @@ public class LightProtoGenerator : IIncrementalGenerator
                 }
             }
 
-            var contract = GetProtoContract(compilation, derivedType);
+            var contract = GetProtoContract(compilation, derivedType, spc);
             if (contract is null)
             {
                 throw LightProtoGeneratorException.ProtoInclude_Type_Should_Be_ProtoContract(
@@ -2230,13 +2182,15 @@ public class LightProtoGenerator : IIncrementalGenerator
         {
             Compilation = compilation,
             Type = targetType,
-            TypeDeclaration = typeDeclaration,
+            TypeDeclarations = typeDeclarations,
             Members = GetProtoMembers(
                 compilation,
                 targetType,
                 typeDeclarations,
                 implicitFields,
-                implicitFirstTag
+                implicitFirstTag,
+                skipConstructor,
+                spc
             ),
             ImplicitFields = implicitFields,
             ImplicitFirstTag = implicitFirstTag,
@@ -2251,13 +2205,25 @@ public class LightProtoGenerator : IIncrementalGenerator
     private List<ProtoMember> GetProtoMembers(
         Compilation compilation,
         INamedTypeSymbol targetType,
-        List<TypeDeclarationSyntax?> typeDeclarations,
+        List<TypeDeclarationSyntax> typeDeclarations,
         ImplicitFields implicitFields,
-        uint firstImplicitTag
+        uint firstImplicitTag,
+        bool skipConstructor,
+        SourceProductionContext spc
     )
     {
         var members = new List<ProtoMember>();
-
+        
+        // 为所有语法树创建 SemanticModel 映射
+        var semanticModelCache = new Dictionary<SyntaxTree, SemanticModel>();
+        foreach (var decl in typeDeclarations)
+        {
+            if (!semanticModelCache.ContainsKey(decl.SyntaxTree))
+            {
+                semanticModelCache[decl.SyntaxTree] = compilation.GetSemanticModel(decl.SyntaxTree);
+            }
+        }
+        
         foreach (var member in targetType.GetMembers())
         {
             if (member.IsStatic)
@@ -2366,47 +2332,67 @@ public class LightProtoGenerator : IIncrementalGenerator
             if (member is IPropertySymbol property)
             {
                 memberName = property.Name;
-                // Search for property declaration across all partial declarations
-                PropertyDeclarationSyntax? propertyDeclarationSyntax = null;
-                foreach (var decl in typeDeclarations)
-                {
-                    if (decl is null) continue;
-                    propertyDeclarationSyntax = decl.Members.OfType<PropertyDeclarationSyntax>()
-                        .FirstOrDefault(m => m.Identifier.Text == memberName);
-                    if (propertyDeclarationSyntax is not null) break;
-                }
+                var propertyDeclarationSyntax = property
+                    .DeclaringSyntaxReferences.Select(x => x.GetSyntax())
+                    .OfType<PropertyDeclarationSyntax>()
+                    .FirstOrDefault();
                 memberDeclarationSyntax = propertyDeclarationSyntax;
-                initializer = propertyDeclarationSyntax?.Initializer?.Value.ToString();
+                
+                // 使用正确的 SemanticModel
+                initializer = null;
+                if (propertyDeclarationSyntax?.Initializer?.Value is { } initializerSyntax)
+                {
+                    var syntaxTree = propertyDeclarationSyntax.SyntaxTree;
+                    if (semanticModelCache.TryGetValue(syntaxTree, out var semanticModel))
+                    {
+                        var emitter = new ExpressionEmitter(semanticModel);
+                        initializer = emitter.Emit(initializerSyntax);
+                    }
+                }
+                
                 nullableAnnotation = property.NullableAnnotation;
                 memberType = property.Type;
                 isReadOnly = property.IsReadOnly;
-                isRequired = member.GetAttributes().Any(a =>
-                    a.AttributeClass?.ToDisplayString() == "System.Runtime.CompilerServices.RequiredMemberAttribute");
+                isRequired = property.IsRequired;
                 isInitOnly = property.SetMethod?.IsInitOnly == true;
             }
             else if (member is IFieldSymbol field)
             {
                 memberName = field.Name;
-                // Search for field declaration across all partial declarations
-                FieldDeclarationSyntax? fieldDeclarationSyntax = null;
-                foreach (var decl in typeDeclarations)
-                {
-                    if (decl is null) continue;
-                    fieldDeclarationSyntax = decl.Members.OfType<FieldDeclarationSyntax>()
-                        .FirstOrDefault(m =>
-                            m.Declaration.Variables.Any(v => v.Identifier.Text == memberName)
-                        );
-                    if (fieldDeclarationSyntax is not null) break;
-                }
+
+                var fieldDeclarationSyntax = field
+                    .DeclaringSyntaxReferences.Select(x =>
+                        x.GetSyntax() is VariableDeclaratorSyntax v
+                        && v.Parent is VariableDeclarationSyntax vd
+                        && vd.Parent is FieldDeclarationSyntax f
+                            ? f
+                            : null
+                    )
+                    .OfType<FieldDeclarationSyntax>()
+                    .FirstOrDefault();
+
                 memberDeclarationSyntax = fieldDeclarationSyntax;
-                initializer = fieldDeclarationSyntax
+                
+                // 使用正确的 SemanticModel
+                initializer = null;
+                var initializerSyntax = fieldDeclarationSyntax
                     ?.Declaration.Variables.FirstOrDefault()
-                    ?.Initializer?.Value.ToString();
+                    ?.Initializer?.Value;
+                
+                if (initializerSyntax is not null && fieldDeclarationSyntax is not null)
+                {
+                    var syntaxTree = fieldDeclarationSyntax.SyntaxTree;
+                    if (semanticModelCache.TryGetValue(syntaxTree, out var semanticModel))
+                    {
+                        var emitter = new ExpressionEmitter(semanticModel);
+                        initializer = emitter.Emit(initializerSyntax);
+                    }
+                }
+                
                 nullableAnnotation = field.NullableAnnotation;
                 memberType = field.Type;
                 isReadOnly = field.IsReadOnly;
-                isRequired = member.GetAttributes().Any(a =>
-                    a.AttributeClass?.ToDisplayString() == "System.Runtime.CompilerServices.RequiredMemberAttribute");
+                isRequired = field.IsRequired;
                 isInitOnly = false;
             }
             else
@@ -2416,31 +2402,12 @@ public class LightProtoGenerator : IIncrementalGenerator
 
             if (memberDeclarationSyntax is null)
             {
-                throw LightProtoGeneratorException.Member_DeclarationSyntax_Not_Found(memberName);
+                throw LightProtoGeneratorException.Member_DeclarationSyntax_Not_Found(
+                    $"{targetType.ToDisplayString()}.{member.Name}"
+                );
             }
 
-            // For collection types, always regenerate initializer with fully qualified names to ensure Unity compatibility
-            if (IsCollectionType(compilation, memberType) || IsDictionaryType(compilation, memberType))
-            {
-                if (memberType is IArrayTypeSymbol arrayTypeSymbol)
-                {
-                    initializer = $"global::System.Array.Empty<{arrayTypeSymbol.ElementType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}>()";
-                }
-                else if (memberType.TypeKind == TypeKind.Interface || memberType.IsAbstract)
-                {
-                    var concreteType = ResolveConcreteTypeSymbol(
-                        compilation,
-                        (memberType as INamedTypeSymbol)!
-                    );
-                    initializer = $"new {concreteType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}()";
-                }
-                else
-                {
-                    // For concrete collection types like List<T>, use fully qualified name
-                    initializer = $"new {memberType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}()";
-                }
-            }
-            else if (initializer is null)
+            if (initializer is null)
             {
                 if (nullableAnnotation == NullableAnnotation.Annotated)
                 {
@@ -2448,11 +2415,50 @@ public class LightProtoGenerator : IIncrementalGenerator
                 }
                 else if (HasEmptyStaticField(memberType))
                 {
-                    initializer = $"{memberType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}.Empty";
+                    initializer = $"{memberType}.Empty";
+                }
+                else if (
+                    IsCollectionType(compilation, memberType)
+                    || IsDictionaryType(compilation, memberType)
+                )
+                {
+                    if (memberType is IArrayTypeSymbol arrayTypeSymbol)
+                    {
+                        initializer = $"Array.Empty<{arrayTypeSymbol.ElementType}>()";
+                    }
+                    else if (memberType.TypeKind == TypeKind.Interface || memberType.IsAbstract)
+                    {
+                        var concreteType = ResolveConcreteTypeSymbol(
+                            compilation,
+                            (memberType as INamedTypeSymbol)!
+                        );
+                        initializer = $"new {concreteType.ToDisplayString()}()";
+                    }
+                    else
+                    {
+                        initializer = "default";
+                    }
                 }
                 else
                 {
                     initializer = "default";
+                }
+            }
+            else
+            {
+                if (
+                    !skipConstructor
+                    && memberType.IsValueType
+                    && !IsCollectionType(compilation, memberType)
+                    && !IsDictionaryType(compilation, memberType)
+                )
+                {
+                    spc.ReportDiagnostic(
+                        LightProtoGeneratorWarning.MemberDefaultValueMayBreakDeserialization(
+                            $"{targetType}.{member.Name}",
+                            member.Locations
+                        )
+                    );
                 }
             }
 
@@ -2737,34 +2743,17 @@ public class LightProtoGenerator : IIncrementalGenerator
         public Location? Location { get; set; }
         public IEnumerable<Location>? AdditionalLocations { get; set; }
 
-        public static LightProtoGeneratorException InitOnlyWhenSkipConstructor(
+        public static LightProtoGeneratorException InitOnlyOrReadOnlyWhenSkipConstructor(
             string memberName,
             Location? location
         )
         {
             return new LightProtoGeneratorException(
-                "Member should not be initonly when SkipConstructor as we can't assign a value to it"
+                "Member should not be initonly or readonly when SkipConstructor as we can't assign a value to it"
             )
             {
                 Id = "LIGHT_PROTO_001",
-                Title = $"{memberName} is InitOnly",
-                Category = "Usage",
-                Severity = DiagnosticSeverity.Error,
-                Location = location,
-            };
-        }
-
-        public static LightProtoGeneratorException ReadOnlyWhenSkipConstructor(
-            string memberName,
-            Location? location
-        )
-        {
-            return new LightProtoGeneratorException(
-                "Member should not be readonly when SkipConstructor as we can't assign a value to it"
-            )
-            {
-                Id = "LIGHT_PROTO_002",
-                Title = $"{memberName} is InitOnly",
+                Title = $"{memberName} is InitOnly or ReadOnly when SkipConstructor",
                 Category = "Usage",
                 Severity = DiagnosticSeverity.Error,
                 Location = location,
@@ -2974,6 +2963,81 @@ public class LightProtoGenerator : IIncrementalGenerator
                 Severity = DiagnosticSeverity.Error,
                 Location = location,
             };
+        }
+        
+        public static Exception CannotFindReadonlyMemberFieldName(
+            string memberName,
+            Location getLocation
+        )
+        {
+            return new LightProtoGeneratorException(
+                $"Cannot find backing field for property {memberName}. Only support auto property."
+            )
+            {
+                Id = "LIGHT_PROTO_016",
+                Title = $"Cannot find backing field for property {memberName}",
+                Category = "Usage",
+                Severity = DiagnosticSeverity.Error,
+                Location = getLocation,
+            };
+        }
+        
+        public static Exception ReadOnlyMemberCannotInitialize(
+            string memberName,
+            Location getLocation
+        )
+        {
+            return new LightProtoGeneratorException(
+                $"ReadOnly member {memberName} cannot be initialized."
+            )
+            {
+                Id = "LIGHT_PROTO_017",
+                Title = $"ReadOnly member {memberName} cannot be initialized",
+                Category = "Usage",
+                Severity = DiagnosticSeverity.Error,
+                Location = getLocation,
+            };
+        }
+        
+        public static Exception No_Parameterless_Constructor(
+            string contractType,
+            Location getLocation
+        )
+        {
+            return new LightProtoGeneratorException(
+                $"Type {contractType} must have a parameterless constructor when SkipConstructor is false."
+            )
+            {
+                Id = "LIGHT_PROTO_018",
+                Title = $"Type {contractType} must have a parameterless constructor",
+                Category = "Usage",
+                Severity = DiagnosticSeverity.Error,
+                Location = getLocation,
+            };
+        }
+    }
+    
+    internal static class LightProtoGeneratorWarning
+    {
+        internal static Diagnostic MemberDefaultValueMayBreakDeserialization(
+            string memberName,
+            ImmutableArray<Location> locations
+        )
+        {
+            return Diagnostic.Create(
+                new DiagnosticDescriptor(
+                    id: "LIGHT_PROTO_W001",
+                    title: "Member has default value which may break deserialization",
+                    messageFormat: "Member '{0}' has a default value which may get a different deserialization result than expected. Consider setting SkipConstructor=true on ProtoContract or removing the default value.",
+                    category: "Usage",
+                    defaultSeverity: DiagnosticSeverity.Warning,
+                    isEnabledByDefault: true,
+                    helpLinkUri: "https://github.com/dameng324/LightProto/blob/main/docs/Diagnostics.md#LIGHT_PROTO_W001"
+                ),
+                locations.FirstOrDefault() ?? Location.None,
+                additionalLocations: locations.Skip(1),
+                memberName
+            );
         }
     }
 }
