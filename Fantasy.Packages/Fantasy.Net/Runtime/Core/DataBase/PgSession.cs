@@ -13,6 +13,7 @@ using Fantasy.Entitas;
 using Fantasy.Entitas.TypeMeta;
 using Fantasy.Helper;
 using Fantasy.Pool;
+using Fantasy.Product;
 using MemoryPack;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -46,20 +47,73 @@ namespace Fantasy.Database
     }
 
     /// <summary>
-    /// 【PgSession是 PgSql 数据库的操作会话, 继承自EFCore 的 DbContext。适用于PgSQL的 CRUD 操作。】
+    /// 用于给<see cref="PgSession"/>注册为非池化的版本
+    /// </summary>    
+    public class PgSessionUnPooled : PgSession
+    {
+        /// <summary>
+        /// 构造方法
+        /// </summary>
+        /// <param name="options"></param>
+        public PgSessionUnPooled(DbContextOptions<PgSessionUnPooled> options) : base(options)
+        {
+        }
+    }
+
+    /// <summary>
+    /// 配置表数据库专用会话
     /// </summary>
-    /// 
-    /// 【注意, 每个 PgSession 会交由EFCore构建一个“Entity - Table”模型】
+    public class PgSessionForConfig : PgSession
+    {
+        /// <summary>
+        /// 构造方法
+        /// </summary>
+        /// <param name="options"></param>
+        public PgSessionForConfig(DbContextOptions<PgSessionForConfig> options) : base(options)
+        {
+        }
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            Design(modelBuilder, isSessionForConfig: true);
+        }
+    }
+
+    /// <summary>
+    /// 配置表数据库专用会话的非池化版本
+    /// </summary>
+    public class PgSessionUnPooledForConfig : PgSession
+    {
+        /// <summary>
+        /// 构造方法
+        /// </summary>
+        /// <param name="options"></param>
+        public PgSessionUnPooledForConfig(DbContextOptions<PgSessionUnPooledForConfig> options) : base(options)
+        {
+        }
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            Design(modelBuilder, isSessionForConfig: true);
+        }
+    }
+
+    /// <summary>
+    /// <para>
+    /// 【<see cref="PgSession"/>是 PgSql 数据库的操作会话, 继承自EFCore 的 DbContext。适用于PgSQL的 CRUD 操作。】
+    /// </para>
+    /// <para>
+    /// 【注意, 每个 <see cref="PgSession"/> 会交由EFCore构建一个“Entity - Table”模型】
     ///  模型初始化时自动构建, 构建后无法运行时变动! 无法HotUpdate！无法检测到动态新建的表、无法感知热更新建的字段！ 
     ///  因此，对于已上线的业务，如果需要无感更新业务数据, (典型的情况是中途给实体新增字段 )，
     ///  请务必考虑采用【蓝绿部署】结合"数据库迁移策略"；
     ///  另一种可能有效的运行时让服务无感交接的解决办法是：继承并实现额外的DbContext，比如实现一组临时的 TempSession 与 TempSessionUnPooled ，专门用于“EntityTable”模型的热交接（但即便如此, 等到合适的时机依然需要重启服务器，构建新的模型）。
-    ///  
-    /// 【关于 PgSession 的池化机制】 由ServiceProvider依赖注入进行池化，
+    /// </para>
+    /// <para>
+    /// 【关于 <see cref="PgSession"/> 的池化机制】 由ServiceProvider依赖注入进行池化，
     /// 具体详情请见 PostgreSQL 初始化时调用的 ServiceCollection.AddDbContextPool() 方法，
     /// 微软在该方法中对 DbContext 的池化做了详细注释。
-    /// 
-    /// 【关于 ORM 性能】PgSession 基于 Dapper和EFCore 封装。
+    /// </para>
+    /// <para>
+    /// 【关于 ORM 性能】<see cref="PgSession"/> 基于 Dapper和EFCore 封装。
     /// 从性能来考虑, 4种 SQL 操作方式排名如下——
     /// 1. 原生SQL: 性能最优, 但没有 ORM 字段自动映射; 
     /// 2. Dapper: 相当于原生SQL + 自动字段映射, 性能次之;
@@ -68,7 +122,12 @@ namespace Fantasy.Database
     /// 当前封装，结合了1 2 3 4，以寻求均衡。
     /// 为什么当前不用号称速度更快的 ORM 框架，比如SQLSugar ？考虑到，现在AI时代, 复杂查询可以让AI生成最优的原生SQL执行, ORM 的性能不必须作为核心考虑项。  
     /// 而且许多数据库的高级用法，更常发生在响应非实时的后运营阶段、离线处理阶段，这时SQL执行效率并不追求极限，EFCore完全足以胜任绝大多数状况。
-    ///
+    /// </para>
+    /// <para>
+    /// 非池中取得的<see cref="PgSession"/>, 劣势: 每次使用都会产生新实例, 相比池化, 会施加轻微GC压力。优势: 绝对的状态安全。
+    /// 调用 PostgreSQL.Use() 时，传入参数设置未非池化， 即可获取 <see cref="PgSessionUnPooled"/> 实例。
+    /// </para>
+    /// </summary>
     public partial class PgSession : DbContext, IDbSession, IAssemblyLifecycle
     {
         /// <summary>
@@ -92,21 +151,6 @@ namespace Fantasy.Database
 
         }
 
-        /// <summary>
-        /// 非池中取得的PgSession, 劣势: 每次使用都会产生新实例, 相比池化, 会施加轻微GC压力。优势: 绝对的状态安全。
-        /// 调用 PostgreSQL.Use() 时，传入参数设置未非池化， 即可获取 PgSessionUnPooled 实例。
-        /// </summary>
-        public class PgSessionUnPooled : PgSession
-        {
-            /// <summary>
-            /// 构造方法
-            /// </summary>
-            /// <param name="options"></param>
-            public PgSessionUnPooled(DbContextOptions<PgSessionUnPooled> options) : base(options)
-            {
-            }
-        }
-
         private JsonSettings _jsonSettings = new JsonSettings(
                 library: Library.Microsoft, 
                 isIndented: false,
@@ -119,10 +163,19 @@ namespace Fantasy.Database
         /// <param name="modelBuilder"></param>
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            //处理DbSet注册
-            DbSetMetadataHelper.ScanDbSetTypes((type, tableName,attr) => {
+            Design(modelBuilder, isSessionForConfig: false);
+        }
 
-                if (attr.IfSelectionContainsDbType(DatabaseType.PostgreSQL) == false)
+        /// <summary>
+        /// 设计模型。
+        /// </summary>
+        /// <param name="modelBuilder">传入一个建模器</param>
+        /// <param name="isSessionForConfig">是否作为配置表数据库专用会话</param>
+        protected void Design(ModelBuilder modelBuilder, bool isSessionForConfig) {
+            //处理DbSet注册
+            DbSetMetadataHelper.ScanDbSetTypes((type, tableName, attr) => {
+
+                if (!attr.IfSelectionContainsDbType(DatabaseType.PostgreSQL))
                     return;
 
                 if (attr.IsEmbedded)
@@ -131,11 +184,35 @@ namespace Fantasy.Database
                     return;
                 }
 
-                Log.Debug($"PgSQL ORM-Model Registering entities: {type.FullName} -> table {tableName}");
+                // 设置默认 schema
+                const string defaultSchema = "default";
+                modelBuilder.HasDefaultSchema(defaultSchema);
 
-                string schemaStr = "public";//PgSQL默认命名空间
+                string schemaStr = defaultSchema;//PgSQL默认命名空间
                 if (attr.WithNamespace == true && !string.IsNullOrWhiteSpace(type.Namespace))
-                    schemaStr = type.Namespace;
+                    schemaStr = type.Namespace.ReplaceDotWith_();
+
+                // 数据库分为两种，过滤规则如下：
+                // 如果当前数据库没有被设置为配置表数据库, 那就不处理配置表类型的DbSet；
+                // 如果当前数据库被设置为配置表数据库, 那就不处理那些普通的DbSet。
+                if (attr.IsAsConfig == true)
+                {
+                    PgSQL.ExistingAtLeastOneConfigDbSet = true;
+
+                    if (!isSessionForConfig)
+                        return; //直接返回
+
+                    if (schemaStr == defaultSchema)
+                        schemaStr = "Config";
+                    else
+                        schemaStr = "Config_" + schemaStr;
+                }
+                else if(!attr.IsAsConfig && isSessionForConfig)
+                {
+                    return; //直接返回
+                }
+
+                Log.Debug($"PgSQL ORM-Model Registering entities: {type.FullName} -> table {schemaStr}.{tableName}");
 
                 EntityTypeBuilder? entityBuilder = default;
                 if (attr.IsAsDocument)
@@ -145,7 +222,7 @@ namespace Fantasy.Database
                         entityBuilder = modelBuilder.SharedTypeEntity<EntityDocumentDTC>($"{type.FullName}_Shadow");
                     else
                         entityBuilder = modelBuilder.SharedTypeEntity<DocumentDTC>($"{type.FullName}_Shadow");
-                    
+
                     entityBuilder.ToTable($"{tableName}_Doc", schemaStr);
 
                     if (typeof(Entity).IsAssignableFrom(type))
@@ -167,17 +244,17 @@ namespace Fantasy.Database
                     //实体建表
                     entityBuilder = modelBuilder.Entity(type).ToTable(tableName, schemaStr);
 
-                    if(typeof(Entity).IsAssignableFrom(type))
+                    if (typeof(Entity).IsAssignableFrom(type))
                     {
                         //承载Embedded实体的影子属性, 自定义序列化转化逻辑
                         entityBuilder.Property<EntityTreeCollection>(DbSetProperty.JsonSingle).HasColumnType("jsonb")
-                            .HasConversion( 
+                            .HasConversion(
                                            entityList => entityList.ToJson(_jsonSettings, true),
                                            jsonStr => jsonStr.Deserialize<EntityTreeCollection>(_jsonSettings, true)
                                            )
                             .IsRequired(false);
                         entityBuilder.Property<EntityMultiCollection>(DbSetProperty.JsonMulti).HasColumnType("jsonb")
-                            .HasConversion( 
+                            .HasConversion(
                                            entityList => entityList.ToJson(_jsonSettings, true),
                                            jsonStr => jsonStr.Deserialize<EntityMultiCollection>(_jsonSettings, true)
                                            )
@@ -195,16 +272,14 @@ namespace Fantasy.Database
                     //父级Type+Id联合索引
                     entityBuilder.Property<long>(DbSetProperty.ParentType);
                     entityBuilder.Property<long>(DbSetProperty.ParentId);
-                    entityBuilder.HasIndex(DbSetProperty.ParentType, DbSetProperty.ParentId).IsUnique(false);                    
+                    entityBuilder.HasIndex(DbSetProperty.ParentType, DbSetProperty.ParentId).IsUnique(false);
                 }
-            });          
+            });
 
             if (!modelBuilder.Model.GetEntityTypes().Any())
             {
                 Log.Warning("❌ No entities were detected during the EF Core model-building phase. Please verify!");
             }
-
-            base.OnModelCreating(modelBuilder);
         }
 
         /// <summary>

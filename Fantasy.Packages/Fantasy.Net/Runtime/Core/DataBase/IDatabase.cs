@@ -29,6 +29,10 @@ namespace Fantasy.Database
         /// MongoDB 初始化自定义委托，当设置了这个委托后，就不会自动创建MongoClient，把创建权交给自定义。
         /// </summary>
         public static Func<DatabaseCustomConfig, MongoClient>? MongoDBCustomInitialize;
+        /// <summary>
+        /// 用于存放配置表的数据库名字约定。我们约定这些数据库仅用于存放配置性数据，而不作为玩家数据写入。
+        /// </summary>
+        public static readonly string ConfigDbName = "config_db";
     }
 
     /// <summary>
@@ -82,25 +86,26 @@ namespace Fantasy.Database
         public int Duty { get; }
 
         /// <summary>
+        /// 获得当前数据库的名字
+        /// </summary>
+        public string Name { get; }
+
+        /// <summary>
+        /// 当前数据库是否是配置表数据库
+        /// </summary>
+        public bool IsForConnfig { get;}
+
+        /// <summary>
         /// 初始化数据库。
         /// </summary>
-        IDatabase Initialize(Scene scene, ref ServiceCollection servicec, int duty, string connectionString, string dbName);
+        IDatabase Initialize(Scene scene, int duty, string connectionString, string dbName);
         
         /// <summary>
         /// 使用数据库会话, 返回一个作用域；out一个Session, 通过Session操作数据库。
         /// <param name="dbSession">dbSession 获得一个新的数据库会话</param>
         /// <param name="useSessionFromPool">useSessionFromPool 是否从池中获取会话</param>
         /// </summary>
-        public AsyncServiceScope Use(out IDbSession? dbSession, bool useSessionFromPool = true);
-
-        /// <summary>
-        /// 传入异步函数, 通过委托直接操作数据库。
-        /// 注意 ：如果传入的函数闭包了外部变量, 编译器将会自动生成DisplayClass, 导致一定的GC压力。
-        /// </summary>
-        /// <param name="asyncFunc">asyncFunc 传入一个异步FTask函数</param>
-        /// <param name="useSessionFromPool">useSessionFromPool 是否从池中获取会话</param>
-        /// <returns></returns>
-        public FTask Invoke(Func<IDbSession?, FTask> asyncFunc, bool useSessionFromPool = true);
+        public AsyncServiceScope Use(out IDbSession dbSession, bool useSessionFromPool = true);
 
         /// <summary>
         /// 快速部署, 用于开发时 一次性快速创建所有标记了 [Table] 或 [FTable] 的存储集。

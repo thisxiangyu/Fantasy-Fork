@@ -25,7 +25,7 @@ namespace Fantasy.Database.Helper
             {
                 var assm = kv.Value.Assembly;
 
-                //Log._info($"Scanning for FantasyDbSets in assembly: {assm.FullName}");
+                Log.Debug($"Scanning for DbSets in assembly: {assm.FullName}");
 
                 foreach (var type in assm.GetTypes())
                 {

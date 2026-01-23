@@ -56,9 +56,19 @@ namespace Fantasy.Database
         /// </summary>
         public int Duty { get; private set; }
         /// <summary>
+        /// 这个数据库的名字
+        /// </summary>
+        public string Name { get; private set; }
+        /// <summary>
+        /// 当前数据库是否是配置表数据库
+        /// </summary>
+        public bool IsForConnfig { get; private set; }
+        /// <summary>
         /// 获得Mongo数据库的原生操作柄
         /// </summary>
         public IMongoDatabase RawHandler { get; private set; }
+
+        internal ServiceProvider ServiceProvider { get; private set; }
 
         #region Basic
 
@@ -71,12 +81,15 @@ namespace Fantasy.Database
         /// <param name="connectionString">数据库连接字符串。</param>
         /// <param name="dbName">数据库名称。</param>
         /// <returns>初始化后的数据库实例。</returns>
-        public IDatabase Initialize(Scene scene,ref ServiceCollection worldServices, int duty, string connectionString, string dbName)
+        public IDatabase Initialize(Scene scene, int duty, string connectionString, string dbName)
         {
             this.Scene = scene;
             Duty = duty;
+            Name = dbName;
+            Serializer = SerializerManager.BsonPack;
+            IsForConnfig = Name == DatabaseSetting.ConfigDbName;
 
-            if(DatabaseSetting.MongoDBCustomInitialize != null)
+            if (DatabaseSetting.MongoDBCustomInitialize != null)
             {
                 _mongoClient = DatabaseSetting.MongoDBCustomInitialize(new DatabaseCustomConfig()
                 {
@@ -117,7 +130,10 @@ namespace Fantasy.Database
                 throw new Exception($"Mongo logic-database {dbName} connection failed:\n{ex}");
             }
 
-            Serializer = SerializerManager.BsonPack;
+            // 这里构建 ServiceProvider 并没有实际意义，只是为了兼容 PgSQL 那种数据库
+            var services = new ServiceCollection();
+            ServiceProvider = services.BuildServiceProvider();
+
             return this;
         }
 
@@ -163,20 +179,10 @@ namespace Fantasy.Database
         /// <param name="mongoSession"></param>
         /// <param name="useSessionFromPool">Session池化, Mongo 数据库无需关心</param>
         /// <returns></returns>
-        public AsyncServiceScope Use(out IDbSession? mongoSession, bool useSessionFromPool = true)
+        public AsyncServiceScope Use(out IDbSession mongoSession, bool useSessionFromPool = true)
         {
             mongoSession = _dbSession;
-            return Scene.World.ServiceProvider.CreateAsyncScope();
-        }
-
-        /// <summary>
-        /// 通过 IDbSession 操作数据库会话。 
-        /// </summary>
-        /// <param name="asyncFunc"></param>
-        /// <param name="useSessionFromPool">Session池化, Mongo 数据库无需关心</param>
-        public async FTask Invoke(Func<IDbSession, FTask> asyncFunc, bool useSessionFromPool = true)
-        {
-           await asyncFunc(_dbSession);
+            return ServiceProvider.CreateAsyncScope();
         }
         #endregion
 

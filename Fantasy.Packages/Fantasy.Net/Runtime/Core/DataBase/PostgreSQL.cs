@@ -46,9 +46,21 @@ namespace Fantasy.Database
         /// </summary>
         public int Duty { get; private set; }
         /// <summary>
+        /// 获得当前数据库的名字
+        /// </summary>
+        public string Name { get; private set; }
+        /// <summary>
+        /// 当前数据库是否是配置表数据库
+        /// </summary>
+        public bool IsForConnfig { get; private set; }
+        /// <summary>
         /// PgSQL原生操作柄
         /// </summary>
         public NpgsqlDataSource RawHandler { get; private set; }
+
+
+        public static bool ExistingAtLeastOneConfigDbSet;
+        internal ServiceProvider ServiceProvider { get; private set; }
 
         #region Basic
 
@@ -57,15 +69,19 @@ namespace Fantasy.Database
         /// </summary>
         /// <param name="duty">工作职责。</param>
         /// <param name="scene">场景对象。</param>
-        /// <param name="worldServices">世界服务构建。</param>
         /// <param name="connectionString">数据库连接字符串。</param>
         /// <param name="dbName">数据库名称。</param>
         /// <returns>初始化后的数据库实例。</returns>
-        public IDatabase Initialize(Scene scene, ref ServiceCollection worldServices,int duty, string connectionString, string dbName)
+        public IDatabase Initialize(Scene scene,int duty, string connectionString, string dbName)
         {
             Scene = scene;
             Duty = duty;
+            Name = dbName;
             Serializer = SerializerManager.MemoryPackHelper;
+            IsForConnfig = Name == DatabaseSetting.ConfigDbName;
+
+            var services = new ServiceCollection();
+            services.AddHttpContextAccessor();
 
             if (DatabaseSetting.PostgreSQLCustomInitialize != null)
             {
@@ -103,31 +119,67 @@ namespace Fantasy.Database
             // 注意, DbContext的池化会将Scope也一并连带, 这导致的直接结果是, 每次调用Open取池中的PgSession时, Scoped服务都是跟初始保持一致的,
             // 因此 池化的PgSession 不允许使用动态Scoped服务 (非动态Scoped服务无影响)。
             // 详情 请阅读 AddDbContextPool 微软官方的注释以获得更多理解。
-            worldServices.AddDbContextPool<PgSession>(contextOptionsBuilder =>
-            {
-                ConfigurePgSession(contextOptionsBuilder, RawHandler);
-            }, poolSize: FTaskCountLimit);
 
-            //为World服务 注册非池化版本的PgSession。
-            worldServices.AddDbContext<PgSessionUnPooled>(contextOptionsBuilder =>
+            if(IsForConnfig)
             {
-                ConfigurePgSession(contextOptionsBuilder, RawHandler);
-            });
+                // 注册配置表数据库专用会话
+                services.AddDbContextPool<PgSessionForConfig>(contextOptionsBuilder =>
+                {
+                    ConfigurePgSession(contextOptionsBuilder, RawHandler);
+                }, poolSize: FTaskCountLimit);
+
+                // 注册非池化版本
+                services.AddDbContext<PgSessionUnPooledForConfig>(contextOptionsBuilder =>
+                {
+                    ConfigurePgSession(contextOptionsBuilder, RawHandler);
+                });
+            }
+            else
+            {
+                // 注册最常用的PgSession
+                services.AddDbContextPool<PgSession>(contextOptionsBuilder =>
+                {
+                    ConfigurePgSession(contextOptionsBuilder, RawHandler);
+                }, poolSize: FTaskCountLimit);
+
+                // 注册非池化版本的PgSession。
+                services.AddDbContext<PgSessionUnPooled>(contextOptionsBuilder =>
+                {
+                    ConfigurePgSession(contextOptionsBuilder, RawHandler);
+                });
+            }
 
             //分别初始化池化Session和非池化Session连接( 这一步同时也会构建 EntityTable映射模型 )
             try
             {
-                var optionsBuilder = new DbContextOptionsBuilder<PgSession>();
-                optionsBuilder.UseNpgsql(RawHandler);
-                var pgSession = new PgSession(optionsBuilder.Options);
-                pgSession.Database.OpenConnection();
-                pgSession.Dispose();
+                if (Name == DatabaseSetting.ConfigDbName)
+                {
+                    var optionsBuilder = new DbContextOptionsBuilder<PgSessionForConfig>();
+                    optionsBuilder.UseNpgsql(RawHandler);
+                    var pgSession = new PgSessionForConfig(optionsBuilder.Options);
+                    pgSession.Database.OpenConnection();
+                    pgSession.Dispose();
 
-                var optionsBuilderForNonPooled = new DbContextOptionsBuilder<PgSessionUnPooled>();
-                optionsBuilderForNonPooled.UseNpgsql(RawHandler);
-                var pgSessionNonPooled = new PgSessionUnPooled(optionsBuilderForNonPooled.Options);
-                pgSessionNonPooled.Database.OpenConnection();
-                pgSessionNonPooled.Dispose();
+                    var optionsBuilderForNonPooled = new DbContextOptionsBuilder<PgSessionUnPooledForConfig>();
+                    optionsBuilderForNonPooled.UseNpgsql(RawHandler);
+                    var pgSessionNonPooled = new PgSessionUnPooledForConfig(optionsBuilderForNonPooled.Options);
+                    pgSessionNonPooled.Database.OpenConnection();
+                    pgSessionNonPooled.Dispose();
+                }
+                else
+                {
+                    var optionsBuilder = new DbContextOptionsBuilder<PgSession>();
+                    optionsBuilder.UseNpgsql(RawHandler);
+                    var pgSession = new PgSession(optionsBuilder.Options);
+                    pgSession.Database.OpenConnection();
+                    pgSession.Dispose();
+
+                    var optionsBuilderForNonPooled = new DbContextOptionsBuilder<PgSessionUnPooled>();
+                    optionsBuilderForNonPooled.UseNpgsql(RawHandler);
+                    var pgSessionNonPooled = new PgSessionUnPooled(optionsBuilderForNonPooled.Options);
+                    pgSessionNonPooled.Database.OpenConnection();
+                    pgSessionNonPooled.Dispose();
+                }
             }
             catch (Exception ex) {
                 throw new Exception($"( Failed to init PgSession. \"{GetConnectionInfoWithoutPassword()}\") :\n {ex} ");
@@ -139,6 +191,8 @@ namespace Fantasy.Database
             FlowLock = (FlowLock == null)
                     ? new FTaskFlowLock(FTaskCountLimit, scene.CoroutineLockComponent, pgDbHash)
                     : FlowLock.Reset(scene.CoroutineLockComponent, pgDbHash);
+
+            ServiceProvider = services.BuildServiceProvider();  //构建 ServiceProvider
 
             return this;
         }
@@ -188,6 +242,31 @@ namespace Fantasy.Database
 
         #region  Use Session
 
+        // PgSession有四种不同的情况:
+        // 池化和非池化、配置表和非配置表
+        private PgSession GetSession(bool useSessionFromPool = true) {
+            if (IsForConnfig)
+            {
+                if (useSessionFromPool)
+                    return ServiceProvider.GetRequiredService<PgSessionForConfig>();
+                else
+                    return ServiceProvider.GetRequiredService<PgSessionUnPooledForConfig>();
+            }
+            else
+            {
+                if (useSessionFromPool)
+                    return ServiceProvider.GetRequiredService<PgSession>();
+                else
+                    return ServiceProvider.GetRequiredService<PgSessionUnPooled>();
+            }
+        }
+
+        private PgSession GetSessionAndInit(bool useSessionFromPool = true) {
+            PgSession res = GetSession(useSessionFromPool);
+            res.SetPg(this);
+            return res;
+        }
+
         /// <summary>
         /// 使用数据库: 创建作用域并获取 Db对话实例。
         /// (这里的 SqlSession 超过 scope 会自动Dispose, 确保外部使用了using 管理作用域, 即可自动将SqlSession返还池中)
@@ -200,28 +279,20 @@ namespace Fantasy.Database
         /// 然而, 由于 PgSession 当中保存了一些数据库操作的状态, 池化模式在少数高并发的边缘情况可能存在副作用, 需特别留意, 
         /// 详情请参考微软EFCore官方手册对DbContextPool的说明以获得更多理解。 </param>
         /// <returns>创建的作用域（外部通过 using 释放）</returns>
-        public AsyncServiceScope Use(out IDbSession? session,bool useSessionFromPool = true)
+        public AsyncServiceScope Use(out IDbSession session, bool useSessionFromPool = true)
         {
-            var scope = Scene.World.ServiceProvider.CreateAsyncScope();
-            PgSession? pgSession = null; 
+            var scope = ServiceProvider.CreateAsyncScope();
             try
             {
-                if (useSessionFromPool)
-                    pgSession = scope.ServiceProvider.GetRequiredService<PgSession>();
-                else
-                    pgSession = scope.ServiceProvider.GetRequiredService<PgSessionUnPooled>();
-
-                pgSession.SetPg(this);
-                session = pgSession;
+                session = GetSessionAndInit(useSessionFromPool);
+                return scope;
             }
             catch (Exception ex)
             {
-                pgSession?.Dispose();
-                session = null;
-                throw new($"( Critical Emergency! PgSQL failed to get connection! ) \n " +
-                $"{GetConnectionInfoWithoutPassword()}\n ",ex);
+                scope.Dispose();
+                throw new Exception($"( Critical Emergency! PgSQL failed to get connection! ) \n " +
+                                    $"{GetConnectionInfoWithoutPassword()}\n ", ex);
             }
-            return scope;
         }
 
         /// <summary>
@@ -236,94 +307,19 @@ namespace Fantasy.Database
         /// 详情请参考微软EFCore官方手册对DbContextPool的说明以获得更多理解。 </param>
         /// <returns>创建的作用域（外部通过 using 释放）</returns>
         /// <returns>作用域（外部通过 using 释放）</returns>
-        public AsyncServiceScope Use(out PgSession? session, bool useSessionFromPool = true)
+        public AsyncServiceScope Use(out PgSession session, bool useSessionFromPool = true)
         {
-            var scope = Scene.World.ServiceProvider.CreateAsyncScope();
-            PgSession? pgSession = null;
+            var scope = ServiceProvider.CreateAsyncScope();
             try
             {
-                if (useSessionFromPool)
-                    pgSession = scope.ServiceProvider.GetRequiredService<PgSession>();
-                else
-                    pgSession = scope.ServiceProvider.GetRequiredService<PgSessionUnPooled>();
-
-                pgSession.SetPg(this);
-                session = pgSession;
+                session = GetSessionAndInit(useSessionFromPool);
+                return scope;
             }
             catch (Exception ex)
             {
-
-                pgSession?.Dispose();
-                session = null;
-                throw new($"( Critical Emergency! PgSQL failed to get connection! ) \n " +
-                $"{GetConnectionInfoWithoutPassword()}\n ", ex);
-            }
-            return scope;
-        }
-
-        /// <summary>
-        /// 直接传入一个函数操作数据库, 函数执行完会自动结束 PgSession；
-        /// 注意: 这一方法写起来更方便, 但如果传入函数闭包了外部变量, 编译器将会生成DisplayClass, 导致一定的GC压力。 
-        /// </summary>
-        /// <param name="asyncFunc"></param>
-        /// <param name="useSessionFromPool"> 本次连接是否从池中取 DbSession, 默认为为true; 
-        /// 解释如下 : DbSession 的父类是微软提供的 DbContext。使用DbContext分池化和实例化两种用法，
-        /// 池化模式每次会尝试从DbContextPool当中取一个DbContext, 相比于每次都实例化, 池化的GC压力较小且性能略优,
-        /// 在我们框架中, PgSQL 从池中取的是 PgSession; 
-        /// 然而, 由于 PgSession 当中保存了一些数据库操作的状态, 池化模式在少数高并发的边缘情况可能存在副作用, 需特别留意, 
-        /// 详情请参考微软EFCore官方手册对DbContextPool的说明以获得更多理解。 </param>
-        public async FTask Invoke(Func<PgSession?, FTask> asyncFunc, bool useSessionFromPool = true)
-        {
-            await using AsyncServiceScope scope = Scene.World.ServiceProvider.CreateAsyncScope();
-            PgSession? pgSession = null;
-            try
-            {
-                if (useSessionFromPool)
-                    pgSession = scope.ServiceProvider.GetRequiredService<PgSession>(); //TODO 需要验证一下这里拿到的PgSession是自动Connection还是手动的
-                else
-                    pgSession = scope.ServiceProvider.GetRequiredService<PgSessionUnPooled>();
-
-                pgSession.SetPg(this);
-                await asyncFunc(pgSession);
-            }
-            catch (Exception ex)
-            {
-                await asyncFunc(pgSession);
-                throw new($"( Critical Emergency! PgSQL failed to get connection! ) \n " +
-                $"{GetConnectionInfoWithoutPassword()}\n ", ex);
-            }
-        }
-
-        /// <summary>
-        /// 通过 IDbSession 操作数据库。直接传入一个函数, 执行完会自动结束 PgSession；
-        /// 注意: 这一方法写起来更方便, 但如果传入函数闭包了外部变量, 编译器将会生成DisplayClass, 导致一定的GC压力。 
-        /// </summary>
-        /// <param name="asyncFunc"></param>
-        /// <param name="useSessionFromPool"> 本次连接是否从池中取 DbSession, 默认为为true; 
-        /// 解释如下 : DbSession 的父类是微软提供的 DbContext。使用DbContext分池化和实例化两种用法，
-        /// 池化模式每次会尝试从DbContextPool当中取一个DbContext, 相比于每次都实例化, 池化的GC压力较小且性能略优,
-        /// 在我们框架中, PgSQL 从池中取的是 PgSession; 
-        /// 然而, 由于 PgSession 当中保存了一些数据库操作的状态, 池化模式在少数高并发的边缘情况可能存在副作用, 需特别留意, 
-        /// 详情请参考微软EFCore官方手册对DbContextPool的说明以获得更多理解。 </param>
-        public async FTask Invoke(Func<IDbSession?, FTask> asyncFunc, bool useSessionFromPool = true)
-        {
-            await using AsyncServiceScope scope = Scene.World.ServiceProvider.CreateAsyncScope();
-            PgSession? pgSession = null;
-            try
-            {
-                if (useSessionFromPool)
-                    pgSession = scope.ServiceProvider.GetRequiredService<PgSession>(); //TODO 需要验证一下这里拿到的PgSession是自动Connection还是手动的
-                else
-                    pgSession = scope.ServiceProvider.GetRequiredService<PgSessionUnPooled>();
-
-                pgSession.SetPg(this);
-                await asyncFunc(pgSession);
-            }
-            catch (Exception ex)
-            {
-                await asyncFunc(pgSession);
-                throw new($"( Critical Emergency! PgSQL failed to get connection! ) \n " +
-                $"{GetConnectionInfoWithoutPassword()}\n ", ex);
+                scope.Dispose();
+                throw new Exception($"( Critical Emergency! PgSQL failed to get connection! ) \n " +
+                                    $"{GetConnectionInfoWithoutPassword()}\n ", ex);
             }
         }
 

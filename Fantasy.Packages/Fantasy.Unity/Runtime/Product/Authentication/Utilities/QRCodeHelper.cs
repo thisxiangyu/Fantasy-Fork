@@ -23,7 +23,7 @@ namespace Fantasy.Product.Authentication
         /// <param name="width">图像宽度</param>
         /// <param name="height">图像高度</param>
         /// <returns></returns>
-        public static async Task<PixelData> GenerateQRCodeAsync(string contents, CancellationToken cancelToken,int verision = 5, int width = 256,int height = 256)
+        public static async Task<PixelData> GenerateQRCodeAsync(string contents, CancellationToken cancelToken, int verision = 5, int width = 256, int height = 256)
         {
             cancelToken.ThrowIfCancellationRequested();
             return await Task.Run(() =>
@@ -41,7 +41,7 @@ namespace Fantasy.Product.Authentication
                         ErrorCorrection = ErrorCorrectionLevel.M // 纠错等级
                     }
                 };
-                return writer.Write(contents); 
+                return writer.Write(contents);
             }, cancelToken);
         }
     }

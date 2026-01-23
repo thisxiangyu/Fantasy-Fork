@@ -239,7 +239,7 @@ namespace Fantasy.Async
             Interlocked.Increment(ref _activeCount);
 
             long idIndex = Math.Abs(waitForId % FTaskFlowLimit);
-            var cancelToken = new CancellationTokenSource(timeOut);// TODO 这里CancelToken的逻辑可能可以优化, 等我研究一下再来改进, 先不要在乎这些细节
+            var cancelToken = new CancellationTokenSource(timeOut); // 超时打断
 
             try
             {

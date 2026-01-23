@@ -140,25 +140,25 @@ namespace Fantasy.Product.Authentication
         /// <summary>
         /// 申请一个JWT。
         /// </summary>
-        /// <param name="userId">用户唯一标识符</param>
+        /// <param name="uniqueId">用户唯一标识符</param>
         /// <returns>JWT 字符串</returns>
-        public static string RequestToken(string userId) { return RequestToken(userId);}
+        public static string RequestToken(string uniqueId) { return RequestToken(uniqueId);}
 
         /// <summary>
         /// 申请一个JWT。
         /// </summary>
-        /// <param name="userId">用户唯一标识符</param>
+        /// <param name="uniqueId">用户唯一标识符</param>
         /// <param name="additionalClaims">额外自定义 Claim</param>
         /// <param name="duration">令牌有效持续时间</param>
         /// <returns>JWT 字符串</returns>
         public static string RequestToken(
-          string userId,
+          string uniqueId,
           Claim[]? additionalClaims = null,
           TimeSpan duration = default
         )
         {
-            if (string.IsNullOrWhiteSpace(userId))
-                throw new ArgumentNullException(nameof(userId));
+            if (string.IsNullOrWhiteSpace(uniqueId))
+                throw new ArgumentNullException(nameof(uniqueId));
 
             // 设置默认有效期
             if (duration == default)
@@ -169,7 +169,7 @@ namespace Fantasy.Product.Authentication
             var claims = new List<Claim>
             {
                 // 用户唯一标识符
-                new Claim(JwtRegisteredClaimNames.Sub, userId),
+                new Claim(JwtRegisteredClaimNames.Sub, uniqueId),
                 // Token 唯一标识
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                 // Token 发行时间

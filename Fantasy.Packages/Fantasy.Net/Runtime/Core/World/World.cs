@@ -21,13 +21,9 @@ namespace Fantasy
         /// </summary>
         public string Name { get; private init; }
         /// <summary>
-        /// 本世界的服务注册和提供者
-        /// </summary>
-        internal ServiceProvider ServiceProvider { get; init; }
-        /// <summary>
         /// 本世界所有数据库, 按照工作职责号存取。
         /// </summary>
-        private Dictionary<int, IDatabase> AllDatabases { get; init; }
+        public Dictionary<int, IDatabase> AllDatabases { get; init; }
         /// <summary>
         /// 本世界当前聚焦的数据库。
         /// </summary>
@@ -86,13 +82,17 @@ namespace Fantasy
         private World(Scene scene, byte worldConfigId)
         {
             Id = worldConfigId;            
-            var worldConfig = Config;
             Name = Config.WorldName;
-            var services = new ServiceCollection();
-            services.AddHttpContextAccessor();
 
-            AllDatabases = [];
-            for(int i = 0; i < worldConfig.DbType.Length; i++)
+            AllDatabases = InitDatabases(scene, Id);
+        }
+
+        public static Dictionary<int, IDatabase> InitDatabases(Scene scene, byte worldId) {
+
+            var worldConfig = WorldConfigData.Instance.Get(worldId);
+            Dictionary<int, IDatabase> allDatabases = new();
+
+            for (int i = 0; i < worldConfig.DbType.Length; i++)
             {
                 if (string.IsNullOrWhiteSpace(worldConfig.DbConnection[i]))
                     continue;
@@ -105,23 +105,23 @@ namespace Fantasy
                     case "pgsql":
                     case "pg":
                         {
-                            if (AllDatabases.ContainsKey(worldConfig.DbDuty[i]))
+                            if (allDatabases.ContainsKey(worldConfig.DbDuty[i]))
                                 throw new Exception($"CurrentDb {worldConfig.DbName[i]} Duty({worldConfig.DbDuty[i]}) is duplicated. Please verify your configuration.");
-                            
+
                             var pg = new PgSQL();
-                            pg.Initialize(scene,ref services, worldConfig.DbDuty[i], worldConfig.DbConnection[i], worldConfig.DbName[i]);
-                            AllDatabases.Add(worldConfig.DbDuty[i], pg);
+                            pg.Initialize(scene, worldConfig.DbDuty[i], worldConfig.DbConnection[i], worldConfig.DbName[i]);
+                            allDatabases.Add(worldConfig.DbDuty[i], pg);
                             break;
                         }
                     case "mongodb":
                     case "mongo":
                         {
-                            if (AllDatabases.ContainsKey(worldConfig.DbDuty[i]))
+                            if (allDatabases.ContainsKey(worldConfig.DbDuty[i]))
                                 throw new Exception($"CurrentDb {worldConfig.DbName[i]} Duty({worldConfig.DbDuty[i]}) is duplicated. Please verify your configuration.");
-                            
+
                             var mongo = new Mongo();
-                            mongo.Initialize(scene, ref services, worldConfig.DbDuty[i], worldConfig.DbConnection[i], worldConfig.DbName[i]);
-                            AllDatabases.Add(worldConfig.DbDuty[i], mongo);                           
+                            mongo.Initialize(scene, worldConfig.DbDuty[i], worldConfig.DbConnection[i], worldConfig.DbName[i]);
+                            allDatabases.Add(worldConfig.DbDuty[i], mongo);
                             break;
                         }
                     default:
@@ -130,18 +130,18 @@ namespace Fantasy
                         }
                 }
             }
-            if (AllDatabases.Count == 0)
-            { 
-                Log.Warning($" Warning : Has no available database ! (World id:{Id})(Scene configId:{scene.SceneConfigId})");
+            if (allDatabases.Count == 0)
+            {
+                Log.Warning($" Warning : Has no available database ! (World id:{worldId})(Scene configId:{scene.SceneConfigId})");
             }
             else
             {
-                Log.Debug($"(World id:{Id})(Scene configId:{scene.SceneConfigId}) Has successfully owned {AllDatabases.Count} database(s): "+
-                string.Join("，", AllDatabases.Select((kv, index) =>
+                Log.Debug($"(World id:{worldId})(Scene configId:{scene.SceneConfigId}) Has successfully owned {allDatabases.Count} database(s): " +
+                string.Join("，", allDatabases.Select((kv, index) =>
                 $"{index + 1}.{kv.Value.GetDatabaseType} (Duty {kv.Key})")));   //依次打印世界中可用数据库的简要信息
             }
 
-            ServiceProvider = services.BuildServiceProvider();  //构建服务中心
+            return allDatabases;
         }
 
         /// <summary>

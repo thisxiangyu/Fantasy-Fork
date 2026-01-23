@@ -100,13 +100,13 @@ namespace Fantasy.Assembly
         /// 程序集清单集合（WebGL 单线程版本）
         /// Key: 程序集唯一标识, Value: 程序集清单对象
         /// </summary>
-        private static readonly Dictionary<long, AssemblyManifest> Manifests = new Dictionary<long, AssemblyManifest>();
+        public static readonly Dictionary<long, AssemblyManifest> Manifests = new ();
 #else
         /// <summary>
         /// 程序集清单集合（线程安全版本）
         /// Key: 程序集唯一标识, Value: 程序集清单对象
         /// </summary>
-        internal static readonly ConcurrentDictionary<long, AssemblyManifest> Manifests = new ConcurrentDictionary<long, AssemblyManifest>();
+        public static readonly ConcurrentDictionary<long, AssemblyManifest> Manifests  = new();
 #endif
         /// <summary>
         /// 清理程序集清单内部资源

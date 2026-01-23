@@ -1,9 +1,10 @@
-﻿using System;
-using NJ = Newtonsoft.Json;
+﻿using NJ = Newtonsoft.Json;
 using MongoDB.Bson.Serialization.Attributes;
 using MemoryPack;
 using System.Runtime.Serialization;
 using LightProto;
+using System;
+
 #if FANTASY_NET
 using MJ = System.Text.Json.Serialization;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -158,7 +159,7 @@ namespace Fantasy.Database.Attributes
         //public bool EnableSharding { get; set; } = false;
         #endregion
     }
-   
+
     /// <summary>
     /// [DbSet] ，标记一个实体类型允许存入数据库集合当中。设计用于加强对数据库操作的管理。
     /// 在SQL数据库中作用于Table，而在NoSQL如MongoDb中作用于Collection。
@@ -188,7 +189,7 @@ namespace Fantasy.Database.Attributes
         public string? Comment { get; set; }
 
         /// <summary>
-        /// 数据库权限选择, 默认为任意, 即所有数据库均可以操作这个类。
+        /// 数据库权限选择。默认为任意, 即所有数据库均可以操作这个类。
         /// </summary>
         public DatabaseType DbSelection = DatabaseType.Any;
 
@@ -214,6 +215,15 @@ namespace Fantasy.Database.Attributes
         /// </summary>
         public bool IsAsBytes = false;
 
+        /// <summary>
+        /// 将存储集标记为以配置形式存储, 这意味着这份数据应单独划归读写权限, 
+        /// 由策划或开发者来定义数据内容, 配置数据随运营版本发布, 玩家不会写入数据到配置中。
+        /// 注意 : <see cref="IsAsConfig"/>需要配合在启服配置中
+        /// 将一个数据库的名字设置为"<see cref="DatabaseSetting.ConfigDbName"/>"才能被识别,
+        /// 如果没有设置任何配置表数据库, 该存储集将会被忽视。
+        /// </summary>
+        public bool IsAsConfig = false;
+
         #region TODO-LIST 这几个特性以后做
         ///// <summary>
         ///// 禁止整表更新
@@ -237,7 +247,10 @@ namespace Fantasy.Database.Attributes
         /// <returns></returns>
         public bool IfSelectionContainsDbType(DatabaseType dbType)
         {
-            return (DbSelection & DatabaseType.MongoDB) == DatabaseType.MongoDB;
+            if (dbType == DatabaseType.None)
+                return false;
+
+            return (DbSelection & dbType) == dbType;
         }
     }
 }
