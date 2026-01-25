@@ -13,6 +13,8 @@ using System.ComponentModel.DataAnnotations;
 #pragma warning disable CS8603 // 允许返回Null
 #pragma warning disable CS8625
 #pragma warning disable CS8600
+#pragma warning disable CS8632
+#pragma warning disable IDE1006 // 允许小写字母作为属性
 
 namespace Fantasy.GlobalAndLocalization
 {
@@ -29,8 +31,8 @@ namespace Fantasy.GlobalAndLocalization
         自我映射,
 
         中国,
-        中_台湾,
-        中_香港,
+        CN台湾,
+        CN香港,
 
     }
 
@@ -40,7 +42,7 @@ namespace Fantasy.GlobalAndLocalization
     }
 
     [AttributeUsage(AttributeTargets.Property, Inherited = false)]
-    public class 未受良好支持Attribute: Attribute
+    public class 未受良好支持Attribute : Attribute
     {
 
     }
@@ -69,7 +71,8 @@ namespace Fantasy.GlobalAndLocalization
     public class 排序订正符文Attribute : Attribute
     {
         public string 排序符文 { get; private set; } = default;
-        public 排序订正符文Attribute(string 排序符文) {
+        public 排序订正符文Attribute(string 排序符文)
+        {
             this.排序符文 = 排序符文;
         }
     }
@@ -103,7 +106,7 @@ namespace Fantasy.GlobalAndLocalization
         [大语种]
         public virtual string ko { get; set; } = string.Empty;
         public virtual string mn { get; set; } = string.Empty;
-        public virtual string mn_t { get; set;} = string.Empty;
+        public virtual string mn_t { get; set; } = string.Empty;
         public virtual string my { get; set; } = string.Empty;
         public virtual string km { get; set; } = string.Empty;
         public virtual string lo { get; set; } = string.Empty;
@@ -138,20 +141,20 @@ namespace Fantasy.GlobalAndLocalization
         public virtual string sr { get; set; } = string.Empty;
         public virtual string hr { get; set; } = string.Empty;
         public virtual string be { get; set; } = string.Empty;
-        public virtual string lt { get; set; } = string.Empty; 
+        public virtual string lt { get; set; } = string.Empty;
         public virtual string et { get; set; } = string.Empty;
-        public virtual string lv { get; set; } = string.Empty; 
+        public virtual string lv { get; set; } = string.Empty;
         public virtual string sk { get; set; } = string.Empty;
-        public virtual string mt { get; set; } = string.Empty; 
+        public virtual string mt { get; set; } = string.Empty;
         public virtual string la { get; set; } = string.Empty;   // 拉丁语 (目前仅在梵蒂冈使用)
-        public virtual string sl { get; set; } = string.Empty; 
-        public virtual string sq { get; set; } = string.Empty;  
-        public virtual string mk { get; set; } = string.Empty;   
-        public virtual string bs { get; set; } = string.Empty; 
+        public virtual string sl { get; set; } = string.Empty;
+        public virtual string sq { get; set; } = string.Empty;
+        public virtual string mk { get; set; } = string.Empty;
+        public virtual string bs { get; set; } = string.Empty;
         public virtual string cnr { get; set; } = string.Empty;
-        public virtual string rm { get; set; } = string.Empty; 
-        public virtual string lb { get; set; } = string.Empty; 
-        public virtual string ga { get; set; } = string.Empty; 
+        public virtual string rm { get; set; } = string.Empty;
+        public virtual string lb { get; set; } = string.Empty;
+        public virtual string ga { get; set; } = string.Empty;
         public virtual string tr { get; set; } = string.Empty; // 土耳其虽然主要在西亚, 但他们自认为属于欧洲
 
         // 西亚(中东)
@@ -215,13 +218,13 @@ namespace Fantasy.GlobalAndLocalization
 
         // 拉美 - 西班牙语系
         public virtual string es_mx { get; set; } = string.Empty;
-        public virtual string es_ar { get; set; } = string.Empty;     
-        public virtual string es_co { get; set; } = string.Empty;     
-        public virtual string es_cl { get; set; } = string.Empty;     
-        public virtual string es_pe { get; set; } = string.Empty;     
-        public virtual string es_ve { get; set; } = string.Empty;      
-        public virtual string es_ec { get; set; } = string.Empty;      
-        public virtual string es_gt { get; set; } = string.Empty;      
+        public virtual string es_ar { get; set; } = string.Empty;
+        public virtual string es_co { get; set; } = string.Empty;
+        public virtual string es_cl { get; set; } = string.Empty;
+        public virtual string es_pe { get; set; } = string.Empty;
+        public virtual string es_ve { get; set; } = string.Empty;
+        public virtual string es_ec { get; set; } = string.Empty;
+        public virtual string es_gt { get; set; } = string.Empty;
         public virtual string es_cu { get; set; } = string.Empty;
 
         // 拉美 - 葡萄牙语
@@ -229,9 +232,9 @@ namespace Fantasy.GlobalAndLocalization
         [排序订正符文("PortuguêA")] public virtual string pt_br { get; set; } = string.Empty;
 
         // 拉美 - 英语 / 法语（加勒比部分）
-      
-        public virtual string en_jm { get; set; } = string.Empty;      
-        public virtual string en_tt { get; set; } = string.Empty;     
+
+        public virtual string en_jm { get; set; } = string.Empty;
+        public virtual string en_tt { get; set; } = string.Empty;
         public virtual string fr_ht { get; set; } = string.Empty;
 
         // 拉美土著语
@@ -241,32 +244,32 @@ namespace Fantasy.GlobalAndLocalization
         public virtual string gn { get; set; } = string.Empty; // 瓜拉尼语 (Guarani, 巴拉圭主流语言之一)
 
         // 非洲
-         public virtual string af { get; set; } = string.Empty; // 南非荷语 (Afrikaans)
-         public virtual string zu { get; set; } = string.Empty; // 祖鲁语 (Zulu)
-        
-         public virtual string ha { get; set; } = string.Empty; // 豪萨语 (西非大语种)
-         public virtual string sw { get; set; } = string.Empty; // 斯瓦希里语 (东非通用)
-         public virtual string am { get; set; } = string.Empty; // 阿姆哈拉语 (埃塞俄比亚官方)
-         public virtual string ln { get; set; } = string.Empty; // 林加拉语 (刚果通用)
-         public virtual string rw { get; set; } = string.Empty; // 卢旺达语
-         public virtual string mg { get; set; } = string.Empty; // 马达加斯加语
-         public virtual string sn { get; set; } = string.Empty; // 修纳语
+        public virtual string af { get; set; } = string.Empty; // 南非荷语 (Afrikaans)
+        public virtual string zu { get; set; } = string.Empty; // 祖鲁语 (Zulu)
+
+        public virtual string ha { get; set; } = string.Empty; // 豪萨语 (西非大语种)
+        public virtual string sw { get; set; } = string.Empty; // 斯瓦希里语 (东非通用)
+        public virtual string am { get; set; } = string.Empty; // 阿姆哈拉语 (埃塞俄比亚官方)
+        public virtual string ln { get; set; } = string.Empty; // 林加拉语 (刚果通用)
+        public virtual string rw { get; set; } = string.Empty; // 卢旺达语
+        public virtual string mg { get; set; } = string.Empty; // 马达加斯加语
+        public virtual string sn { get; set; } = string.Empty; // 修纳语
 
         // 太平洋系
-         public virtual string mi { get; set; } = string.Empty;   // 毛利语
-         public virtual string fj { get; set; } = string.Empty;   // 斐济语
-         public virtual string sm { get; set; } = string.Empty;   // 萨摩亚语
-         public virtual string to { get; set; } = string.Empty;   // 汤加语
-         public virtual string tpi { get; set; } = string.Empty;  // 托克皮辛语 (巴新通用语)
-         public virtual string bi { get; set; } = string.Empty;   // 比斯拉马语
-         public virtual string gil { get; set; } = string.Empty;  // 基里巴斯语
-         public virtual string na { get; set; } = string.Empty;   // 瑙鲁语
-         public virtual string tvl { get; set; } = string.Empty;  // 图瓦卢语
-         public virtual string mh { get; set; } = string.Empty;   // 马绍尔语
-         public virtual string pau { get; set; } = string.Empty;  // 帕劳语
-         public virtual string rar { get; set; } = string.Empty;  // 库克群岛语
-         public virtual string niu { get; set; } = string.Empty;  // 纽埃语
-         public virtual string ty { get; set; } = string.Empty;   // 塔希提语
+        public virtual string mi { get; set; } = string.Empty;   // 毛利语
+        public virtual string fj { get; set; } = string.Empty;   // 斐济语
+        public virtual string sm { get; set; } = string.Empty;   // 萨摩亚语
+        public virtual string to { get; set; } = string.Empty;   // 汤加语
+        public virtual string tpi { get; set; } = string.Empty;  // 托克皮辛语 (巴新通用语)
+        public virtual string bi { get; set; } = string.Empty;   // 比斯拉马语
+        public virtual string gil { get; set; } = string.Empty;  // 基里巴斯语
+        public virtual string na { get; set; } = string.Empty;   // 瑙鲁语
+        public virtual string tvl { get; set; } = string.Empty;  // 图瓦卢语
+        public virtual string mh { get; set; } = string.Empty;   // 马绍尔语
+        public virtual string pau { get; set; } = string.Empty;  // 帕劳语
+        public virtual string rar { get; set; } = string.Empty;  // 库克群岛语
+        public virtual string niu { get; set; } = string.Empty;  // 纽埃语
+        public virtual string ty { get; set; } = string.Empty;   // 塔希提语
     }
 
     public static partial class 语言映射扩展类
@@ -298,7 +301,7 @@ namespace Fantasy.GlobalAndLocalization
 
             if (忽视元数据)
             {
-                enumerable = properties_info.Where(p => p.PropertyType == typeof(string) 
+                enumerable = properties_info.Where(p => p.PropertyType == typeof(string)
                         && p.GetCustomAttribute<T>() != null
                         && p.GetCustomAttribute<元数据Attribute>() == null);
             }
@@ -383,7 +386,7 @@ namespace Fantasy.GlobalAndLocalization
             foreach (var prop in properties)
             {
                 var attr = prop.GetCustomAttribute<排序订正符文Attribute>();
-                if (attr == null) 
+                if (attr == null)
                     continue;
 
                 var originalValue = prop.GetValue(self)?.ToString();
@@ -401,7 +404,8 @@ namespace Fantasy.GlobalAndLocalization
         /// <summary>
         /// 返回各个语种的自我映射。比如 cn 对应简体中文, en 对应English。
         /// </summary>
-        public static 语言映射 生成自我映射(this 语言映射 self) {
+        public static 语言映射 生成自我映射(this 语言映射 self)
+        {
 
             self.theme = 翻译主题.自我映射.ToString();
             self.theme_id = (uint)翻译主题.自我映射;
@@ -507,9 +511,9 @@ namespace Fantasy.GlobalAndLocalization
             self.tl = "Filipino";
             self.en_sgp = "English (Singapore)";
             self.cn_ny = "华语 (南洋)";
-            self.my = "မြန်မာဘာသာ"; 
-            self.km = "ភាសាខ្មែរ"; 
-            self.lo = "ພາສາລາວ";  
+            self.my = "မြန်မာဘာသာ";
+            self.km = "ភាសាខ្មែរ";
+            self.lo = "ພາສາລາວ";
 
             // 中亚
             self.kk = "Қазақша";
@@ -578,49 +582,50 @@ namespace Fantasy.GlobalAndLocalization
             return self;
         }
 
-        public static 语言映射 生成中文映射(this 语言映射 self) {
+        public static 语言映射 生成中文映射(this 语言映射 self)
+        {
 
             self.theme_id = (uint)翻译主题.中文映射;
             self.theme = 翻译主题.中文映射.ToString();
 
             // 中文系
-            self. cn  = "中文";
-            self. cn_t  = "華語";
+            self.cn = "中文";
+            self.cn_t = "華語";
 
             // 昂撒英语系       
-            self. en  = "英语";
-            self. en_us  = "英语(美国)";
-            self. en_au  = "英语(澳大利亚)";
-            self. en_ca  = "英语(加拿大)";
+            self.en = "英语";
+            self.en_us = "英语(美国)";
+            self.en_au = "英语(澳大利亚)";
+            self.en_ca = "英语(加拿大)";
 
             // 东亚系      
-            self. ja  = "日语";       
-            self. ko  = "韩语";
+            self.ja = "日语";
+            self.ko = "韩语";
             self.mn = "蒙古语";
             self.mn_t = "传统蒙古语";
 
             // 欧洲语言        
-            self. de  = "德语";       
-            self. fr  = "法语";        
-            self. es  = "西班牙语";        
-            self. it  = "意大利语";        
-            self. pt  = "葡萄牙语";        
-            self. ru  = "俄语";
-            self. nl  = "荷兰语";
-            self. sv  = "瑞典语";
-            self. no  = "挪威语";
-            self. da  = "丹麦语";
-            self. fi  = "芬兰语";
-            self. Is  = "冰岛语";
-            self. pl  = "波兰语";
-            self. cs  = "捷克语";
-            self. hu  = "匈牙利语";
-            self. el  = "希腊语";
-            self. uk  = "乌克兰语";
-            self. ro  = "罗马尼亚语";
-            self. bg  = "保加利亚语";
-            self. sr  = "塞尔维亚语";
-            self. hr  = "克罗地亚语";
+            self.de = "德语";
+            self.fr = "法语";
+            self.es = "西班牙语";
+            self.it = "意大利语";
+            self.pt = "葡萄牙语";
+            self.ru = "俄语";
+            self.nl = "荷兰语";
+            self.sv = "瑞典语";
+            self.no = "挪威语";
+            self.da = "丹麦语";
+            self.fi = "芬兰语";
+            self.Is = "冰岛语";
+            self.pl = "波兰语";
+            self.cs = "捷克语";
+            self.hu = "匈牙利语";
+            self.el = "希腊语";
+            self.uk = "乌克兰语";
+            self.ro = "罗马尼亚语";
+            self.bg = "保加利亚语";
+            self.sr = "塞尔维亚语";
+            self.hr = "克罗地亚语";
             self.be = "白俄罗斯语";
             self.lt = "立陶宛语";
             self.et = "爱沙尼亚语";
@@ -637,88 +642,88 @@ namespace Fantasy.GlobalAndLocalization
             self.rm = "罗曼什语";
             self.lb = "卢森堡语";
             self.ga = "爱尔兰语";
-            self. tr  = "土耳其语"; // 土耳其虽然主要在西亚, 但他们自认为属于欧洲
+            self.tr = "土耳其语"; // 土耳其虽然主要在西亚, 但他们自认为属于欧洲
 
             // 西亚(中东)        
-            self. ar  = "阿拉伯语";
-            self. fa  = "波斯语";
-            self. dr =  "达里波斯语";
-            self. ps = "普什图语";
-            self. he  = "希伯来语";
-            self. ku  = "库尔德语";      // 伊拉克、叙利亚部分
-            self. hy  = "亚美尼亚语";    // 亚美尼亚
-            self. az  = "阿塞拜疆语";    // 阿塞拜疆
+            self.ar = "阿拉伯语";
+            self.fa = "波斯语";
+            self.dr = "达里波斯语";
+            self.ps = "普什图语";
+            self.he = "希伯来语";
+            self.ku = "库尔德语";      // 伊拉克、叙利亚部分
+            self.hy = "亚美尼亚语";    // 亚美尼亚
+            self.az = "阿塞拜疆语";    // 阿塞拜疆
 
             // 南亚
-            self. en_in  = "英语(印度)";
-            self. en_pk  = "英语(巴基斯坦)";
-            self. ur  = "乌尔都语";  // 巴基斯坦
-            self. hi  = "印地语";
-            self. bn  = "孟加拉语";
-            self. ne  = "尼泊尔语";
-            self. ta  = "泰米尔语";
-            self. dz = "宗卡语";   // 不丹
-            self. dv = "迪维希语";   // 马尔代夫
-            self. si = "僧伽罗语";  // 斯里兰卡
+            self.en_in = "英语(印度)";
+            self.en_pk = "英语(巴基斯坦)";
+            self.ur = "乌尔都语";  // 巴基斯坦
+            self.hi = "印地语";
+            self.bn = "孟加拉语";
+            self.ne = "尼泊尔语";
+            self.ta = "泰米尔语";
+            self.dz = "宗卡语";   // 不丹
+            self.dv = "迪维希语";   // 马尔代夫
+            self.si = "僧伽罗语";  // 斯里兰卡
 
             // 印度特色    
-            self. ml  = "马拉雅拉姆语";        
-            self. kn  = "卡纳达语";        
-            self. te  = "泰卢固语";       
-            self. mr  = "马拉地语";       
-            self. gu  = "古吉拉特语";      
-            self. or  = "奥里亚语";        
-            self. pa  = "旁遮普语";        
-            self. asm  = "阿萨姆语";       
-            self. ks  = "卡什米尔语";        
-            self. mni  = "马尼普尔语";       
-            self. sd  = "信德语";       
-            self. bh  = "博杰普尔语";        
-            self. kok  = "康卡尼语";
+            self.ml = "马拉雅拉姆语";
+            self.kn = "卡纳达语";
+            self.te = "泰卢固语";
+            self.mr = "马拉地语";
+            self.gu = "古吉拉特语";
+            self.or = "奥里亚语";
+            self.pa = "旁遮普语";
+            self.asm = "阿萨姆语";
+            self.ks = "卡什米尔语";
+            self.mni = "马尼普尔语";
+            self.sd = "信德语";
+            self.bh = "博杰普尔语";
+            self.kok = "康卡尼语";
 
             // 东南亚
-            self. th  = "泰语";
-            self. vi  = "越南语";
-            self. id  = "印尼语";
-            self. ms  = "马来语";
-            self. tl  = "菲律宾语";
-            self. en_sgp  = "英语 (新加坡)";
-            self. cn_ny  = "华语 (南洋)";
-            self.my = "缅甸语";  
+            self.th = "泰语";
+            self.vi = "越南语";
+            self.id = "印尼语";
+            self.ms = "马来语";
+            self.tl = "菲律宾语";
+            self.en_sgp = "英语 (新加坡)";
+            self.cn_ny = "华语 (南洋)";
+            self.my = "缅甸语";
             self.km = "高棉语";  //（柬埔寨语）
-            self.lo = "老挝语";  
+            self.lo = "老挝语";
 
             // 中亚
-            self. kk  = "哈萨克语";
-            self. ru_kz  = "俄语(哈萨克斯坦)";
-            self. uz  = "乌兹别克语";
-            self. ru_uz  = "俄语(乌兹别克斯坦)";
-            self. tk  = "土库曼语";
-            self. ru_tm  = "俄语(土库曼斯坦)";
-            self. ky  = "吉尔吉斯语";
-            self. ru_kg  = "俄语(吉尔吉斯斯坦)";
-            self. tg  = "塔吉克语";
-            self. ru_tj  = "俄语(塔吉克斯坦)";
+            self.kk = "哈萨克语";
+            self.ru_kz = "俄语(哈萨克斯坦)";
+            self.uz = "乌兹别克语";
+            self.ru_uz = "俄语(乌兹别克斯坦)";
+            self.tk = "土库曼语";
+            self.ru_tm = "俄语(土库曼斯坦)";
+            self.ky = "吉尔吉斯语";
+            self.ru_kg = "俄语(吉尔吉斯斯坦)";
+            self.tg = "塔吉克语";
+            self.ru_tj = "俄语(塔吉克斯坦)";
 
             // 拉美 - 西班牙语系
-      
-            self. es_mx  = "西班牙语(墨西哥)";       
-            self. es_ar  = "西班牙语(阿根廷)";       
-            self. es_co  = "西班牙语(哥伦比亚)";     
-            self. es_cl  = "西班牙语(智利)";       
-            self. es_pe  = "西班牙语(秘鲁)";     
-            self. es_ve  = "西班牙语(委内瑞拉)";       
-            self. es_ec  = "西班牙语(厄瓜多尔)";      
-            self. es_gt  = "西班牙语(危地马拉)";      
-            self. es_cu  = "西班牙语(古巴)";
+
+            self.es_mx = "西班牙语(墨西哥)";
+            self.es_ar = "西班牙语(阿根廷)";
+            self.es_co = "西班牙语(哥伦比亚)";
+            self.es_cl = "西班牙语(智利)";
+            self.es_pe = "西班牙语(秘鲁)";
+            self.es_ve = "西班牙语(委内瑞拉)";
+            self.es_ec = "西班牙语(厄瓜多尔)";
+            self.es_gt = "西班牙语(危地马拉)";
+            self.es_cu = "西班牙语(古巴)";
 
             // 拉美 - 葡萄牙语     
-            self. pt_br  = "葡萄牙语(巴西)";
+            self.pt_br = "葡萄牙语(巴西)";
 
             // 拉美 - 英语 / 法语（加勒比部分）      
-            self. en_jm  = "英语(牙买加)";      
-            self. en_tt  = "英语(特立尼达和多巴哥)";      
-            self. fr_ht  = "法语(海地)";
+            self.en_jm = "英语(牙买加)";
+            self.en_tt = "英语(特立尼达和多巴哥)";
+            self.fr_ht = "法语(海地)";
 
             // 拉美特色
             self.ht = "海地克里奥尔语";

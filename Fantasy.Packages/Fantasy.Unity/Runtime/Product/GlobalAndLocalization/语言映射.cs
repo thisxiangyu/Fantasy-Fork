@@ -13,6 +13,8 @@ using System.ComponentModel.DataAnnotations;
 #pragma warning disable CS8603 // 允许返回Null
 #pragma warning disable CS8625
 #pragma warning disable CS8600
+#pragma warning disable CS8632
+#pragma warning disable IDE1006 // 允许小写字母作为属性
 
 namespace Fantasy.GlobalAndLocalization
 {
@@ -29,8 +31,8 @@ namespace Fantasy.GlobalAndLocalization
         自我映射,
 
         中国,
-        中_台湾,
-        中_香港,
+        CN台湾,
+        CN香港,
 
     }
 
@@ -668,7 +670,7 @@ namespace Fantasy.GlobalAndLocalization
             self.ml = "马拉雅拉姆语";
             self.kn = "卡纳达语";
             self.te = "泰卢固语";
-            self.mr = "马拉地语";
+            self.mr = "马拉米语";
             self.gu = "古吉拉特语";
             self.or = "奥里亚语";
             self.pa = "旁遮普语";

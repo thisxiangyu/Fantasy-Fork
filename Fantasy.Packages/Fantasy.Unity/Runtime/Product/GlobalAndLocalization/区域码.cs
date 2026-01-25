@@ -7,63 +7,6 @@ using System.Reflection;
 
 namespace Fantasy.GlobalAndLocalization
 {
-    [AttributeUsage(AttributeTargets.All, AllowMultiple = true, Inherited = true)]
-    public sealed class 区域TagAttribute : Attribute
-    {
-        public 区域码 RegionCode { get; private set; }
-
-        public 区域TagAttribute(区域码 地区码)
-        {
-            RegionCode = 地区码;
-        }
-    }
-
-    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
-    public class 大区Attribute : Attribute
-    {
-        public 区域码 大区 { get; private set; }
-        public 大区Attribute(区域码 大区)
-        {
-            this.大区 = 大区;
-        }
-    }
-
-    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field, AllowMultiple = true)]
-    public class 语言码Attribute : Attribute
-    {
-        public string 语言码 { get; private set; }
-        public 语言码Attribute(string 语言码)
-        {
-            this.语言码 = 语言码;
-        }
-    }
-
-    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
-    public class 简写Attribute : Attribute
-    {
-        public string 简写 { get; private set; }
-        public 简写Attribute(string 简写)
-        {
-            this.简写 = 简写;
-        }
-    }
-
-
-    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
-    public class 共用区码Attribute : Attribute
-    {
-        public 区域码 共用者 { get; private set; }
-        public 共用区码Attribute(区域码 共用者) {
-            this.共用者 = 共用者;
-        }
-    }
-
-    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
-    public class 特殊标记Attribute : Attribute
-    {
-
-    }    
-
     /// <summary>
     /// 发行区码
     /// </summary>
@@ -121,7 +64,7 @@ namespace Fantasy.GlobalAndLocalization
         [语言码(nameof(语言映射.id))]
         [简写("ID")]
         印尼 = 62,
-        [大区(东南亚)]
+        [大区(东亚)] // 越南位于东南亚, 但自认为属于东亚
         [语言码(nameof(语言映射.vi))]
         [简写("VN")]
         越南 = 84,

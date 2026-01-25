@@ -46,6 +46,20 @@ namespace Fantasy.GlobalAndLocalization
         }
 
         /// <summary>
+        /// 根据key返回value列表
+        /// </summary>
+        public static List<string> GetValueListByKey(this List<(string, string)> self, string item1)
+        {
+            List<string> res = new();
+            foreach (var x in self)
+            {
+                if (x.Item1 == item1)
+                    res.Add(x.Item2);
+            }
+            return res;
+        }
+
+        /// <summary>
         /// 根据value返回首个key
         /// </summary>
         public static string GetFirstKeyByValue(this List<(string, string)> self, string item2)
@@ -58,16 +72,24 @@ namespace Fantasy.GlobalAndLocalization
             return null;
         }
 
+        /// <summary>
+        /// 根据value返回key列表
+        /// </summary>
+        public static List<string> GetKeyListByValue(this List<(string, string)> self, string item2)
+        {
+            List<string> res = new();
+            foreach (var x in self)
+            {
+                if (x.Item2 == item2)
+                    res.Add(x.Item1);
+            }
+            return res;
+        }
+
         // CompareInfo 缓存
         static readonly CompareInfo _invariantCompare = CultureInfo.InvariantCulture.CompareInfo;
 
         // 跨语种首字母排序方案。
-        // sorting_logic 是一个额外的string字典, 用于修正特定的排序元素。
-        // 该字典的 key 是原字符串, value 是用于修正的字符串,
-        // 比如 key 为 English (US), value 为 EnglishA: 
-        // 意味着在排序的时候一旦遇到 English(US) 就使用 EnglishA 来作为"排序替身"完成排序, 
-        // 从而达到局部修改顺序的效果。
-        // 注意: 该方法返回的依然是原字符串的内容, 只是顺序受到"排序替身"影响, 而产生了微调。
         static List<(string, string)> InternalRankByFirstChar(
             List<(string, string)> self,
             bool sort_by_key,
@@ -104,13 +126,25 @@ namespace Fantasy.GlobalAndLocalization
         }
 
         /// <summary>
-        /// 根据 Key(item1) 的首字母排序
+        /// 根据 Key(item1) 的首字母排序。
+        /// sorting_logic 是一个额外的string字典, 用于修正特定的排序元素。
+        /// 该字典的 key 是原字符串, value 是用于修正的字符串,
+        /// 比如 key 为 English (US), value 为 EnglishA: 
+        /// 意味着在排序的时候一旦遇到 English(US) 就使用 EnglishA 来作为"排序替身"完成排序, 
+        /// 从而达到局部修改顺序的效果。
+        /// 注意: 该方法返回的依然是原字符串的内容, 只是顺序受到"排序替身"影响, 而产生了微调。
         /// </summary>
         public static List<(string, string)> RankByFirstCharOfKey(this List<(string, string)> self, Dictionary<string,string> sorting_logic = null)
             => InternalRankByFirstChar(self, true, sorting_logic);
 
         /// <summary>
-        /// 根据 Value(item2) 的首字母排序
+        /// 根据 Value(item2) 的首字母排序。
+        /// sorting_logic 是一个额外的string字典, 用于修正特定的排序元素。
+        /// 该字典的 key 是原字符串, value 是用于修正的字符串,
+        /// 比如 key 为 English (US), value 为 EnglishA: 
+        /// 意味着在排序的时候一旦遇到 English(US) 就使用 EnglishA 来作为"排序替身"完成排序, 
+        /// 从而达到局部修改顺序的效果。
+        /// 注意: 该方法返回的依然是原字符串的内容, 只是顺序受到"排序替身"影响, 而产生了微调。
         /// </summary>
         public static List<(string, string)> RankByFirstCharOfValue(this List<(string, string)> self, Dictionary<string, string> sorting_logic = null)
             => InternalRankByFirstChar(self, false, sorting_logic);
