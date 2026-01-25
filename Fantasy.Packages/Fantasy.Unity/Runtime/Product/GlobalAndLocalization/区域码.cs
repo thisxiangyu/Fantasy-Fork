@@ -64,7 +64,7 @@ namespace Fantasy.GlobalAndLocalization
         [语言码(nameof(语言映射.id))]
         [简写("ID")]
         印尼 = 62,
-        [大区(东亚)] // 越南位于东南亚, 但自认为属于东亚
+        [大区(东南亚)]
         [语言码(nameof(语言映射.vi))]
         [简写("VN")]
         越南 = 84,
