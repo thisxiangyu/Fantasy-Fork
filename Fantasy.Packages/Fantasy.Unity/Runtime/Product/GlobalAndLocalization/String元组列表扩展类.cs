@@ -37,10 +37,10 @@ namespace Fantasy.GlobalAndLocalization
         /// </summary>
         public static string GetFirstValueByKey(this List<(string, string)> self, string item1)
         {
-            foreach (var x in self)
+            for (int i = 0; i < self.Count; i++)
             {
-                if (x.Item1 == item1)
-                    return x.Item2;
+                if (self[i].Item1 == item1)
+                    return self[i].Item2;
             }
             return null;
         }

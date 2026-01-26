@@ -27,9 +27,11 @@ namespace Fantasy.GlobalAndLocalization
     public class 语言码Attribute : Attribute
     {
         public string 语言码 { get; private set; }
-        public 语言码Attribute(string 语言码)
+        public uint 语言顺序 { get; private set; } = 0; // 在多语言的时候需要设置顺序
+        public 语言码Attribute(string 语言码, uint 语言顺序 = 0)
         {
             this.语言码 = 语言码;
+            this.语言顺序 = 语言顺序;
         }
     }
 

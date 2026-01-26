@@ -37,10 +37,10 @@ namespace Fantasy.GlobalAndLocalization
         /// </summary>
         public static string GetFirstValueByKey(this List<(string, string)> self, string item1)
         {
-            foreach (var x in self)
+            for (int i = 0; i < self.Count; i++)
             {
-                if (x.Item1 == item1)
-                    return x.Item2;
+                if (self[i].Item1 == item1)
+                    return self[i].Item2;
             }
             return null;
         }
@@ -134,7 +134,7 @@ namespace Fantasy.GlobalAndLocalization
         /// 从而达到局部修改顺序的效果。
         /// 注意: 该方法返回的依然是原字符串的内容, 只是顺序受到"排序替身"影响, 而产生了微调。
         /// </summary>
-        public static List<(string, string)> RankByFirstCharOfKey(this List<(string, string)> self, Dictionary<string,string> sorting_logic = null)
+        public static List<(string, string)> RankByFirstCharOfKey(this List<(string, string)> self, Dictionary<string, string> sorting_logic = null)
             => InternalRankByFirstChar(self, true, sorting_logic);
 
         /// <summary>

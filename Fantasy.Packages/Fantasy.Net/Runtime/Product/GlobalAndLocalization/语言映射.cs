@@ -164,13 +164,13 @@ namespace Fantasy.GlobalAndLocalization
         public virtual string dr { get; set; } = string.Empty;
         public virtual string ps { get; set; } = string.Empty;
         public virtual string he { get; set; } = string.Empty;
-        public virtual string ku { get; set; } = string.Empty;      // 伊拉克、叙利亚部分
+        public virtual string ku { get; set; } = string.Empty;      // 伊拉克、叙利亚部分库语
         public virtual string hy { get; set; } = string.Empty;    // 亚美尼亚
         public virtual string az { get; set; } = string.Empty;    // 阿塞拜疆
+        public virtual string ka { get; set; } = string.Empty;    // 格鲁吉亚
 
         // 南亚
         public virtual string en_in { get; set; } = string.Empty;
-        public virtual string en_pk { get; set; } = string.Empty;
         public virtual string ur { get; set; } = string.Empty;  // 巴基斯坦
         public virtual string dz { get; set; } = string.Empty;
         public virtual string dv { get; set; } = string.Empty;
@@ -474,10 +474,10 @@ namespace Fantasy.GlobalAndLocalization
             self.ku = "Kurdî";
             self.hy = "Հայերեն";
             self.az = "Azərbaycan dili";
+            self.ka = "ქართული";
 
             // 南亚
             self.en_in = "English (India)";
-            self.en_pk = "English (Pakistan)";
             self.ur = "اردو";
             self.hi = "हिन्दी";
             self.bn = "বাংলা";
@@ -651,12 +651,12 @@ namespace Fantasy.GlobalAndLocalization
             self.ps = "普什图语";
             self.he = "希伯来语";
             self.ku = "库尔德语";      // 伊拉克、叙利亚部分
-            self.hy = "亚美尼亚语";    // 亚美尼亚
-            self.az = "阿塞拜疆语";    // 阿塞拜疆
+            self.hy = "亚美尼亚语";
+            self.az = "阿塞拜疆语";
+            self.ka = "格鲁吉亚语";
 
             // 南亚
             self.en_in = "英语(印度)";
-            self.en_pk = "英语(巴基斯坦)";
             self.ur = "乌尔都语";  // 巴基斯坦
             self.hi = "印地语";
             self.bn = "孟加拉语";
@@ -670,7 +670,7 @@ namespace Fantasy.GlobalAndLocalization
             self.ml = "马拉雅拉姆语";
             self.kn = "卡纳达语";
             self.te = "泰卢固语";
-            self.mr = "马拉地语";
+            self.mr = "马拉米语";
             self.gu = "古吉拉特语";
             self.or = "奥里亚语";
             self.pa = "旁遮普语";
