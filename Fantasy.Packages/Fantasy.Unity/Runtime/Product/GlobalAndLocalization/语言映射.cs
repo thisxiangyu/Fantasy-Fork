@@ -171,12 +171,15 @@ namespace Fantasy.GlobalAndLocalization
 
         // 南亚
         public virtual string en_in { get; set; } = string.Empty;
-        public virtual string ur { get; set; } = string.Empty;  // 巴基斯坦
+        public virtual string ur { get; set; } = string.Empty;  // 巴基斯坦 乌尔都语
+        public virtual string ur_ro { get; set; } = string.Empty; // 乌尔都语拉丁版
         public virtual string dz { get; set; } = string.Empty;
         public virtual string dv { get; set; } = string.Empty;
         public virtual string si { get; set; } = string.Empty;
         public virtual string hi { get; set; } = string.Empty;
+        public virtual string hi_ro { get; set; } = string.Empty; // 印地语拉丁版
         public virtual string bn { get; set; } = string.Empty;
+        public virtual string bn_ro { get; set; } = string.Empty; // 孟加拉语拉丁版
         public virtual string ne { get; set; } = string.Empty;
         public virtual string ta { get; set; } = string.Empty;
 
@@ -480,7 +483,9 @@ namespace Fantasy.GlobalAndLocalization
             self.en_in = "English (India)";
             self.ur = "اردو";
             self.hi = "हिन्दी";
+            self.hi_ro = "Hindi (Roman)";
             self.bn = "বাংলা";
+            self.bn_ro = "Bengali (Roman)";
             self.ne = "नेपाली";
             self.ta = "தமிழ்";
             self.dz = "རྫོང་ཁ";
@@ -658,8 +663,11 @@ namespace Fantasy.GlobalAndLocalization
             // 南亚
             self.en_in = "英语(印度)";
             self.ur = "乌尔都语";  // 巴基斯坦
+            self.ur_ro = "乌尔都语(拉丁版)";
             self.hi = "印地语";
+            self.hi_ro = "印地语(拉丁版)";
             self.bn = "孟加拉语";
+            self.bn_ro = "孟加拉语(拉丁版)";
             self.ne = "尼泊尔语";
             self.ta = "泰米尔语";
             self.dz = "宗卡语";   // 不丹
