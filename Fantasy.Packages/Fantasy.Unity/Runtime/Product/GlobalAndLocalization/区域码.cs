@@ -79,7 +79,7 @@ namespace Fantasy.GlobalAndLocalization
         [简写("TH")]
         泰国 = 66,
         [大区(东南亚)]
-        [语言码(nameof(语言映射.en_sgp))]
+        [语言码(nameof(语言映射.en))]
         [语言码(nameof(语言映射.cn_ny), 2)]
         [语言码(nameof(语言映射.ms), 3)]
         [语言码(nameof(语言映射.ta), 4)]
@@ -273,27 +273,27 @@ namespace Fantasy.GlobalAndLocalization
         [大区(中亚)]
         [共用区码(俄罗斯)]
         [语言码(nameof(语言映射.kk))]
-        [语言码(nameof(语言映射.ru_kz), 1)]
+        [语言码(nameof(语言映射.ru_as), 1)]
         [简写("KZ")]
         哈萨克斯坦 = 7,
         [大区(中亚)]
         [语言码(nameof(语言映射.ky))]
-        [语言码(nameof(语言映射.ru_kg), 1)]
+        [语言码(nameof(语言映射.ru_as), 1)]
         [简写("KG")]
         吉尔吉斯斯坦 = 996,
         [大区(中亚)]
         [语言码(nameof(语言映射.tg))]
-        [语言码(nameof(语言映射.ru_tj), 1)]
+        [语言码(nameof(语言映射.ru_as), 1)]
         [简写("TJ")]
         塔吉克斯坦 = 992,
         [大区(中亚)]
         [语言码(nameof(语言映射.tk))]
-        [语言码(nameof(语言映射.ru_tm), 1)]
+        [语言码(nameof(语言映射.ru_as), 1)]
         [简写("TM")]
         土库曼斯坦 = 993,
         [大区(中亚)]
         [语言码(nameof(语言映射.uz))]
-        [语言码(nameof(语言映射.ru_uz), 1)]
+        [语言码(nameof(语言映射.ru_as), 1)]
         [简写("UZ")]
         乌兹别克斯坦 = 998,
 
@@ -417,7 +417,7 @@ namespace Fantasy.GlobalAndLocalization
 
         [大区(北美)]
         [语言码(nameof(语言映射.en_us))]
-        [语言码(nameof(语言映射.es), 1)] // 美国有极大量的西班牙语人口
+        [语言码(nameof(语言映射.es_419), 1)] // 美国有极大量的西班牙语人口
         [简写("US")]
         美国 = 1,
         [大区(北美)]
@@ -523,7 +523,7 @@ namespace Fantasy.GlobalAndLocalization
         加勒比地区 = 10009,
 
         [大区(加勒比地区)]
-        [语言码(nameof(语言映射.es_cu))]
+        [语言码(nameof(语言映射.es_419))]
         [简写("CU")]
         古巴 = 53,
         [大区(加勒比地区)]
@@ -543,11 +543,11 @@ namespace Fantasy.GlobalAndLocalization
         巴巴多斯 = 1,
         [大区(加勒比地区)]
         [语言码(nameof(语言映射.en))]
-        [语言码(nameof(语言映射.es), 1)]
+        [语言码(nameof(语言映射.es_419), 1)]
         [简写("BZ")]
         伯利兹 = 501,
         [大区(加勒比地区)]
-        [语言码(nameof(语言映射.es))]
+        [语言码(nameof(语言映射.es_419))]
         [简写("CR")]
         哥斯达黎加 = 506,
         [大区(加勒比地区)]
@@ -557,11 +557,11 @@ namespace Fantasy.GlobalAndLocalization
         多米尼克 = 1,
         [大区(加勒比地区)]
         [共用区码(美国)]
-        [语言码(nameof(语言映射.es))]
+        [语言码(nameof(语言映射.es_419))]
         [简写("DO")]
         多米尼加 = 1,
         [大区(加勒比地区)]
-        [语言码(nameof(语言映射.es))]
+        [语言码(nameof(语言映射.es_419))]
         [简写("SV")]
         萨尔瓦多 = 503,
         [大区(加勒比地区)]
@@ -570,7 +570,7 @@ namespace Fantasy.GlobalAndLocalization
         [简写("GD")]
         格林纳达 = 1,
         [大区(加勒比地区)]
-        [语言码(nameof(语言映射.es_gt))]
+        [语言码(nameof(语言映射.es_419))]
         [简写("GT")]
         危地马拉 = 502,
         [大区(加勒比地区)]
@@ -578,25 +578,25 @@ namespace Fantasy.GlobalAndLocalization
         [简写("GY")]
         圭亚那 = 592,
         [大区(加勒比地区)]
-        [语言码(nameof(语言映射.fr_ht))]
+        [语言码(nameof(语言映射.fr))]
         [语言码(nameof(语言映射.ht), 1)]
         [简写("HT")]
         海地 = 509,
         [大区(加勒比地区)]
-        [语言码(nameof(语言映射.es))]
+        [语言码(nameof(语言映射.es_419))]
         [简写("HN")]
         洪都拉斯 = 504,
         [大区(加勒比地区)]
         [共用区码(美国)]
-        [语言码(nameof(语言映射.en_jm))]
+        [语言码(nameof(语言映射.en))]
         [简写("JM")]
         牙买加 = 1,
         [大区(加勒比地区)]
-        [语言码(nameof(语言映射.es))]
+        [语言码(nameof(语言映射.es_419))]
         [简写("NI")]
         尼加拉瓜 = 505,
         [大区(加勒比地区)]
-        [语言码(nameof(语言映射.es))]
+        [语言码(nameof(语言映射.es_419))]
         [简写("PA")]
         巴拿马 = 507,
         [大区(加勒比地区)]
@@ -621,7 +621,7 @@ namespace Fantasy.GlobalAndLocalization
         苏里南 = 597,
         [大区(加勒比地区)]
         [共用区码(美国)]
-        [语言码(nameof(语言映射.en_tt))]
+        [语言码(nameof(语言映射.en))]
         [简写("TT")]
         特立尼达和多巴哥双岛 = 1,
 
@@ -629,11 +629,11 @@ namespace Fantasy.GlobalAndLocalization
         拉丁美洲 = 100010,
 
         [大区(拉丁美洲)]
-        [语言码(nameof(语言映射.es_mx))]
+        [语言码(nameof(语言映射.es_419))]
         [简写("MX")]
         墨西哥 = 52,
         [大区(拉丁美洲)]
-        [语言码(nameof(语言映射.es_co))]
+        [语言码(nameof(语言映射.es_419))]
         [简写("CO")]
         哥伦比亚 = 57,
         [大区(拉丁美洲)]
@@ -641,38 +641,38 @@ namespace Fantasy.GlobalAndLocalization
         [简写("BR")]
         巴西 = 55,
         [大区(拉丁美洲)]
-        [语言码(nameof(语言映射.es_ar))]
+        [语言码(nameof(语言映射.es_419))]
         [简写("AR")]
         阿根廷 = 54,
         [大区(拉丁美洲)]
-        [语言码(nameof(语言映射.es_cl))]
+        [语言码(nameof(语言映射.es_419))]
         [简写("CL")]
         智利 = 56,
         [大区(拉丁美洲)]
-        [语言码(nameof(语言映射.es_pe))]
+        [语言码(nameof(语言映射.es_419))]
         [简写("PE")]
         秘鲁 = 51,
         [大区(拉丁美洲)]
-        [语言码(nameof(语言映射.es_ve))]
+        [语言码(nameof(语言映射.es_419))]
         [简写("VE")]
         委内瑞拉 = 58,
         [大区(拉丁美洲)]
-        [语言码(nameof(语言映射.es_ec))]
+        [语言码(nameof(语言映射.es_419))]
         [简写("EC")]
         厄瓜多尔 = 593,
         [大区(拉丁美洲)]
-        [语言码(nameof(语言映射.es))]
+        [语言码(nameof(语言映射.es_419))]
         [语言码(nameof(语言映射.ay), 1)]
         [语言码(nameof(语言映射.qu), 2)]
         [简写("BO")]
         玻利维亚 = 591,
         [大区(拉丁美洲)]
-        [语言码(nameof(语言映射.es))]
+        [语言码(nameof(语言映射.es_419))]
         [语言码(nameof(语言映射.gn), 1)] // 瓜拉尼语 (巴拉圭官方双语)
         [简写("PY")]
         巴拉圭 = 595,
         [大区(拉丁美洲)]
-        [语言码(nameof(语言映射.es))]
+        [语言码(nameof(语言映射.es_419))]
         [简写("UY")]
         乌拉圭 = 598,
         [大区(拉丁美洲)]

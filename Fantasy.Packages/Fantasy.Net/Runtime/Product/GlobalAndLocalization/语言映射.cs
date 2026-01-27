@@ -204,41 +204,22 @@ namespace Fantasy.GlobalAndLocalization
         public virtual string id { get; set; } = string.Empty;
         public virtual string ms { get; set; } = string.Empty;
         public virtual string tl { get; set; } = string.Empty;
-        public virtual string en_sgp { get; set; } = string.Empty;
         [排序订正符文("中文C")] public virtual string cn_ny { get; set; } = string.Empty;
 
         // 中亚
         public virtual string kk { get; set; } = string.Empty;
-        public virtual string ru_kz { get; set; } = string.Empty;
+        public virtual string ru_as { get; set; } = string.Empty;
         public virtual string uz { get; set; } = string.Empty;
-        public virtual string ru_uz { get; set; } = string.Empty;
         public virtual string tk { get; set; } = string.Empty;
-        public virtual string ru_tm { get; set; } = string.Empty;
         public virtual string ky { get; set; } = string.Empty;
-        public virtual string ru_kg { get; set; } = string.Empty;
         public virtual string tg { get; set; } = string.Empty;
-        public virtual string ru_tj { get; set; } = string.Empty;
 
         // 拉美 - 西班牙语系
-        public virtual string es_mx { get; set; } = string.Empty;
-        public virtual string es_ar { get; set; } = string.Empty;
-        public virtual string es_co { get; set; } = string.Empty;
-        public virtual string es_cl { get; set; } = string.Empty;
-        public virtual string es_pe { get; set; } = string.Empty;
-        public virtual string es_ve { get; set; } = string.Empty;
-        public virtual string es_ec { get; set; } = string.Empty;
-        public virtual string es_gt { get; set; } = string.Empty;
-        public virtual string es_cu { get; set; } = string.Empty;
+        public virtual string es_419 { get; set; } = string.Empty;
 
         // 拉美 - 葡萄牙语
 
         [排序订正符文("PortuguêA")] public virtual string pt_br { get; set; } = string.Empty;
-
-        // 拉美 - 英语 / 法语（加勒比部分）
-
-        public virtual string en_jm { get; set; } = string.Empty;
-        public virtual string en_tt { get; set; } = string.Empty;
-        public virtual string fr_ht { get; set; } = string.Empty;
 
         // 拉美土著语
         public virtual string ht { get; set; } = string.Empty; // 海地 克里奥尔语
@@ -431,7 +412,7 @@ namespace Fantasy.GlobalAndLocalization
             // 欧洲
             self.de = "Deutsch";
             self.fr = "Français";
-            self.es = "Español";
+            self.es = "Español(EU)";
             self.it = "Italiano";
             self.pt = "Português";
             self.ru = "Русский";
@@ -515,7 +496,6 @@ namespace Fantasy.GlobalAndLocalization
             self.id = "Bahasa Indonesia";
             self.ms = "Bahasa Melayu";
             self.tl = "Filipino";
-            self.en_sgp = "English (Singapore)";
             self.cn_ny = "华语 (南洋)";
             self.my = "မြန်မာဘာသာ";
             self.km = "ភាសាខ្មែរ";
@@ -523,34 +503,17 @@ namespace Fantasy.GlobalAndLocalization
 
             // 中亚
             self.kk = "Қазақша";
-            self.ru_kz = "Русский (Казахстан)";
+            self.ru_as = "Русский (Азия)";
             self.uz = "O‘zbek";
-            self.ru_uz = "Русский (Узбекистан)";
             self.tk = "Türkmen";
-            self.ru_tm = "Русский (Туркменистан)";
             self.ky = "Кыргызча";
-            self.ru_kg = "Русский (Кыргызстан)";
             self.tg = "Тоҷикӣ";
-            self.ru_tj = "Русский (Таджикистан)";
 
             // 拉美 - 西班牙语
-            self.es_mx = "Español (México)";
-            self.es_ar = "Español (Argentina)";
-            self.es_co = "Español (Colombia)";
-            self.es_cl = "Español (Chile)";
-            self.es_pe = "Español (Perú)";
-            self.es_ve = "Español (Venezuela)";
-            self.es_ec = "Español (Ecuador)";
-            self.es_gt = "Español (Guatemala)";
-            self.es_cu = "Español (Cuba)";
+            self.es_419 = "Español";
 
             // 拉美 - 葡萄牙语
             self.pt_br = "Português (Brasil)";
-
-            // 拉美 - 英语 / 法语
-            self.en_jm = "English (Jamaica)";
-            self.en_tt = "English (Trinidad and Tobago)";
-            self.fr_ht = "Français (Haïti)";
 
             // 拉美特色
             self.ht = "Kreyòl Ayisyen";
@@ -696,7 +659,6 @@ namespace Fantasy.GlobalAndLocalization
             self.id = "印尼语";
             self.ms = "马来语";
             self.tl = "菲律宾语";
-            self.en_sgp = "英语 (新加坡)";
             self.cn_ny = "华语 (南洋)";
             self.my = "缅甸语";
             self.km = "高棉语";  //（柬埔寨语）
@@ -704,35 +666,18 @@ namespace Fantasy.GlobalAndLocalization
 
             // 中亚
             self.kk = "哈萨克语";
-            self.ru_kz = "俄语(哈萨克斯坦)";
+            self.ru_as = "俄语(亚洲)";
             self.uz = "乌兹别克语";
-            self.ru_uz = "俄语(乌兹别克斯坦)";
             self.tk = "土库曼语";
-            self.ru_tm = "俄语(土库曼斯坦)";
             self.ky = "吉尔吉斯语";
-            self.ru_kg = "俄语(吉尔吉斯斯坦)";
             self.tg = "塔吉克语";
-            self.ru_tj = "俄语(塔吉克斯坦)";
 
             // 拉美 - 西班牙语系
 
-            self.es_mx = "西班牙语(墨西哥)";
-            self.es_ar = "西班牙语(阿根廷)";
-            self.es_co = "西班牙语(哥伦比亚)";
-            self.es_cl = "西班牙语(智利)";
-            self.es_pe = "西班牙语(秘鲁)";
-            self.es_ve = "西班牙语(委内瑞拉)";
-            self.es_ec = "西班牙语(厄瓜多尔)";
-            self.es_gt = "西班牙语(危地马拉)";
-            self.es_cu = "西班牙语(古巴)";
+            self.es_419 = "西班牙语(美洲)";
 
             // 拉美 - 葡萄牙语     
             self.pt_br = "葡萄牙语(巴西)";
-
-            // 拉美 - 英语 / 法语（加勒比部分）      
-            self.en_jm = "英语(牙买加)";
-            self.en_tt = "英语(特立尼达和多巴哥)";
-            self.fr_ht = "法语(海地)";
 
             // 拉美特色
             self.ht = "海地克里奥尔语";

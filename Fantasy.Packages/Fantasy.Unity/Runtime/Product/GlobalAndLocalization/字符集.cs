@@ -223,6 +223,35 @@ namespace Fantasy.GlobalAndLocalization
             WriteToFile(outputPath, result);
         }
 
+        public static void 输出全部阿姆哈拉语文字(string outputPath)
+        {
+            StringBuilder sb = new StringBuilder();
+
+            // 1. 基础吉兹字母 (Ethiopic)
+            // 这是核心部分，包含阿姆哈拉语、提格雷语等最常用的音节和标点
+            // 覆盖范围：1200 - 137F
+            AppendRange(sb, 0x1200, 0x137F);
+
+            // 2. 埃塞俄比亚补充区 (Ethiopic Supplement)
+            // 包含一些额外的音节，主要用于某些特定方言或罕见词汇
+            // 覆盖范围：1380 - 139F
+            AppendRange(sb, 0x1380, 0x139F);
+
+            // 3. 埃塞俄比亚扩展区 (Ethiopic Extended)
+            // 包含一些用于其他当地语言（如奥罗莫语的部分书写）的额外字符
+            // 覆盖范围：2D80 - 2DDF
+            AppendRange(sb, 0x2D80, 0x2DDF);
+
+            // 4. 埃塞俄比亚扩展-A (Ethiopic Extended-A)
+            // 较新的 Unicode 标准补充
+            // 覆盖范围：AB00 - AB2F
+            AppendRange(sb, 0xAB00, 0xAB2F);
+
+            // 去重并输出
+            // 注意：阿姆哈拉语字符间没有类似韩语 Jamo 的逻辑组合，全部是独立码位
+            string result = new string(sb.ToString().Distinct().ToArray());
+            WriteToFile(outputPath, result);
+        }
 
         private static void AppendRange(StringBuilder sb, int start, int end)
         {
