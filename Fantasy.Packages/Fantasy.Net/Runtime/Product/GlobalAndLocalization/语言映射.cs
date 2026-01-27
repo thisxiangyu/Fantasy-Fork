@@ -482,10 +482,11 @@ namespace Fantasy.GlobalAndLocalization
             // 南亚
             self.en_in = "English (India)";
             self.ur = "اردو";
+            self.ur_ro = "Urdu";
             self.hi = "हिन्दी";
-            self.hi_ro = "Hindi (Roman)";
+            self.hi_ro = "Hindi";
             self.bn = "বাংলা";
-            self.bn_ro = "Bengali (Roman)";
+            self.bn_ro = "Bengali";
             self.ne = "नेपाली";
             self.ta = "தமிழ்";
             self.dz = "རྫོང་ཁ";

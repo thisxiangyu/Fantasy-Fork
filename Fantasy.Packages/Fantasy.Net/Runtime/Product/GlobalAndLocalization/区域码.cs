@@ -224,6 +224,8 @@ namespace Fantasy.GlobalAndLocalization
         [语言码(nameof(语言映射.mni))]
         [语言码(nameof(语言映射.sd))]
         [语言码(nameof(语言映射.kok))]
+        [语言码(nameof(语言映射.ur))]
+        [语言码(nameof(语言映射.ur_ro))]
         [简写("IN")]
         印度 = 91,
         [大区(南亚)]
