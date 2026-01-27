@@ -207,8 +207,10 @@ namespace Fantasy.GlobalAndLocalization
 
         [大区(印度)]
         [语言码(nameof(语言映射.hi))]
+        [语言码(nameof(语言映射.hi_ro))]
         [语言码(nameof(语言映射.en_in))]
         [语言码(nameof(语言映射.bn))]
+        [语言码(nameof(语言映射.bn_ro))]
         [语言码(nameof(语言映射.te))]
         [语言码(nameof(语言映射.mr))]
         [语言码(nameof(语言映射.ta))]
@@ -226,6 +228,7 @@ namespace Fantasy.GlobalAndLocalization
         印度 = 91,
         [大区(南亚)]
         [语言码(nameof(语言映射.ur))]
+        [语言码(nameof(语言映射.ur_ro))]
         [语言码(nameof(语言映射.en), 1)]
         [语言码(nameof(语言映射.pa), 2)]
         [简写("PK")]
