@@ -85,7 +85,7 @@ namespace Fantasy.GlobalAndLocalization
 #if FANTASY_NET
         [Key]
 #endif
-        public uint theme_id { get; set; } = (uint)翻译主题.Unknown;
+        [元数据] public uint theme_id { get; set; } = (uint)翻译主题.Unknown;
         [元数据] public string theme { get; set; } = 翻译主题.Unknown.ToString();
 
         // 中文系

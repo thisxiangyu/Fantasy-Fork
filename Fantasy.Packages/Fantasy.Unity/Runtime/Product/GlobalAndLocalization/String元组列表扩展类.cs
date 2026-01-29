@@ -86,6 +86,71 @@ namespace Fantasy.GlobalAndLocalization
             return res;
         }
 
+        /// <summary>
+        /// 是否存在Value
+        /// </summary>
+        public static bool ContainsValue(this List<(string, string)> self, string item2)
+        {
+            foreach (var x in self)
+            {
+                if (x.Item2 == item2)
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 是否存在Key
+        /// </summary>
+        public static bool ContainsKey(this List<(string, string)> self, string item1)
+        {
+            foreach (var x in self)
+            {
+                if (x.Item1 == item1)
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 是否存在Value包含
+        /// </summary>
+        public static string? AnyValueContains(this List<(string, string)> self, string item2)
+        {
+            foreach (var x in self)
+            {
+                if (x.Item2.Contains(item2))
+                    return x.Item2;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// 是否存在Key包含
+        /// </summary>
+        public static string? AnyKeyContains(this List<(string, string)> self, string item1)
+        {
+            foreach (var x in self)
+            {
+                if (x.Item1.Contains(item1))
+                    return x.Item1;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// 是否存在元素包含
+        /// </summary>
+        public static string? AnyItemContains(this List<string> self, string item)
+        {
+            foreach (var x in self)
+            {
+                if (x.Contains(item))
+                    return x;
+            }
+            return null;
+        }
+
         // CompareInfo 缓存
         static readonly CompareInfo _invariantCompare = CultureInfo.InvariantCulture.CompareInfo;
 

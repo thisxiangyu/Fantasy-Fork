@@ -1050,7 +1050,30 @@ namespace Fantasy.GlobalAndLocalization
             return _region_area_number_tuples_enumName;
         }
 
-        public static string? 根据区码枚举名获取为首的语言码(this string 区域枚举名)
+        public static (List<string> 所有语言码, string 为首的语言码)? 根据区码枚举名获取语言码(this string 区域枚举名)
+        {
+            // 获取该字段上的所有语言码特性
+            var langAttrs = 区域枚举名.根据区码枚举名获取语言码Attr();
+            if (langAttrs == null || !langAttrs.Any())
+                return null;
+
+            var ordered = langAttrs.OrderBy(a => a.语言顺序).ToList();
+
+            if (ordered.Count == 0)
+                return null;
+
+            // 首语言：顺序为 0 的优先，否则取最小顺序
+            var first = ordered.FirstOrDefault(a => a.语言顺序 == 0) ?? ordered[0];
+
+            // 所有语言码（保持顺序）
+            var allLangCodes = ordered
+                .Select(a => a.语言码)
+                .ToList();
+
+            return (allLangCodes, first.语言码);
+        }
+
+        public static IEnumerable<语言码Attribute>? 根据区码枚举名获取语言码Attr(this string 区域枚举名)
         {
             var type = typeof(区域码);
 
@@ -1061,14 +1084,8 @@ namespace Fantasy.GlobalAndLocalization
 
             // 获取该字段上的所有语言码特性
             var langAttrs = field.GetCustomAttributes<语言码Attribute>(false);
-            if (!langAttrs.Any())
-                return null;
 
-            // 优先取顺序为 0 的语言码
-            var first = langAttrs.FirstOrDefault(a => a.语言顺序 == 0)
-                     ?? langAttrs.OrderBy(a => a.语言顺序).First();
-
-            return first.语言码;
+            return langAttrs;
         }
     }
 }
