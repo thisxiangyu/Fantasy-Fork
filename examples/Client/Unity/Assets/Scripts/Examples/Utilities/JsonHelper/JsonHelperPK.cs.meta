@@ -1,5 +1,9 @@
 fileFormatVersion: 2
+<<<<<<<< HEAD:examples/Client/Unity/Assets/Scripts/Examples/Utilities/JsonHelper/JsonHelperPK.cs.meta
 guid: 9786262dc8049f645a37a823ff75426e
+========
+guid: c1b5af05559ce49efa01413bfb69fc94
+>>>>>>>> ft-contribution:examples/Client/Unity/Assets/Resources/Starter Assets/Scripts/PlayerInfo.cs.meta
 MonoImporter:
   externalObjects: {}
   serializedVersion: 2
