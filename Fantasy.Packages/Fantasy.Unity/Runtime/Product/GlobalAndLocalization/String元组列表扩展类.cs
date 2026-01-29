@@ -117,6 +117,9 @@ namespace Fantasy.GlobalAndLocalization
         /// </summary>
         public static string? AnyValueContains(this List<(string, string)> self, string item2)
         {
+            if (item2 == null)
+                return null;
+
             foreach (var x in self)
             {
                 if (x.Item2.Contains(item2))
@@ -130,6 +133,9 @@ namespace Fantasy.GlobalAndLocalization
         /// </summary>
         public static string? AnyKeyContains(this List<(string, string)> self, string item1)
         {
+            if (item1 == null)
+                return null;
+
             foreach (var x in self)
             {
                 if (x.Item1.Contains(item1))
@@ -143,6 +149,9 @@ namespace Fantasy.GlobalAndLocalization
         /// </summary>
         public static string? AnyItemContains(this List<string> self, string item)
         {
+            if (item == null)
+                return null;
+
             foreach (var x in self)
             {
                 if (x.Contains(item))
