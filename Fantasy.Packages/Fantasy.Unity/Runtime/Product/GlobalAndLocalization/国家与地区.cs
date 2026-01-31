@@ -10,13 +10,13 @@ using UnityEngine.Networking;
 namespace Fantasy.GlobalAndLocalization
 {
     [DbSet(IsEmbedded = true)]
-    public class 国家与地区信息: Entity
+    public class 国家与地区相关信息: Entity
     {
         /// <summary>
         /// 据<see cref="区域码"/>
         /// </summary>
-        public 区域码 当前所在法律区 { get; set; } = 区域码.中国;
-        public string 当前所选语言 { get; set; } = "cn";
+        public 区域码? 当前所在法律区 { get; set; } = 区域码.英国;
+        public string 当前所选语言 { get; set; } = "English";
 
 #if FANTASY_UNITY
         public IEnumerator 快速获取当前IP区域代码(Action<string> callback)

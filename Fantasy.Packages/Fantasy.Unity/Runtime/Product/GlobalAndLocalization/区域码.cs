@@ -970,7 +970,27 @@ namespace Fantasy.GlobalAndLocalization
     public static class 区域码信息
     {
         static List<(string 区码简写, string 语言码)> _area_lang_tuples = null;
-        static List<(区域码 大区, string 简写, string 枚举名)> _region_area_number_tuples_enumName = null;
+        static List<(区域码 大区, string 区码简写, string 区码枚举名)> _region_area_number_tuples_enumName = null;
+
+        public static 区域码? 根据区码简写取区码(string 区码简写)
+        {
+            var tuple = 获取大区With简写With区码元组List();
+            string name = default;
+
+            foreach (var item in tuple)
+            {
+                if(item.区码简写 == 区码简写)
+                {
+                    name = item.区码枚举名;
+                    break;
+                }
+            }
+            if (Enum.TryParse<区域码>(name, true, out var result))
+            {
+                return result;
+            }
+            return null;
+        }
 
         /// <summary>
         /// 生成 List<(string 简写, string 语言码)>, 
