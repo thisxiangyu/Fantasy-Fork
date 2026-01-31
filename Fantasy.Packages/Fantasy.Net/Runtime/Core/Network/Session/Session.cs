@@ -150,9 +150,15 @@ namespace Fantasy.Network
         {
             if (IsDisposed)
             {
+#if DESIGN_TIME
+                Log.Error($"Session already destroyed: {Id}");
+#endif
                 return;
             }
-            
+#if DESIGN_TIME
+            Log.Debug($"Session Dispose: {Id}");
+#endif
+
             _rpcId = 0;
             LastReceiveTime = 0;
             Channel = null;
