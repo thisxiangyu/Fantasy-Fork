@@ -6,6 +6,7 @@ using System.Reflection;
 
 #pragma warning disable CS8603 // 允许返回Null
 #pragma warning disable CS8625 
+#pragma warning disable CS8604 
 
 namespace Fantasy.GlobalAndLocalization
 {
@@ -182,21 +183,54 @@ namespace Fantasy.GlobalAndLocalization
                 // 如果字典不为空且包含该 key，则使用 value 参与比较，否则保留原样
                 if (sorting_logic != null)
                 {
-                    if (s1 != null && sorting_logic.TryGetValue(s1, out var alias1))
-                    {
-                        s1 = alias1;
-                    }
-
-                    if (s2 != null && sorting_logic.TryGetValue(s2, out var alias2))
-                    {
-                        s2 = alias2;
-                    }
+                    if (s1 != null && sorting_logic.TryGetValue(s1, out var alias1)) s1 = alias1;
+                    if (s2 != null && sorting_logic.TryGetValue(s2, out var alias2)) s2 = alias2;
                 }
+
+                // --- 新增：脚本优先级判定逻辑 ---
+                int p1 = GetCharPriority(s1);
+                int p2 = GetCharPriority(s2);
+
+                if (p1 != p2)
+                    return p1.CompareTo(p2); // 如果优先级不同，直接按优先级排
 
                 return _invariantCompare.Compare(s1, s2, CompareOptions.IgnoreCase);
             });
 
             return self;
+        }
+
+        /// <summary>
+        /// 字符的排序优先级分类。(数值越小，排位越靠前。)
+        /// </summary>
+        static int GetCharPriority(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return 100; // 空白排最后
+
+            char c = s[0];
+
+            // 1. 真正的控制字符（回车、Tab等）
+            if (c < 32) return 0;
+
+            // 2. 显式的置顶符号（如果你使用了 \x01 这种控制字符作为 alias 前缀）
+            if (c == '\x01') return 1;
+
+            // 3. 空格
+            if (c == 32) return 2;
+
+            // 4. 普通标点与符号
+            if (char.IsPunctuation(c) || char.IsSymbol(c)) return 3;
+
+            // 5. 数字
+            if (char.IsDigit(c)) return 4;
+            // 6. 字母与文字 (包含拉丁语、中文、以及阿姆哈拉语等文字)
+            // 将吉兹字母等统一归为此类，它们将遵循 InvariantCompare 在字母桶内的内部排序
+            return 5;
+        }
+
+        public static class 排序符号
+        {
+            public const char Top = '\x01';
         }
 
         /// <summary>

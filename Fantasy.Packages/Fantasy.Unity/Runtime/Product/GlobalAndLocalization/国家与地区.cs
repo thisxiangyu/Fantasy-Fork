@@ -15,7 +15,7 @@ namespace Fantasy.GlobalAndLocalization
         /// <summary>
         /// 据<see cref="区域码"/>
         /// </summary>
-        public 区域码? 当前所在法律区 { get; set; } = 区域码.英国;
+        public 区域码 当前所在法律区 { get; set; } = 区域码.Unknown;
         public string 当前所选语言 { get; set; } = "English";
 
 #if FANTASY_UNITY
