@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
+using Fantasy.DataStructure.Dictionary;
+
 
 #if FANTASY_NET
 using System.ComponentModel.DataAnnotations;
@@ -20,24 +22,19 @@ namespace Fantasy.GlobalAndLocalization
 {
     /// <summary>
     /// 这是一个翻译主题枚举类的例子, 其它翻译主题枚举类可以模仿这个扩展, 
-    /// 关键在于打上<see cref="翻译主题枚举类Attribute"/>标签, 以及每个枚举值不能重复(通过设置首个枚举值)。
+    /// 关键在于打上<see cref="翻译主题枚举Attribute"/>标签, 以及每个枚举值不能重复(通过设置首个枚举值)。
     /// </summary>
-    [翻译主题枚举类]
+    [翻译主题枚举]
     public enum 翻译主题 : uint
     {
         Unknown = 0,
 
         中文映射,
         自我映射,
-
-        中国,
-        CN台湾,
-        CN香港,
-
     }
 
     [AttributeUsage(AttributeTargets.Enum)]
-    public class 翻译主题枚举类Attribute : Attribute
+    public class 翻译主题枚举Attribute : Attribute
     {
     }
 
