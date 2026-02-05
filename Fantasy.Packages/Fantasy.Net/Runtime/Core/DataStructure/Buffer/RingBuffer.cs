@@ -5,7 +5,7 @@ namespace Fantasy.DataStructure.Buffer
     /// <summary>
     /// 简易环形缓冲
     /// </summary>
-    public struct RingBuffer<T>
+    public class RingBuffer<T>
     {
         private readonly T[] _buffer;
         private int _index;
@@ -36,6 +36,10 @@ namespace Fantasy.DataStructure.Buffer
 
         public int Count => _count;
 
+        public int WriteIndex => _index;
+
+        public int Capacity => _buffer.Length;
+
         // 仅仅判断数量是否超标，不需要管顺序
         public bool IsFull => _count >= _buffer.Length;
 
@@ -49,6 +53,12 @@ namespace Fantasy.DataStructure.Buffer
                 int realIndex = (_count < _buffer.Length) ? i : (_index + i) % _buffer.Length;
                 return _buffer[realIndex];
             }
+        }
+
+        public void Clear()
+        {
+            _index = 0;
+            _count = 0;
         }
     }
 }
