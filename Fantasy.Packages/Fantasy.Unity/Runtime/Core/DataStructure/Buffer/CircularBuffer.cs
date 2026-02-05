@@ -4,9 +4,9 @@ using System.IO;
 #pragma warning disable CS8625 // Cannot convert null literal to non-nullable reference type.
 #pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
 
-namespace Fantasy.DataStructure.Bytes
+namespace Fantasy.DataStructure.Buffer
 {
-    /// 环形缓存（自增式缓存，自动扩充、不会收缩缓存、所以不要用这个操作过大的IO流）
+    /// 环形缓冲（自增式缓存，自动扩充、不会收缩缓存、所以不要用这个操作过大的IO流）
     /// 1、环大小8192，溢出的会自动增加环的大小。
     /// 2、每个块都是一个环形缓存，当溢出的时候会自动添加到下一个环中。
     /// 3、当读取完成后用过的环会放在缓存中，不会销毁掉。
@@ -144,7 +144,7 @@ namespace Fantasy.DataStructure.Bytes
             {
                 var n = count - copyCount;
                 var asMemory = First.AsMemory();
-                
+
                 if (ChunkSize - FirstIndex > n)
                 {
                     var slice = asMemory.Slice(FirstIndex, n);
@@ -181,7 +181,7 @@ namespace Fantasy.DataStructure.Bytes
             var length = Length;
             if (length < count)
             {
-                count = (int) length;
+                count = (int)length;
             }
 
             var copyCount = 0;
@@ -228,8 +228,8 @@ namespace Fantasy.DataStructure.Bytes
         public void Write(Stream stream)
         {
             var copyCount = 0;
-            var count = (int) (stream.Length - stream.Position);
-            
+            var count = (int)(stream.Length - stream.Position);
+
             while (copyCount < count)
             {
                 if (LastIndex == ChunkSize)
@@ -239,7 +239,7 @@ namespace Fantasy.DataStructure.Bytes
                 }
 
                 var n = count - copyCount;
-                
+
                 if (ChunkSize - LastIndex > n)
                 {
                     _ = stream.Read(Last, LastIndex, n);
