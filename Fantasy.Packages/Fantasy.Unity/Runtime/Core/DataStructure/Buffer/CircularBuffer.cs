@@ -144,7 +144,7 @@ namespace Fantasy.DataStructure.Buffer
             {
                 var n = count - copyCount;
                 var asMemory = First.AsMemory();
-
+                
                 if (ChunkSize - FirstIndex > n)
                 {
                     var slice = asMemory.Slice(FirstIndex, n);
@@ -181,7 +181,7 @@ namespace Fantasy.DataStructure.Buffer
             var length = Length;
             if (length < count)
             {
-                count = (int)length;
+                count = (int) length;
             }
 
             var copyCount = 0;
@@ -228,8 +228,8 @@ namespace Fantasy.DataStructure.Buffer
         public void Write(Stream stream)
         {
             var copyCount = 0;
-            var count = (int)(stream.Length - stream.Position);
-
+            var count = (int) (stream.Length - stream.Position);
+            
             while (copyCount < count)
             {
                 if (LastIndex == ChunkSize)
@@ -239,7 +239,7 @@ namespace Fantasy.DataStructure.Buffer
                 }
 
                 var n = count - copyCount;
-
+                
                 if (ChunkSize - LastIndex > n)
                 {
                     _ = stream.Read(Last, LastIndex, n);

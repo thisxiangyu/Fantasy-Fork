@@ -1,9 +1,5 @@
 fileFormatVersion: 2
-<<<<<<<< HEAD:Fantasy.Packages/Fantasy.Unity/Runtime/Core/DataBase/Attribute.meta
 guid: f80ff90f6b237074c8a112b8d89aedf4
-========
-guid: 0094d5634a47b4f48a15c45a94b584eb
->>>>>>>> ft-contribution:Fantasy.Packages/Fantasy.Unity/Runtime/Core/Serialize/Pack/ProtoBufPack/LightProto/PublicAPI.meta
 folderAsset: yes
 DefaultImporter:
   externalObjects: {}

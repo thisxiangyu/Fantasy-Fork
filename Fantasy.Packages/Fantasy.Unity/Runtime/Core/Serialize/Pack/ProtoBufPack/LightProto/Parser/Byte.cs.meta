@@ -1,15 +1,2 @@
 fileFormatVersion: 2
-<<<<<<<< HEAD:examples/Client/Unity/Assets/Resources/Starter Assets/Scripts/PlayerInfo.cs.meta
 guid: c1b5af05559ce49efa01413bfb69fc94
-========
-guid: 5ca85f2f80ae0480fb36d55448f44124
->>>>>>>> ft-contribution:Fantasy.Packages/Fantasy.Unity/Runtime/Core/Serialize/Pack/ProtoBufPack/LightProto/Parser/Byte.cs.meta
-MonoImporter:
-  externalObjects: {}
-  serializedVersion: 2
-  defaultReferences: []
-  executionOrder: 0
-  icon: {instanceID: 0}
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 

@@ -278,7 +278,7 @@ namespace Fantasy.Database
 
             if (!modelBuilder.Model.GetEntityTypes().Any())
             {
-                Log.Warning("❌ No entities were detected during the EF Core model-building phase. Please verify!");
+                Log.Warning($"❌ No entities were detected during the EF Core model-building phase. Please verify! isSessionForConfig : {isSessionForConfig}");
             }
         }
 
