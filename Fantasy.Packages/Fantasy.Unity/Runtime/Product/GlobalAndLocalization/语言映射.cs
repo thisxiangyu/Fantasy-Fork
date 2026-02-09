@@ -409,9 +409,9 @@ namespace Fantasy.GlobalAndLocalization
             // 欧洲
             self.de = "Deutsch";
             self.fr = "Français";
-            self.es = "Español(EU)";
+            self.es = "Español (España)";
             self.it = "Italiano";
-            self.pt = "Português";
+            self.pt = "Português (Portugal)";
             self.ru = "Русский";
             self.nl = "Nederlands";
             self.sv = "Svenska";
@@ -507,7 +507,7 @@ namespace Fantasy.GlobalAndLocalization
             self.tg = "Тоҷикӣ";
 
             // 拉美 - 西班牙语
-            self.es_419 = "Español";
+            self.es_419 = "Español(Latinoamérica)";
 
             // 拉美 - 葡萄牙语
             self.pt_br = "Português (Brasil)";
