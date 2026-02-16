@@ -996,7 +996,7 @@ namespace Fantasy.Database
                         Log.Warning($"Dapper does not support Linq filter, this Query for \"{typeof(T)}\" appended on {parentId} has switched to EFCore-Mode automatically");
                 }
 
-                return AppendFromDb(await query.ToListAsync(), parent); ;
+                return AppendFromDb(await query.ToListAsync(), parent); 
             }
             else if (Mode == PreferSqlMode.Dapper)
             {

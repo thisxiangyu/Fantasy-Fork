@@ -955,7 +955,7 @@ namespace Fantasy.GlobalAndLocalization
         亚洲 = 110000,
         非洲 = 120000,
         欧洲 = 130000,
-
+        
         [特殊标记]
         高加索地区 = 999997, // 这里从文化归属上与西亚和中亚都不同, 文化较为独立
         [特殊标记]
@@ -969,9 +969,10 @@ namespace Fantasy.GlobalAndLocalization
     /// </summary>
     public static class 区域码信息
     {
+        static List<(string 区码枚举名, int 枚举值)> _enumName_enumValue = null;
         static List<(string 区码简写, string 语言码)> _area_lang_tuples = null;
         static List<(区域码 大区, string 区码简写, string 区码枚举名)> _region_area_number_tuples_enumName = null;
-
+        
         public static 区域码? 根据区码简写取区码(string 区码简写)
         {
             var tuple = 获取大区With简写With区码元组List();
@@ -979,7 +980,7 @@ namespace Fantasy.GlobalAndLocalization
 
             foreach (var item in tuple)
             {
-                if (item.区码简写 == 区码简写)
+                if(item.区码简写 == 区码简写)
                 {
                     name = item.区码枚举名;
                     break;
@@ -991,6 +992,38 @@ namespace Fantasy.GlobalAndLocalization
             }
             return null;
         }
+        
+        
+        public static IEnumerable<(string 区码枚举名, int 枚举值)> 枚举所有国家或地区码()
+        {
+            if (_enumName_enumValue != null)
+            {
+                foreach (var item in _enumName_enumValue)
+                    yield return item;
+
+                yield break;
+            }
+
+            _enumName_enumValue = new List<(string 区码枚举名, int 枚举值)>();
+
+            var type = typeof(区域码);
+
+            foreach (var field in type.GetFields(BindingFlags.Public | BindingFlags.Static))
+            {
+                if (!field.IsDefined(typeof(简写Attribute), false))
+                    continue;
+                
+                if (field.GetValue(null) is not 区域码 enumValue)
+                    continue;
+
+                _enumName_enumValue.Add((field.Name, (int)enumValue));
+            }
+
+            foreach (var item in _enumName_enumValue)
+                yield return item;
+        }
+
+
 
         /// <summary>
         /// 生成 List<(string 简写, string 语言码)>, 
@@ -1006,7 +1039,10 @@ namespace Fantasy.GlobalAndLocalization
 
             foreach (var field in type.GetFields(BindingFlags.Public | BindingFlags.Static))
             {
-                var langAttrs = field.GetCustomAttributes<语言码Attribute>().ToList();
+                var langAttrs = field
+                    .GetCustomAttributes<语言码Attribute>()
+                    .OrderBy(l => l.语言顺序) // 按顺序排序
+                    .ToList();
 
                 if (langAttrs.Count == 0)
                     continue;
@@ -1024,12 +1060,13 @@ namespace Fantasy.GlobalAndLocalization
                     _area_lang_tuples.Add((shortNameAttr.简写, lang.语言码));
                 }
             }
+
             return _area_lang_tuples;
         }
 
+
         /// <summary>
-        /// 生成 List<(区域码 大区, string 简写, 区域码 区码)>
-        /// 注意：如果一个国家有多个语言码，该方法会根据 [语言码] 标记的顺序，为每个语言关联生成对应的元组条目
+        /// 生成区码简写信息
         /// </summary>
         public static List<(区域码 大区, string 区码简写, string 区码枚举名)> 获取大区With简写With区码元组List(bool update_cache = false)
         {
@@ -1041,13 +1078,6 @@ namespace Fantasy.GlobalAndLocalization
 
             foreach (var field in type.GetFields(BindingFlags.Public | BindingFlags.Static))
             {
-                // 获取该字段上所有的语言码特性，并严格按照你在构造函数里传入的“顺序”字段排序
-                var langAttrs = field.GetCustomAttributes<语言码Attribute>()
-                                     .OrderBy(l => l.语言顺序)
-                                     .ToList();
-
-                if (langAttrs.Count == 0) continue;
-
                 var shortNameAttr = field.GetCustomAttribute<简写Attribute>();
                 var regionAttr = field.GetCustomAttribute<大区Attribute>();
 
@@ -1057,17 +1087,22 @@ namespace Fantasy.GlobalAndLocalization
                     continue;
                 }
 
-                // 枚举名
                 var enumName = field.Name;
 
-                // 如果一个国家有多个语言（如瑞士），
-                // 按照排序后的语言顺序，将该国家信息存入列表
-                foreach (var lang in langAttrs)
-                {
-                    _region_area_number_tuples_enumName.Add((regionAttr.大区, shortNameAttr.简写, enumName));
-                }
+                _region_area_number_tuples_enumName.Add(
+                    (regionAttr.大区, shortNameAttr.简写, enumName)
+                );
             }
+
             return _region_area_number_tuples_enumName;
+        }
+        
+        public static IEnumerable<(区域码 大区, string 区码简写, string 区码枚举名)> 遍历大区With简写With区码元组List(bool update_cache = false)
+        {
+            foreach (var VARIABLE in 获取大区With简写With区码元组List())
+            {
+                yield return VARIABLE;
+            }
         }
 
         public static (List<string> 所有语言码, string 为首的语言码)? 根据区码枚举名获取语言码(this string 区域枚举名)
