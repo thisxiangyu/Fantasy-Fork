@@ -14,10 +14,30 @@ namespace Fantasy.GlobalAndLocalization
     }
 
     [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
-    public class 大区Attribute : Attribute
+    public class 文化大区Attribute : Attribute
     {
         public 区域码 大区 { get; private set; }
-        public 大区Attribute(区域码 大区)
+        public 文化大区Attribute(区域码 大区)
+        {
+            this.大区 = 大区;
+        }
+    }
+    
+    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
+    public class 地理大区Attribute : Attribute
+    {
+        public 区域码 大区 { get; private set; }
+        public 地理大区Attribute(区域码 大区)
+        {
+            this.大区 = 大区;
+        }
+    }
+    
+    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
+    public class 大洲Attribute : Attribute
+    {
+        public 区域码 大区 { get; private set; }
+        public 大洲Attribute(区域码 大区)
         {
             this.大区 = 大区;
         }
