@@ -10,12 +10,12 @@ using UnityEngine.Networking;
 namespace Fantasy.GlobalAndLocalization
 {
     [DbSet(IsEmbedded = true)]
-    public class 国家与地区相关信息 : Entity
+    public class 国家与地区相关信息: Entity
     {
         /// <summary>
         /// 据<see cref="区域码"/>
         /// </summary>
-        public 区域码 当前所在国家或地区 { get; set; } = 区域码.Unknown;
+        public string 当前所在国家或地区 { get; set; } = "Unknown";
         public string 当前所选语言码 { get; set; } = "en";
 
 #if FANTASY_UNITY
