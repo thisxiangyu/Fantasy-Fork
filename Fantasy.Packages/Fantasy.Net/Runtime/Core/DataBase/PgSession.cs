@@ -2,6 +2,7 @@
 using System.Data;
 using System.Data.Common;
 using System.Linq.Expressions;
+using System.Runtime.CompilerServices;
 using Dapper;
 using Fantasy.Assembly;
 using Fantasy.Async;
@@ -225,14 +226,13 @@ namespace Fantasy.Database
 
                     entityBuilder.ToTable($"{tableName}_Doc", schemaStr);
 
-                    if (typeof(Entity).IsAssignableFrom(type))
+                    if (typeof(Entity).IsAssignableFrom(type)) 
                     {
-                        entityBuilder.HasKey(DbSetProperty.ParentType, DbSetProperty.ParentId);
+                        entityBuilder.Property<long>("Id").ValueGeneratedNever();
                     }
-                    else
+                    else// 非Entity对象
                     {
-                        entityBuilder.Property<int>("Id").UseIdentityColumn(); // 数据库自增
-                        entityBuilder.HasKey("Id");
+                        entityBuilder.Property<long>("Id").UseIdentityColumn(); // 数据库自增
                     }
 
                     entityBuilder.Property<object?>(DbSetProperty.DocAsJson).HasColumnType("jsonb").IsRequired(false);
@@ -506,11 +506,10 @@ namespace Fantasy.Database
         /// <typeparam name="T">实体类型。</typeparam>
         /// <param name="table">表名称，可选。如果未指定，将使用实体类型的名称。</param>
         /// <returns>如果存在行则返回 true，否则返回 false。</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async FTask<bool> Exist<T>(string table = null) where T : Entity
         {
-            // return await Count<P>(table) > 0;
-            await FTask.CompletedTask;
-            return false;
+            return await Set<T>().AnyAsync();
         }
 
         /// <summary>
@@ -520,11 +519,10 @@ namespace Fantasy.Database
         /// <param name="filter">用于筛选行的条件。</param>
         /// <param name="table">表名称，可选。如果未指定，将使用实体类型的名称。</param>
         /// <returns>如果存在满足条件的行则返回 true，否则返回 false。</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async FTask<bool> Exist<T>(Expression<Func<T, bool>> filter, string table = null) where T : Entity
         {
-            // return await Count(kind, table) > 0;
-            await FTask.CompletedTask;
-            return false;
+            return await Set<T>().AnyAsync(filter);
         }
 
         #endregion
@@ -1734,11 +1732,11 @@ namespace Fantasy.Database
         /// <summary>
         /// 根据指定过滤条件查询并返回满足条件的行列表，选择指定的列（加锁）。
         /// </summary>
-        /// <param name="filter">文档实体类型。</param>
-        /// <param name="cols">查询过滤条件。</param>
-        /// <param name="isDeserialize">要查询的列名称数组。</param>
-        /// <param name="table">是否在查询后反序列化,执行反序列化后会自动将实体注册到框架系统中，并且能正常使用组件相关功能。</param>
-        /// <typeparam name="T">表名称。</typeparam>
+        /// <param name="filter">查询过滤条件</param>
+        /// <param name="cols">要查询的列名称数组</param>
+        /// <param name="isDeserialize">是否在查询后反序列化,执行反序列化后会自动将实体注册到框架系统中，并且能正常使用组件相关功能。</param>
+        /// <param name="table">表名。</param>
+        /// <typeparam name="T">文档实体类型。</typeparam>
         /// <returns></returns>
         public async FTask<List<T>> Query<T>(Expression<Func<T, bool>> filter, Expression<Func<T, object>>[] cols, bool isDeserialize = true, string table = null) where T : Entity
         {
@@ -2006,7 +2004,7 @@ namespace Fantasy.Database
         /// <typeparam name="T">实体类型。</typeparam>
         /// <param name="entity">要插入的实体对象。</param>
         /// <param name="table">表名称。</param>
-        /// <param name="transaction">事务,因为仅支持EFCore,会自动跟踪事务,不需要显式传入。</param>
+        /// <param name="transaction">事务,因为仅支持EFCore,由外部跟踪事务,不需要显式传入。</param>
         public async FTask Insert<T>(T? entity, string table = null,object? transaction = null) where T : Entity, new()
         {
             if (entity == null)
@@ -2025,7 +2023,7 @@ namespace Fantasy.Database
 
             try
             {
-                EntityDocumentDTC? docData = null;
+#if DESIGN_TIME
                 int singleCount = entity.ForEachAllSingle.Count();
                 int enbbedCount = 0;
                 foreach (var single in entity.ForEachAllSingle)
@@ -2035,36 +2033,44 @@ namespace Fantasy.Database
                 }
                 Log.Debug($"{entity.Type.Name}中有{singleCount}个single(s),其中{enbbedCount}个嵌入");
                 Log.Debug($"{entity.Type.Name}转为Json: \n{entity.ToJson(new JsonSettings(Library.Microsoft),true)}");
+#endif
+
                 if (TypeDbSetChecker<T>.IsAsDoc)
                 {
                     //----------文档式存储----------
-                    docData = MultiThreadPoolStacks.Rent<EntityDocumentDTC>();
+                    EntityDocumentDTC docData = MultiThreadPoolStacks.Rent<EntityDocumentDTC>();
                     docData.ParentId = entity.Parent.Id;
                     docData.ParentType = entity.Parent.TypeHashCode;
                     docData.Json = entity;
 
                     var shadowDbSet = Set<EntityDocumentDTC>(TypeDbSetChecker<T>.ShadowName!);
                     shadowDbSet.Add(docData);
+
+                    var count = await SaveChangesAsync();
+
+                    MultiThreadPoolStacks.Return(docData);
+                    Entry(docData).State = EntityState.Detached;
                 }
                 else
                 {
                     //----------表格式存储----------
+                    var entry = Entry(entity);
+                    Set<T>().Add(entity);
                     Set<T>().Add(entity);
                     var parent = entity.Parent;
+                    if(parent != null)
+                    {
+                        Entry(entity).Property<long>(DbSetProperty.ParentType).CurrentValue = parent.TypeHashCode;
+                        Entry(entity).Property<long>(DbSetProperty.ParentId).CurrentValue = parent.Id;
+                    }
                     //更新影子属性的值
-                    Entry(entity).Property<long>(DbSetProperty.ParentType).CurrentValue = parent.TypeHashCode;
-                    Entry(entity).Property<long>(DbSetProperty.ParentId).CurrentValue = parent.Id;
                     Entry(entity).Property<EntityTreeCollection>(DbSetProperty.JsonSingle).CurrentValue = entity.GetCollectionForSingle();
                     Entry(entity).Property<EntityMultiCollection>(DbSetProperty.JsonMulti).CurrentValue = entity.GetCollectionForMulti();
                     //Note: 暂时不支持二进制存储
                     //Entry(entity).Property<byte[]>(DbSetProperty.BytesSingle).CurrentValue = 1;
                     //Entry(entity).Property<byte[]>(DbSetProperty.BytesMulti).CurrentValue = 1;
+                    var count = await SaveChangesAsync();
                 }
-
-                var count = await SaveChangesAsync();
-
-                if(docData != null)
-                    MultiThreadPoolStacks.Return(docData);
             }
             catch (Exception ex) { 
                 throw new($"{pg.GetDatabaseType} Insert-Err ({entity.Type}:{entity.Id}) !\n {ex} ");
@@ -2078,7 +2084,7 @@ namespace Fantasy.Database
         /// <typeparam name="T">实体类型。</typeparam>
         /// <param name="list">要插入的实体对象列表。</param>
         /// <param name="table">可选表名称。</param>
-        /// <param name="transaction">事务,因为仅支持EFCore,会自动跟踪事务,不需要显式传入。</param>
+        /// <param name="transaction">事务,因为仅支持EFCore,由外部跟踪事务,不需要显式传入。</param>
         public async FTask InsertBatch<T>(IEnumerable<T> list, string table = null, object? transaction=null) where T : Entity, new()
         {
             if (list == null)

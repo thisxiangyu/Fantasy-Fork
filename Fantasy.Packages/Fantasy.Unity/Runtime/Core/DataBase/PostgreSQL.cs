@@ -244,7 +244,7 @@ namespace Fantasy.Database
 
         // PgSession有四种不同的情况:
         // 池化和非池化、配置表和非配置表
-        private PgSession GetSession(bool useSessionFromPool = true) {
+        PgSession GetSession(bool useSessionFromPool = true) {
             if (IsForConnfig)
             {
                 if (useSessionFromPool)
@@ -261,7 +261,7 @@ namespace Fantasy.Database
             }
         }
 
-        private PgSession GetSessionAndInit(bool useSessionFromPool = true) {
+        PgSession GetSessionAndInit(bool useSessionFromPool = true) {
             PgSession res = GetSession(useSessionFromPool);
             res.SetPg(this);
             return res;
