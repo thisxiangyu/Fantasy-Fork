@@ -5,6 +5,19 @@ using System.Runtime.Serialization;
 using LightProto;
 using System;
 
+#if FANTASY_UNITY
+namespace System.ComponentModel.DataAnnotations.Schema
+{
+    /// <summary>
+    /// 这个标签主要是用来占位, 避免客户端报错
+    /// </summary>
+    public class NotMappedAttribute: Attribute
+    {
+
+    }
+}
+#endif
+
 #if FANTASY_NET
 using MJ = System.Text.Json.Serialization;
 using System.ComponentModel.DataAnnotations.Schema;
