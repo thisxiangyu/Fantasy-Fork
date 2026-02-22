@@ -280,6 +280,10 @@ namespace Fantasy.Database
             {
                 Log.Warning($"❌ No entities were detected during the EF Core model-building phase. Please verify! isSessionForConfig : {isSessionForConfig}");
             }
+
+            // 进行一次GC
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
         }
 
         /// <summary>

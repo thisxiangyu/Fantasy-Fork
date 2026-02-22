@@ -2,6 +2,7 @@
 using System.Data;
 using System.Data.Common;
 using System.Linq.Expressions;
+using System.Runtime.CompilerServices;
 using Dapper;
 using Fantasy.Assembly;
 using Fantasy.Async;
@@ -279,6 +280,10 @@ namespace Fantasy.Database
             {
                 Log.Warning($"❌ No entities were detected during the EF Core model-building phase. Please verify! isSessionForConfig : {isSessionForConfig}");
             }
+
+            // 进行一次GC
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
         }
 
         /// <summary>
@@ -505,11 +510,10 @@ namespace Fantasy.Database
         /// <typeparam name="T">实体类型。</typeparam>
         /// <param name="table">表名称，可选。如果未指定，将使用实体类型的名称。</param>
         /// <returns>如果存在行则返回 true，否则返回 false。</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async FTask<bool> Exist<T>(string table = null) where T : Entity
         {
-            // return await Count<P>(table) > 0;
-            await FTask.CompletedTask;
-            return false;
+            return await Set<T>().AnyAsync();
         }
 
         /// <summary>
@@ -519,11 +523,10 @@ namespace Fantasy.Database
         /// <param name="filter">用于筛选行的条件。</param>
         /// <param name="table">表名称，可选。如果未指定，将使用实体类型的名称。</param>
         /// <returns>如果存在满足条件的行则返回 true，否则返回 false。</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async FTask<bool> Exist<T>(Expression<Func<T, bool>> filter, string table = null) where T : Entity
         {
-            // return await Count(kind, table) > 0;
-            await FTask.CompletedTask;
-            return false;
+            return await Set<T>().AnyAsync(filter);
         }
 
         #endregion
@@ -1733,11 +1736,11 @@ namespace Fantasy.Database
         /// <summary>
         /// 根据指定过滤条件查询并返回满足条件的行列表，选择指定的列（加锁）。
         /// </summary>
-        /// <param name="filter">文档实体类型。</param>
-        /// <param name="cols">查询过滤条件。</param>
-        /// <param name="isDeserialize">要查询的列名称数组。</param>
-        /// <param name="table">是否在查询后反序列化,执行反序列化后会自动将实体注册到框架系统中，并且能正常使用组件相关功能。</param>
-        /// <typeparam name="T">表名称。</typeparam>
+        /// <param name="filter">查询过滤条件</param>
+        /// <param name="cols">要查询的列名称数组</param>
+        /// <param name="isDeserialize">是否在查询后反序列化,执行反序列化后会自动将实体注册到框架系统中，并且能正常使用组件相关功能。</param>
+        /// <param name="table">表名。</param>
+        /// <typeparam name="T">文档实体类型。</typeparam>
         /// <returns></returns>
         public async FTask<List<T>> Query<T>(Expression<Func<T, bool>> filter, Expression<Func<T, object>>[] cols, bool isDeserialize = true, string table = null) where T : Entity
         {
@@ -2026,13 +2029,13 @@ namespace Fantasy.Database
             {
 #if DESIGN_TIME
                 int singleCount = entity.ForEachAllSingle.Count();
-                int enbbedCount = 0;
+                int embbededCount = 0;
                 foreach (var single in entity.ForEachAllSingle)
                 {
                     if (single.IsAnnotatedAsEmbedded())
-                        enbbedCount++;
+                        embbededCount++;
                 }
-                Log.Debug($"{entity.Type.Name}中有{singleCount}个single(s),其中{enbbedCount}个嵌入");
+                Log.Debug($"{entity.Type.Name}中有{singleCount}个single(s),其中{embbededCount}个嵌入");
                 Log.Debug($"{entity.Type.Name}转为Json: \n{entity.ToJson(new JsonSettings(Library.Microsoft),true)}");
 #endif
 
@@ -2048,7 +2051,9 @@ namespace Fantasy.Database
                     shadowDbSet.Add(docData);
 
                     var count = await SaveChangesAsync();
+
                     MultiThreadPoolStacks.Return(docData);
+                    Entry(docData).State = EntityState.Detached;
                 }
                 else
                 {
@@ -2063,8 +2068,11 @@ namespace Fantasy.Database
                         Entry(entity).Property<long>(DbSetProperty.ParentId).CurrentValue = parent.Id;
                     }
                     //更新影子属性的值
-                    Entry(entity).Property<EntityTreeCollection>(DbSetProperty.JsonSingle).CurrentValue = entity.GetCollectionForSingle();
-                    Entry(entity).Property<EntityMultiCollection>(DbSetProperty.JsonMulti).CurrentValue = entity.GetCollectionForMulti();
+                    Entry(entity).Property<EntityTreeCollection>(DbSetProperty.JsonSingle).CurrentValue = entity.GetCollectionOfEmbbededSingle();
+                    Entry(entity).Property<EntityMultiCollection>(DbSetProperty.JsonMulti).CurrentValue = entity.GetCollectionOfEmbbedMulti();
+
+
+
                     //Note: 暂时不支持二进制存储
                     //Entry(entity).Property<byte[]>(DbSetProperty.BytesSingle).CurrentValue = 1;
                     //Entry(entity).Property<byte[]>(DbSetProperty.BytesMulti).CurrentValue = 1;
