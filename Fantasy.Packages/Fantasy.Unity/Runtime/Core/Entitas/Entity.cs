@@ -12,6 +12,8 @@ using MongoDB.Bson.Serialization.Attributes;
 using LightProto;
 using MemoryPack;
 using NJ = Newtonsoft.Json;
+using Fantasy.DataStructure.Collection;
+
 #if FANTASY_NET
 using MJ = System.Text.Json.Serialization;
 #endif
@@ -178,15 +180,15 @@ namespace Fantasy.Entitas
         [NJ.JsonIgnore]
         protected EntityMultiCollection Multi;
 
-        [BsonElement("s")][BsonIgnoreIfNull][MemoryPackInclude] protected EntityTreeCollection EmbbededSingle;
-        [BsonElement("m")][BsonIgnoreIfNull][MemoryPackInclude] protected EntityMultiCollection EmbbededMulti;
+        [BsonElement("s")][BsonIgnoreIfNull][MemoryPackInclude] protected ReuseList<Entity> EmbbededSingle;
+        [BsonElement("m")][BsonIgnoreIfNull][MemoryPackInclude] protected ReuseList<Entity> EmbbededMulti;
 
-        internal EntityTreeCollection GetCollectionOfEmbbededSingle()
+        internal ReuseList<Entity> GetCollectionOfEmbbededSingle()
         {
             return EmbbededSingle;
         }
 
-        internal EntityMultiCollection GetCollectionOfEmbbedMulti()
+        internal ReuseList<Entity> GetCollectionOfEmbbedMulti()
         {
             return EmbbededMulti;
         }
@@ -195,39 +197,39 @@ namespace Fantasy.Entitas
         {
             if (subEntity.IsAnnotatedAsEmbedded())
             {
-                EmbbededSingle ??= EntityTreeCollection.Create(true);
-                EmbbededSingle.Add(subEntity.TypeHashCode, subEntity);
+                EmbbededSingle ??= ReuseList<Entity>.Create();
+                EmbbededSingle.Add(subEntity);
             }
         }
         void TryEmbbedMulti(Entity subEntity)
         {
             if (subEntity.IsAnnotatedAsEmbedded())
             {
-                EmbbededMulti ??= EntityMultiCollection.Create(true);
-                EmbbededMulti.Add(subEntity.Id, subEntity);
+                EmbbededMulti ??= ReuseList<Entity>.Create();
+                EmbbededMulti.Add(subEntity);
             }
         }
         void TryEmbbedSingle<T>(T subEntity) where T : Entity
         {
             if (TypeDbSetChecker<T>.IsEmbedded)
             {
-                EmbbededSingle ??= EntityTreeCollection.Create(true);
-                EmbbededSingle.Add(subEntity.TypeHashCode, subEntity);
+                EmbbededSingle ??= ReuseList<Entity>.Create();
+                EmbbededSingle.Add(subEntity);
             }
         }
         void TryEmbbedMulti<T>(T subEntity) where T : Entity
         {
             if (TypeDbSetChecker<T>.IsEmbedded)
             {
-                EmbbededMulti ??= EntityMultiCollection.Create(true);
-                EmbbededMulti.Add(subEntity.Id, subEntity);
+                EmbbededMulti ??= ReuseList<Entity>.Create();
+                EmbbededMulti.Add(subEntity);
             }
         }
         void TryRemoveEmbeddedSingle(Entity subEntity)
         {
             if (EmbbededSingle != null)
             {
-                EmbbededSingle.Remove(subEntity.TypeHashCode);
+                EmbbededSingle.Remove(subEntity);
                 if (EmbbededSingle.Count == 0)
                 {
                     EmbbededSingle.Dispose();
@@ -239,7 +241,7 @@ namespace Fantasy.Entitas
         {
             if (EmbbededMulti != null)
             {
-                EmbbededMulti.Remove(subEntity.Id);
+                EmbbededMulti.Remove(subEntity);
                 if (EmbbededMulti.Count == 0)
                 {
                     EmbbededMulti.Dispose();

@@ -247,16 +247,16 @@ namespace Fantasy.Database
                     if (typeof(Entity).IsAssignableFrom(type))
                     {
                         //承载Embedded实体的影子属性, 自定义序列化转化逻辑
-                        entityBuilder.Property<EntityTreeCollection>(DbSetProperty.JsonSingle).HasColumnType("jsonb")
+                        entityBuilder.Property<ReuseList<Entity>>(DbSetProperty.JsonSingle).HasColumnType("jsonb")
                             .HasConversion(
                                            entityList => entityList.ToJson(_jsonSettings, true),
-                                           jsonStr => jsonStr.Deserialize<EntityTreeCollection>(_jsonSettings, true)
+                                           jsonStr => jsonStr.Deserialize<ReuseList<Entity>>(_jsonSettings, true)
                                            )
                             .IsRequired(false);
-                        entityBuilder.Property<EntityMultiCollection>(DbSetProperty.JsonMulti).HasColumnType("jsonb")
+                        entityBuilder.Property<ReuseList<Entity>>(DbSetProperty.JsonMulti).HasColumnType("jsonb")
                             .HasConversion(
                                            entityList => entityList.ToJson(_jsonSettings, true),
-                                           jsonStr => jsonStr.Deserialize<EntityMultiCollection>(_jsonSettings, true)
+                                           jsonStr => jsonStr.Deserialize<ReuseList<Entity>>(_jsonSettings, true)
                                            )
                             .IsRequired(false);
                         //Note : 暂不支持, 因为byte[]在EFCore中不知道能否池化
@@ -2068,8 +2068,8 @@ namespace Fantasy.Database
                         Entry(entity).Property<long>(DbSetProperty.ParentId).CurrentValue = parent.Id;
                     }
                     //更新影子属性的值
-                    Entry(entity).Property<EntityTreeCollection>(DbSetProperty.JsonSingle).CurrentValue = entity.GetCollectionOfEmbbededSingle();
-                    Entry(entity).Property<EntityMultiCollection>(DbSetProperty.JsonMulti).CurrentValue = entity.GetCollectionOfEmbbedMulti();
+                    Entry(entity).Property<ReuseList<Entity>>(DbSetProperty.JsonSingle).CurrentValue = entity.GetCollectionOfEmbbededSingle();
+                    Entry(entity).Property<ReuseList<Entity>>(DbSetProperty.JsonMulti).CurrentValue = entity.GetCollectionOfEmbbedMulti();
 
 
 
