@@ -42,12 +42,13 @@ namespace Fantasy.Entitas.TypeMeta
             Dictionary<long, TypeDbSetCache> dict = new();
             foreach (var type in types)
             {
-                TypeDbSetCache cache = new();
-
                 //解析并缓存DbSet标签信息
-                cache.DbSetAttri = DbSetMetadataHelper.GetDbSetAttribute(type);
-                if (cache.DbSetAttri == null)
+                var attr = DbSetMetadataHelper.GetDbSetAttribute(type);
+                if (attr == null)
                     continue;
+
+                TypeDbSetCache cache = new();
+                cache.DbSetAttri = attr;
 
                 //规范嵌入标记
                 if (cache.DbSetAttri.IsEmbedded)

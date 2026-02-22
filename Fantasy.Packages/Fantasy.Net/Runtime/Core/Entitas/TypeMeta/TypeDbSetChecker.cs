@@ -34,19 +34,21 @@ namespace Fantasy.Entitas.TypeMeta
         /// <param name="types"></param>
         public static void ReWarmUp(IEnumerable<Type> types)
         {
-            WarmUpInternal(types); 
+            WarmUpInternal(types);
         }
 
-        private static void WarmUpInternal(IEnumerable<Type> types) {
+        private static void WarmUpInternal(IEnumerable<Type> types)
+        {
             Dictionary<long, TypeDbSetCache> dict = new();
             foreach (var type in types)
             {
-                TypeDbSetCache cache = new();
-
                 //解析并缓存DbSet标签信息
-                cache.DbSetAttri = DbSetMetadataHelper.GetDbSetAttribute(type);
-                if (cache.DbSetAttri == null)
+                var attr = DbSetMetadataHelper.GetDbSetAttribute(type);
+                if (attr == null)
                     continue;
+
+                TypeDbSetCache cache = new();
+                cache.DbSetAttri = attr;
 
                 //规范嵌入标记
                 if (cache.DbSetAttri.IsEmbedded)
@@ -100,7 +102,7 @@ namespace Fantasy.Entitas.TypeMeta
         /// <returns></returns>
         public bool IsEmbedded()
         {
-            if(DbSetAttri==null)
+            if (DbSetAttri == null)
                 return false;
 
             if (DbSetAttri.IsEmbedded)
