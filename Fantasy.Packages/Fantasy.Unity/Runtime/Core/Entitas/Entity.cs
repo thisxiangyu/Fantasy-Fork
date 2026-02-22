@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
+using System.ComponentModel.DataAnnotations.Schema;
 using Fantasy.Entitas.Interface;
 using Fantasy.Entitas.TypeMeta;
 using Fantasy.IdFactory;
@@ -13,7 +14,6 @@ using MemoryPack;
 using NJ = Newtonsoft.Json;
 #if FANTASY_NET
 using MJ = System.Text.Json.Serialization;
-using System.ComponentModel.DataAnnotations.Schema;
 #endif
 // ReSharper disable ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
 // ReSharper disable MergeIntoPattern
@@ -32,7 +32,7 @@ namespace Fantasy.Entitas
     /// Entity接口
     /// </summary>
     public interface IEntity : IDisposable, IPool { }
-    
+
     /// <summary>
     /// Entity的抽象类，各类业务Entity皆继承于此。
     /// </summary>
@@ -40,7 +40,7 @@ namespace Fantasy.Entitas
     public abstract partial class Entity : IEntity
     {
         #region Members
-        
+
         /// <summary>
         /// 实体的Id
         /// </summary>
@@ -117,7 +117,9 @@ namespace Fantasy.Entitas
         /// <summary>
         /// 实体的真实Type的编码
         /// </summary>
-        [BsonIgnore][IgnoreDataMember][ProtoIgnore]
+        [BsonIgnore]
+        [IgnoreDataMember]
+        [ProtoIgnore]
 #if FANTASY_NET
         [NotMapped]
         [MJ.JsonIgnore]
@@ -125,12 +127,12 @@ namespace Fantasy.Entitas
         [NJ.JsonIgnore]
         [MemoryPackIgnore]
         public long TypeHashCode { get; private set; }
-#if FANTASY_NET
 
         #region 判断是否为嵌入式DbSet, 目前有基于接口和基于Attri两种判断方式,未来可能只保留一种
 
         private bool? _isEmbeddedCache;
         //基于接口判断
+        // Note: 目前暂不使用这个, 因为用接口标记DbSet属性 似乎不太优雅。有待后续评估。
         internal bool IsEmbeddedIDbSet()
         {
             if (_isEmbeddedCache == null)
@@ -153,56 +155,99 @@ namespace Fantasy.Entitas
         }
 
         #endregion
+
+        [BsonIgnore]
+        [MemoryPackIgnore]
+        [IgnoreDataMember]
+        [ProtoIgnore]
+        [NotMapped]
+#if FANTASY_NET
+        [MJ.JsonIgnore]
 #endif
+        [NJ.JsonIgnore]
+        protected EntityTreeCollection Single;
 
-        // TODO 适配新版本Fantasy
-        //        [BsonElement("_s")]
-        //        [BsonIgnoreIfNull]
-        //        [MJ.JsonInclude]
-        //        [MJ.JsonPropertyName("_s")]
-        //        [NJ.JsonProperty("_s")]
-        //        internal EntityList<Entity> _singleDb;
+        [BsonIgnore]
+        [MemoryPackIgnore]
+        [IgnoreDataMember]
+        [ProtoIgnore]
+        [NotMapped]
+#if FANTASY_NET
+        [MJ.JsonIgnore]
+#endif
+        [NJ.JsonIgnore]
+        protected EntityMultiCollection Multi;
 
-        //        [BsonElement("_m")]
-        //        [BsonIgnoreIfNull]
-        //        [MJ.JsonInclude]
-        //        [MJ.JsonPropertyName("_m")]
-        //        [NJ.JsonProperty("_m")]
-        //        internal EntityList<Entity> _multiDb;
+        [BsonElement("s")][BsonIgnoreIfNull][MemoryPackInclude] protected EntityTreeCollection EmbbededSingle;
+        [BsonElement("m")][BsonIgnoreIfNull][MemoryPackInclude] protected EntityMultiCollection EmbbededMulti;
 
-        //        [BsonIgnore]
-        //        [MemoryPackIgnore]
-        //        [IgnoreDataMember]
-        //        [ProtoIgnore]
-        //#if FANTASY_NET
-        //        [NotMapped]
-        //        [MJ.JsonIgnore]
-        //#endif
-        //        [NJ.JsonIgnore]
-        //        private EntitySortedDictionary<long, Entity> _single;
-
-        //        [BsonIgnore]
-        //        [MemoryPackIgnore]
-        //        [IgnoreDataMember]
-        //        [ProtoIgnore]
-        //#if FANTASY_NET
-        //        [NotMapped]
-        //        [MJ.JsonIgnore]
-        //#endif
-        //        [NJ.JsonIgnore]
-        //        private EntitySortedDictionary<long, Entity> _multi;
-
-        [BsonElement("s")][BsonIgnoreIfNull][MemoryPackInclude] protected EntityTreeCollection Single;
-        [BsonElement("m")][BsonIgnoreIfNull][MemoryPackInclude] protected EntityMultiCollection Multi;
-
-        internal EntityMultiCollection GetCollectionForMulti() {
-            return Multi;
-        }
-
-        internal EntityTreeCollection GetCollectionForSingle()
+        internal EntityTreeCollection GetCollectionOfEmbbededSingle()
         {
-            return Single;
+            return EmbbededSingle;
         }
+
+        internal EntityMultiCollection GetCollectionOfEmbbedMulti()
+        {
+            return EmbbededMulti;
+        }
+
+        void TryEmbbedSingle(Entity subEntity)
+        {
+            if (subEntity.IsAnnotatedAsEmbedded())
+            {
+                EmbbededSingle ??= EntityTreeCollection.Create(true);
+                EmbbededSingle.Add(subEntity.TypeHashCode, subEntity);
+            }
+        }
+        void TryEmbbedMulti(Entity subEntity)
+        {
+            if (subEntity.IsAnnotatedAsEmbedded())
+            {
+                EmbbededMulti ??= EntityMultiCollection.Create(true);
+                EmbbededMulti.Add(subEntity.Id, subEntity);
+            }
+        }
+        void TryEmbbedSingle<T>(T subEntity) where T : Entity
+        {
+            if (TypeDbSetChecker<T>.IsEmbedded)
+            {
+                EmbbededSingle ??= EntityTreeCollection.Create(true);
+                EmbbededSingle.Add(subEntity.TypeHashCode, subEntity);
+            }
+        }
+        void TryEmbbedMulti<T>(T subEntity) where T : Entity
+        {
+            if (TypeDbSetChecker<T>.IsEmbedded)
+            {
+                EmbbededMulti ??= EntityMultiCollection.Create(true);
+                EmbbededMulti.Add(subEntity.Id, subEntity);
+            }
+        }
+        void TryRemoveEmbeddedSingle(Entity subEntity)
+        {
+            if (EmbbededSingle != null)
+            {
+                EmbbededSingle.Remove(subEntity.TypeHashCode);
+                if (EmbbededSingle.Count == 0)
+                {
+                    EmbbededSingle.Dispose();
+                    EmbbededSingle = null;
+                }
+            }
+        }
+        void TryRemoveEmbeddedMulti(Entity subEntity)
+        {
+            if (EmbbededMulti != null)
+            {
+                EmbbededMulti.Remove(subEntity.Id);
+                if (EmbbededMulti.Count == 0)
+                {
+                    EmbbededMulti.Dispose();
+                    EmbbededMulti = null;
+                }
+            }
+        }
+
 
         /// <summary>
         /// 获得父Entity
@@ -288,9 +333,9 @@ namespace Fantasy.Entitas
             {
                 throw new NotSupportedException($"Type:{type.FullName} must inherit from Child");
             }
-            
+
             Entity entity = null;
-            
+
             if (isPool)
             {
                 entity = (Entity)scene.EntityPool.Rent(scene, type);
@@ -299,7 +344,7 @@ namespace Fantasy.Entitas
             {
                 entity = scene.PoolGeneratorComponent.Create<Entity>(type);
             }
-            
+
             entity.Scene = scene;
             entity.Type = type;
             entity.TypeHashCode = TypeHashCache.GetHashCode(type);
@@ -307,7 +352,7 @@ namespace Fantasy.Entitas
             entity.Id = id;
             entity.RuntimeId = scene.RuntimeIdFactory.Create(isPool);
             scene.AddEntity(entity);
-            
+
             if (isRunEvent)
             {
                 scene.EntityComponent.Awake(entity);
@@ -316,7 +361,7 @@ namespace Fantasy.Entitas
                 scene.EntityComponent.RegisterLateUpdate(entity);
 #endif
             }
-            
+
             return entity;
         }
 
@@ -344,7 +389,7 @@ namespace Fantasy.Entitas
         {
             return Create<T>(scene, scene.EntityIdFactory.Create, isPool, true);
         }
-        
+
         /// <summary>
         /// 创建一个实体
         /// </summary>
@@ -358,7 +403,7 @@ namespace Fantasy.Entitas
         {
             return Create<T>(scene, scene.EntityIdFactory.Create, isPool, isRunEvent);
         }
-        
+
         /// <summary>
         /// 创建一个实体
         /// </summary>
@@ -379,7 +424,7 @@ namespace Fantasy.Entitas
             entity.Id = id;
             entity.RuntimeId = scene.RuntimeIdFactory.Create(isPool);
             scene.AddEntity(entity);
-            
+
             if (isRunEvent)
             {
                 scene.EntityComponent.Awake(entity);
@@ -460,20 +505,12 @@ namespace Fantasy.Entitas
                 {
                     Multi ??= EntityMultiCollection.Create(true);
                     Multi.Add(subEntity.Id, subEntity);
+                    TryEmbbedMulti(subEntity);
                 }
                 catch (Exception ex)
                 {
                     throw new Exception($"Multi-Appended Entity {subEntity.Id} of {subEntity.Type} added failed to {GetType()} : {ex}");
                 }
-
-#if FANTASY_NET
-                if (subEntity.IsAnnotatedAsEmbedded())
-                {
-                    //_multiDb ??= Scene.EntityListPool.Rent();
-                    //_multiDb.Add(subEntity);
-                    // TODO 适配新版本Fantasy
-                }
-#endif
             }
             else
             {
@@ -490,14 +527,7 @@ namespace Fantasy.Entitas
                 }
 
                 Single.Add(typeHashCode, subEntity);
-#if FANTASY_NET
-                //TODO 适配新版本Fantasy
-                //if (subEntity.IsAnnotatedAsEmbedded())
-                //{
-                //    _singleDb ??= Scene.EntityListPool.Rent();
-                //    _singleDb.Add(subEntity);
-                //}
-#endif
+                TryEmbbedSingle(subEntity);
             }
 
             subEntity.Parent = this;
@@ -530,19 +560,12 @@ namespace Fantasy.Entitas
                 {
                     Multi ??= EntityMultiCollection.Create(true);
                     Multi.Add(subEntity.Id, subEntity);
+                    TryEmbbedMulti(subEntity);
                 }
                 catch (Exception ex)
                 {
                     throw new Exception($"Multi-Appended Entity {subEntity.Id} of {subEntity.Type} added failed to {GetType()} : {ex}");
                 }
-#if FANTASY_NET
-                //TODO 适配新版本Fantasy
-                //if (TypeDbSetChecker<T>.IsEmbedded)
-                //{
-                //    _multiDb ??= Scene.EntityListPool.Rent();
-                //    _multiDb.Add(subEntity);
-                //}
-#endif
             }
             else
             {
@@ -559,14 +582,7 @@ namespace Fantasy.Entitas
                 }
 
                 Single.Add(typeHashCode, subEntity);
-#if FANTASY_NET
-                // TODO 适配新版本Fantasy
-                //if (TypeDbSetChecker<T>.IsEmbedded)
-                //{
-                //    _singleDb ??= Scene.EntityListPool.Rent();
-                //    _singleDb.Add(subEntity);
-                //} 
-#endif
+                TryEmbbedSingle(subEntity);
             }
 
             subEntity.Parent = this;
@@ -735,6 +751,8 @@ namespace Fantasy.Entitas
                 return false;
             }
 
+            TryRemoveEmbeddedSingle(component);
+
             if (Single.Count != 0)
             {
                 return true;
@@ -765,6 +783,8 @@ namespace Fantasy.Entitas
                 return false;
             }
 
+            TryRemoveEmbeddedMulti(component);
+
             if (Multi.Count != 0)
             {
                 return true;
@@ -786,7 +806,7 @@ namespace Fantasy.Entitas
         {
             if (TypeSupportedChecker<T>.IsMulti)
             {
-                throw new NotSupportedException($"{typeof(T).FullName} message:Cannot delete enitity that implement the IMultiAppended interface");
+                throw new NotSupportedException($"{typeof(T).FullName} message:Cannot delete entity that implement the IMultiAppended interface with a generic-type method.");
             }
 
             if (Single == null)
@@ -803,6 +823,7 @@ namespace Fantasy.Entitas
                     Single.Dispose();
                     Single = null;
                 }
+                TryRemoveEmbeddedSingle(component);
             }
 
             if (isDispose)
@@ -831,19 +852,9 @@ namespace Fantasy.Entitas
                     Multi.Dispose();
                     Multi = null;
                 }
+                TryRemoveEmbeddedMulti(subEntity);
             }
-#if FANTASY_NET
-            //TODO 适配新版本Fantasy
-            //if (_multiDb != null && EntitySupportedChecker<T>.IsDataBase)
-            //{
-            //    _multiDb.Remove(component);
-            //    if (_multiDb.Count == 0)
-            //    {
-            //        Scene.EntityListPool.Return(_multiDb);
-            //        _multiDb = null;
-            //    }
-            //}
-#endif
+
             if (isDispose)
             {
                 subEntity.Dispose();
@@ -873,6 +884,7 @@ namespace Fantasy.Entitas
                             Multi.Dispose();
                             Multi = null;
                         }
+                        TryRemoveEmbeddedMulti(subEntity);
                     }
                 }
             }
@@ -887,6 +899,7 @@ namespace Fantasy.Entitas
                         Single.Dispose();
                         Single = null;
                     }
+                    TryRemoveEmbeddedSingle(subEntity);
                 }
             }
 
@@ -908,7 +921,7 @@ namespace Fantasy.Entitas
             {
                 return;
             }
-            
+
             if (TypeSupportedChecker<T>.IsMulti)
             {
                 if (Multi != null)
@@ -920,19 +933,8 @@ namespace Fantasy.Entitas
                             Multi.Dispose();
                             Multi = null;
                         }
+                        TryRemoveEmbeddedMulti(subEntity);
                     }
-#if FANTASY_NET
-                    //TODO 适配新版本Fantasy
-                    //if (EntitySupportedChecker<T>.IsDataBase)
-                    //{
-                    //    _multiDb.Remove(component);
-                    //    if (_multiDb.Count == 0)
-                    //    {
-                    //        Scene.EntityListPool.Return(_multiDb);
-                    //        _multiDb = null;
-                    //    }
-                    //}
-#endif                   
                 }
             }
             else if (Single != null)
@@ -946,20 +948,8 @@ namespace Fantasy.Entitas
                         Single.Dispose();
                         Single = null;
                     }
+                    TryRemoveEmbeddedSingle(subEntity);
                 }
-#if FANTASY_NET
-                //TODO 适配新版本Fantasy
-                //if (_treeDb != null && EntitySupportedChecker<T>.IsDataBase)
-                //{
-                //    _treeDb.Remove(component);
-
-                //    if (_treeDb.Count == 0)
-                //    {
-                //        Scene.EntityListPool.Return(_treeDb);
-                //        _treeDb = null;
-                //    }
-                //}
-#endif
             }
 
             if (isDispose)
@@ -1076,7 +1066,7 @@ namespace Fantasy.Entitas
 
             foreach (var (_, entity) in Multi)
             {
-                if(entity is T res)
+                if (entity is T res)
                     yield return res;
             }
         }
@@ -1120,7 +1110,7 @@ namespace Fantasy.Entitas
             {
                 return;
             }
-            
+
             var scene = Scene;
             var runTimeId = RuntimeId;
             RuntimeId = 0;
@@ -1180,7 +1170,7 @@ namespace Fantasy.Entitas
             Type = null;
         }
 
-#endregion
+        #endregion
 
         #region Pool
 
@@ -1191,7 +1181,7 @@ namespace Fantasy.Entitas
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsPool()
         {
-            return IdFactoryHelper.RuntimeIdTool.GetIsPool(RuntimeId); 
+            return IdFactoryHelper.RuntimeIdTool.GetIsPool(RuntimeId);
         }
 
         /// <summary>

@@ -1,5 +1,4 @@
-﻿#if FANTASY_NET
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Fantasy.Database;
 using Fantasy.Database.Attributes;
@@ -35,10 +34,11 @@ namespace Fantasy.Entitas.TypeMeta
         /// <param name="types"></param>
         public static void ReWarmUp(IEnumerable<Type> types)
         {
-            WarmUpInternal(types); 
+            WarmUpInternal(types);
         }
 
-        private static void WarmUpInternal(IEnumerable<Type> types) {
+        private static void WarmUpInternal(IEnumerable<Type> types)
+        {
             Dictionary<long, TypeDbSetCache> dict = new();
             foreach (var type in types)
             {
@@ -101,7 +101,7 @@ namespace Fantasy.Entitas.TypeMeta
         /// <returns></returns>
         public bool IsEmbedded()
         {
-            if(DbSetAttri==null)
+            if (DbSetAttri == null)
                 return false;
 
             if (DbSetAttri.IsEmbedded)
@@ -226,4 +226,3 @@ namespace Fantasy.Entitas.TypeMeta
         }
     }
 }
-#endif

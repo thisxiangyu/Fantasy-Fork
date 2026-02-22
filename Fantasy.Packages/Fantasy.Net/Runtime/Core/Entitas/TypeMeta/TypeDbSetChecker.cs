@@ -1,5 +1,4 @@
-﻿#if FANTASY_NET
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Fantasy.Database;
 using Fantasy.Database.Attributes;
@@ -226,4 +225,3 @@ namespace Fantasy.Entitas.TypeMeta
         }
     }
 }
-#endif

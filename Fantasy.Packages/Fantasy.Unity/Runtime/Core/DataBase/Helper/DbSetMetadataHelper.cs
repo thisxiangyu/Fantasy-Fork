@@ -1,4 +1,5 @@
-﻿#if FANTASY_NET
+﻿using System;
+using System.Collections.Generic;
 using System.Reflection;
 using Fantasy.Assembly;
 using Fantasy.Async;
@@ -11,7 +12,7 @@ namespace Fantasy.Database.Helper
     /// <summary>
     /// DbSet类型元数据操作帮助类
     /// </summary>
-    internal static class DbSetMetadataHelper
+    public static class DbSetMetadataHelper
     {
         /// <summary>
         /// 扫描程序集中所有含有[DbSet]标签的类型, 并进行操作。
@@ -25,7 +26,9 @@ namespace Fantasy.Database.Helper
             {
                 var assm = kv.Value.Assembly;
 
-                Log.Debug($"Scanning for DbSets in assembly: {assm.FullName}");
+#if DESIGN_TIME || UNITY_EDITOR
+                Log.Info($"Scanning for DbSets in assembly: {assm.FullName}");
+#endif
 
                 foreach (var type in assm.GetTypes())
                 {
@@ -41,7 +44,9 @@ namespace Fantasy.Database.Helper
                     else
                         tableName ??= $"{type.Name}"; // 没有用标签设置自定义表名, 那就直接用类名作为表名
                     all.Add(type);
-                    doSomething.Invoke(type, tableName, attr);
+
+                    if (doSomething != null)
+                        doSomething.Invoke(type, tableName, attr);
                 }
             }
             TypeDbSetChecker.WarmUp(all);
@@ -57,8 +62,9 @@ namespace Fantasy.Database.Helper
             foreach (var kv in AssemblyManifest.Manifests)
             {
                 var assm = kv.Value.Assembly;
-
-                Log.Info($"Scanning assembly: {assm.FullName}");
+#if DESIGN_TIME || UNITY_EDITOR
+                Log.Info($"Scanning for DbSets in assembly: {assm.FullName}");
+#endif
                 foreach (var type in assm.GetTypes())
                 {
                     var attr = type.GetCustomAttribute<DbSetAttribute>();
@@ -73,7 +79,9 @@ namespace Fantasy.Database.Helper
                     else
                         tableName ??= $"{type.Name}"; // 没有用标签设置自定义表名, 那就直接用类名作为表名
                     all.Add(type);
-                    await doSomething.Invoke(type, tableName, attr);
+
+                    if(doSomething != null)
+                        await doSomething.Invoke(type, tableName, attr);
                 }
             }
             TypeDbSetChecker.WarmUp(all);
@@ -97,4 +105,3 @@ namespace Fantasy.Database.Helper
         }
     }
 }
-#endif

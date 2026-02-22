@@ -2025,13 +2025,13 @@ namespace Fantasy.Database
             {
 #if DESIGN_TIME
                 int singleCount = entity.ForEachAllSingle.Count();
-                int enbbedCount = 0;
+                int embbededCount = 0;
                 foreach (var single in entity.ForEachAllSingle)
                 {
                     if (single.IsAnnotatedAsEmbedded())
-                        enbbedCount++;
+                        embbededCount++;
                 }
-                Log.Debug($"{entity.Type.Name}中有{singleCount}个single(s),其中{enbbedCount}个嵌入");
+                Log.Debug($"{entity.Type.Name}中有{singleCount}个single(s),其中{embbededCount}个嵌入");
                 Log.Debug($"{entity.Type.Name}转为Json: \n{entity.ToJson(new JsonSettings(Library.Microsoft),true)}");
 #endif
 
@@ -2064,8 +2064,11 @@ namespace Fantasy.Database
                         Entry(entity).Property<long>(DbSetProperty.ParentId).CurrentValue = parent.Id;
                     }
                     //更新影子属性的值
-                    Entry(entity).Property<EntityTreeCollection>(DbSetProperty.JsonSingle).CurrentValue = entity.GetCollectionForSingle();
-                    Entry(entity).Property<EntityMultiCollection>(DbSetProperty.JsonMulti).CurrentValue = entity.GetCollectionForMulti();
+                    Entry(entity).Property<EntityTreeCollection>(DbSetProperty.JsonSingle).CurrentValue = entity.GetCollectionOfEmbbededSingle();
+                    Entry(entity).Property<EntityMultiCollection>(DbSetProperty.JsonMulti).CurrentValue = entity.GetCollectionOfEmbbedMulti();
+
+
+
                     //Note: 暂时不支持二进制存储
                     //Entry(entity).Property<byte[]>(DbSetProperty.BytesSingle).CurrentValue = 1;
                     //Entry(entity).Property<byte[]>(DbSetProperty.BytesMulti).CurrentValue = 1;
