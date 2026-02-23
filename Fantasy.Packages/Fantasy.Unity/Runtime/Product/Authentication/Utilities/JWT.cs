@@ -142,7 +142,7 @@ namespace Fantasy.Product.Authentication
         /// </summary>
         /// <param name="uniqueId">用户唯一标识符</param>
         /// <returns>JWT 字符串</returns>
-        public static string RequestToken(string uniqueId) { return RequestToken(uniqueId);}
+        public static string RequestToken(string uniqueId) { return RequestToken(uniqueId, default, default);}
 
         /// <summary>
         /// 申请一个JWT。
