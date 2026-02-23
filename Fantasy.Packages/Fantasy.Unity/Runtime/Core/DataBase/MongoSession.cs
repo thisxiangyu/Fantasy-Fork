@@ -1005,6 +1005,14 @@ namespace Fantasy.Database
             return data == null ? 0 : Convert.ToInt64(data["Result"]);
         }
 
+        /// <summary>
+        /// MongoDB不需要这个方法, 仅占位实现
+        /// </summary>
+        public void ClearTracker()
+        {
+            
+        }
+
         #endregion
     }
 }

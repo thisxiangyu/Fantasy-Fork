@@ -2344,6 +2344,11 @@ namespace Fantasy.Database
             return 1;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void ClearTracker() {
+            ChangeTracker.Clear();
+        }
+
         #endregion
 
         #region Helper Methods

@@ -271,6 +271,10 @@ namespace Fantasy.Database
         /// 根据给定的筛选条件计算指定存储集中类型 <typeparamref name="T"/> 实体某个属性的总和。
         /// </summary>
         FTask<long> Sum<T>(Expression<Func<T, bool>> filter, Expression<Func<T, object>> sumExpression, string name = null) where T : Entity;
+        /// <summary>
+        /// 解除跟踪
+        /// </summary>
+        void ClearTracker();
     }
 }
 
