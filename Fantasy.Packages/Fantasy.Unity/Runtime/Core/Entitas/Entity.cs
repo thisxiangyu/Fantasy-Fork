@@ -135,7 +135,7 @@ namespace Fantasy.Entitas
         private bool? _isEmbeddedCache;
         //基于接口判断
         // Note: 目前暂不使用这个, 因为用接口标记DbSet属性 似乎不太优雅。有待后续评估。
-        internal bool IsEmbeddedIDbSet()
+        public bool IsEmbeddedIDbSet()
         {
             if (_isEmbeddedCache == null)
                 _isEmbeddedCache = (this is IDbSet dbSet) && dbSet.DbSetOpts != null && dbSet.DbSetOpts.IsEmbedded;
@@ -143,14 +143,20 @@ namespace Fantasy.Entitas
             return _isEmbeddedCache.Value;
         }
         //基于DbSetAttri判断
-        internal bool IsAnnotatedAsEmbedded()
+        public bool IsAnnotatedAsEmbedded()
         {
             if (_isEmbeddedCache == null)
             {
                 long code = TypeHashCache.GetHashCode(this.Type);
-                _isEmbeddedCache = TypeDbSetChecker.InfoByHash == null
-                                   ? false
-                                   : TypeDbSetChecker.InfoByHash[code].IsEmbedded();
+
+                if (TypeDbSetChecker.InfoByHash.TryGetValue(code, out var value))
+                {
+                    _isEmbeddedCache = value.IsEmbedded();
+                }
+                else
+                {
+                    _isEmbeddedCache = true; // 非DbSet, 直接视作嵌入
+                }
             }
 
             return _isEmbeddedCache.Value;
@@ -1143,6 +1149,7 @@ namespace Fantasy.Entitas
             EmbbededSingle = null;
             EmbbededMulti?.Dispose();
             EmbbededMulti = null;
+            _isEmbeddedCache = null;
 
             scene.EntityComponent.Destroy(this);
 
