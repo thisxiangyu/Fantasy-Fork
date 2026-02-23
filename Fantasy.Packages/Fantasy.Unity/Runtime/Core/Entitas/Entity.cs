@@ -1139,22 +1139,10 @@ namespace Fantasy.Entitas
                 Multi = null;
             }
 
-#if FANTASY_NET
-            // TODO 适配新版本Fantasy
-            //if (_singleDb != null)
-            //{
-            //    _singleDb.Clear();
-            //    scene.EntityListPool.Return(_singleDb);
-            //    _singleDb = null;
-            //}
-            
-            //if (_multiDb != null)
-            //{
-            //    _multiDb.Clear();
-            //    scene.EntityListPool.Return(_multiDb);
-            //    _multiDb = null;
-            //}
-#endif
+            EmbbededSingle?.Dispose();
+            EmbbededSingle = null;
+            EmbbededMulti?.Dispose();
+            EmbbededMulti = null;
 
             scene.EntityComponent.Destroy(this);
 
