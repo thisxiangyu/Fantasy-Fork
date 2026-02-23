@@ -143,7 +143,7 @@ namespace Fantasy.Entitas
             return _isEmbeddedCache.Value;
         }
         //基于DbSetAttri判断
-        public bool IsAnnotatedAsEmbedded()
+        public bool? IsAnnotatedAsEmbedded()
         {
             if (_isEmbeddedCache == null)
             {
@@ -155,11 +155,11 @@ namespace Fantasy.Entitas
                 }
                 else
                 {
-                    _isEmbeddedCache = true; // 非DbSet, 直接视作嵌入
+                    _isEmbeddedCache = null;
                 }
             }
 
-            return _isEmbeddedCache.Value;
+            return _isEmbeddedCache;
         }
 
         #endregion
@@ -201,7 +201,7 @@ namespace Fantasy.Entitas
 
         void TryEmbbedSingle(Entity subEntity)
         {
-            if (subEntity.IsAnnotatedAsEmbedded())
+            if (subEntity.IsAnnotatedAsEmbedded() == true)
             {
                 EmbbededSingle ??= ReuseList<Entity>.Create();
                 EmbbededSingle.Add(subEntity);
@@ -209,7 +209,7 @@ namespace Fantasy.Entitas
         }
         void TryEmbbedMulti(Entity subEntity)
         {
-            if (subEntity.IsAnnotatedAsEmbedded())
+            if (subEntity.IsAnnotatedAsEmbedded() == true)
             {
                 EmbbededMulti ??= ReuseList<Entity>.Create();
                 EmbbededMulti.Add(subEntity);

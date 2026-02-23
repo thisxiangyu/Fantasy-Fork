@@ -2045,7 +2045,7 @@ namespace Fantasy.Database
                 int embbededCount = 0;
                 foreach (var single in entity.ForEachAllSingle)
                 {
-                    if (single.IsAnnotatedAsEmbedded())
+                    if (single.IsAnnotatedAsEmbedded() == true)
                         embbededCount++;
                 }
                 Log.Debug($"{entity.Type.Name}中有{singleCount}个single(s),其中{embbededCount}个嵌入");
