@@ -2071,8 +2071,6 @@ namespace Fantasy.Database
                     Entry(entity).Property<ReuseList<Entity>>(DbSetProperty.JsonSingle).CurrentValue = entity.GetCollectionOfEmbbededSingle();
                     Entry(entity).Property<ReuseList<Entity>>(DbSetProperty.JsonMulti).CurrentValue = entity.GetCollectionOfEmbbedMulti();
 
-
-
                     //Note: 暂时不支持二进制存储
                     //Entry(entity).Property<byte[]>(DbSetProperty.BytesSingle).CurrentValue = 1;
                     //Entry(entity).Property<byte[]>(DbSetProperty.BytesMulti).CurrentValue = 1;

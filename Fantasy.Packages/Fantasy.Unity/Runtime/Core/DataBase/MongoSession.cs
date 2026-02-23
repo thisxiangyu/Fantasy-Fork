@@ -437,6 +437,21 @@ namespace Fantasy.Database
         }
 
         /// <summary>
+        /// 通过指定过滤条件查询并返回满足条件的一行。
+        /// 如果超过一行会报错(说明逻辑错误或数据库中存储了不在预期内的额外数据)。
+        /// </summary>
+        /// <returns>如果未找到则为 null。</returns>
+        public async FTask<T?> SingleOrDefault<T>(Expression<Func<T, bool>> filter, bool isDeserialize = true, string collection = null) where T : Entity
+        {
+            var res = await GetCollection<T>(collection)
+                            .Find(filter)
+                            .SingleOrDefaultAsync();
+            if (isDeserialize)
+                res.Deserialize(mongo.Scene);
+            return res;
+        }
+
+        /// <summary>
         /// 通过指定过滤条件查询并返回满足条件的文档列表，并按指定表达式进行排序（加锁）。
         /// </summary>
         /// <typeparam name="T">文档实体类型。</typeparam>
@@ -970,7 +985,7 @@ namespace Fantasy.Database
             }
         }
 
-        #endregion       
+        #endregion
 
         #region Utility
 

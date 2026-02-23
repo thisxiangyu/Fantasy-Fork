@@ -853,6 +853,19 @@ namespace Fantasy.Database
         }
 
         /// <summary>
+        /// 通过指定过滤条件查询并返回满足条件的一行。
+        /// 如果超过一行会报错(说明逻辑错误或数据库中存储了不在预期内的额外数据)。
+        /// </summary>
+        /// <returns>如果未找到则为 null。</returns>
+        public async FTask<T?> SingleOrDefault<T>(Expression<Func<T, bool>> filter, bool isDeserialize = true, string table = null) where T : Entity
+        {
+            var res = await Set<T>().SingleOrDefaultAsync(filter);
+            if(isDeserialize)
+                res.Deserialize(pg.Scene);
+            return res;
+        }
+
+        /// <summary>
         /// 通过指定过滤条件查询并返回满足条件的行列表，并按指定表达式进行排序（加锁）。
         /// </summary>
         /// <typeparam name="T">文档实体类型。</typeparam>
@@ -2070,8 +2083,6 @@ namespace Fantasy.Database
                     //更新影子属性的值
                     Entry(entity).Property<ReuseList<Entity>>(DbSetProperty.JsonSingle).CurrentValue = entity.GetCollectionOfEmbbededSingle();
                     Entry(entity).Property<ReuseList<Entity>>(DbSetProperty.JsonMulti).CurrentValue = entity.GetCollectionOfEmbbedMulti();
-
-
 
                     //Note: 暂时不支持二进制存储
                     //Entry(entity).Property<byte[]>(DbSetProperty.BytesSingle).CurrentValue = 1;

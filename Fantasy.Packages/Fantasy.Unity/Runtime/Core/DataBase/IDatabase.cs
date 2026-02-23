@@ -200,6 +200,10 @@ namespace Fantasy.Database
         /// </summary>
         FTask<T> First<T>(string json, string[] cols, bool isDeserialize = false, string name = null) where T : Entity;
         /// <summary>
+        /// 查询指定存储集中唯一一个实体。
+        /// </summary>
+        FTask<T?> SingleOrDefault<T>(Expression<Func<T, bool>> filter, bool isDeserialize = true, string table = null) where T : Entity;
+        /// <summary>
         /// 从指定存储集中按页查询满足给定筛选条件的类型 <typeparamref name="T"/> 的实体列表，按指定字段排序。
         /// </summary>
         FTask<List<T>> QueryOrderBy<T>(Expression<Func<T, bool>> filter, Expression<Func<T, object>> orderByExpression, bool isAsc = true, bool isDeserialize = false, string name = null) where T : Entity;
