@@ -250,13 +250,13 @@ namespace Fantasy.Database
                         entityBuilder.Property<ReuseList<Entity>>(DbSetProperty.JsonSingle).HasColumnType("jsonb")
                             .HasConversion(
                                            entityList => entityList.ToJson(_jsonSettings, true),
-                                           jsonStr => jsonStr.Deserialize<ReuseList<Entity>>(_jsonSettings, true)
+                                           jsonStr => jsonStr.Deserialize<ReuseList<Entity>>(_jsonSettings,DetectMode.MustBeWrapper,true)
                                            )
                             .IsRequired(false);
                         entityBuilder.Property<ReuseList<Entity>>(DbSetProperty.JsonMulti).HasColumnType("jsonb")
                             .HasConversion(
                                            entityList => entityList.ToJson(_jsonSettings, true),
-                                           jsonStr => jsonStr.Deserialize<ReuseList<Entity>>(_jsonSettings, true)
+                                           jsonStr => jsonStr.Deserialize<ReuseList<Entity>>(_jsonSettings, DetectMode.MustBeWrapper,true)
                                            )
                             .IsRequired(false);
                         //Note : 暂不支持, 因为byte[]在EFCore中不知道能否池化

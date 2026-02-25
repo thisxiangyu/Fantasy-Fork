@@ -16,12 +16,20 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Buffers;
+using System.Runtime.CompilerServices;
 
 #pragma warning disable CS8632
 #pragma warning disable CS8603
 
 namespace Fantasy.Helper
 {
+    public enum DetectMode
+    {
+        Auto = 0,
+        MustBeWrapper = 1,
+        MustBeNormal = 2
+    }
+
     /// <summary>
     /// 一个Json包装器, 用于包装额外可解析的标头或标尾信息到框架序列化的Json中
     /// </summary>
@@ -76,7 +84,7 @@ namespace Fantasy.Helper
     /// 注 : Unity仅支持缩进, 不支持其余设置。
     /// </para>
     /// </summary>
-    public struct JsonSettings
+    public struct JsonSettings : IEquatable<JsonSettings>
     {
         /// <summary>
         /// 构造函数
@@ -98,6 +106,24 @@ namespace Fantasy.Helper
         /// 选择序列化库。
         /// </summary>
         public Library Library;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public string GetLibraryMark() {
+            switch(Library)
+            {
+                case Library.Newtonsoft:
+                    return Mark.N;
+#if FANTASY_NET
+                case Library.Microsoft:
+                    return Mark.M;
+#endif
+#if FANTASY_UNITY
+                case Library.UnityJson:
+                    return Mark.U;
+#endif
+                default: throw new("Unexpected: Unknown");
+            }
+        }
         /// <summary>
         /// 采用缩进格式。
         /// </summary>
@@ -122,6 +148,27 @@ namespace Fantasy.Helper
         public bool NoNull;
 
         // ... NOTE: 除了以上, 未来可拓展
+
+
+        public bool Equals(JsonSettings other)
+        {
+            // 对比字段
+            return Library == other.Library &&
+                   IsIndented == other.IsIndented &&
+                   WriteTypeWhenNecessary == other.WriteTypeWhenNecessary &&
+                   NoCycles == other.NoCycles &&
+                   NoNull == other.NoNull;
+        }
+
+        public override bool Equals(object? obj) => obj is JsonSettings other && Equals(other);
+
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(Library, IsIndented, WriteTypeWhenNecessary, NoCycles, NoNull);
+        }
+
+        public static bool operator ==(JsonSettings left, JsonSettings right) => left.Equals(right);
+        public static bool operator !=(JsonSettings left, JsonSettings right) => !left.Equals(right);
     }
 
     /// <summary>
@@ -156,7 +203,7 @@ namespace Fantasy.Helper
         /// <summary>
         /// 标识符
         /// </summary>
-        private class Mark
+        internal class Mark
         {
             /// <summary>
             /// 代表 微软
@@ -433,39 +480,65 @@ namespace Fantasy.Helper
         /// <param name="json">要反序列化的 JSON 字符串。</param>
         /// <param name="type">目标对象的类型。</param>    
         /// <param name="settings">序列化器设置</param>
+        /// <param name="detectMode">指定为<see cref="DetectMode.MustBeNormal"/>
+        /// 或者<see cref="DetectMode.MustBeWrapper"/> 跳过自动检测, 性能更好；
+        /// 设置为<see cref="DetectMode.Auto"/>如果开启, 会自动检测是否Wrapped、自动检测是哪个库, 代价是性能较差。 </param>
         /// <param name="isCacheThreadSafe">将缓存设置为线程安全, 默认为 false ;如果开启线程安全, 自动加锁会导致性能略微降低. </param>
         /// <returns>反序列化后的对象。</returns>
-        public static object Deserialize(this string json, Type type, JsonSettings? settings = null, bool isCacheThreadSafe = false)
+        public static object Deserialize(this string json, Type type, JsonSettings? settings = null, DetectMode detectMode = DetectMode.MustBeWrapper, bool isCacheThreadSafe = false)
         {
-            // 探测是不是 Wrapper 结构
+            bool isWrapped = default;
+
 #if FANTASY_NET
-            using JsonDocument document = JsonDocument.Parse(json);
-            JsonElement root = document.RootElement;
             JsonElement LibMark_Element = default;
             JsonElement Data_Element = default;
-
-            bool isWrapped = root.ValueKind == JsonValueKind.Object &&
-                             root.TryGetProperty(MetaPropertyStr.L, out LibMark_Element) &&
-                             root.TryGetProperty(MetaPropertyStr.D, out Data_Element);
 #endif
 #if FANTASY_UNITY
-            var root = JObject.Parse(json);
             JToken libMarkElement = default;
             JToken dataElement = default;
-            bool isWrapped =
-                root.Type == JTokenType.Object &&
-                root.TryGetValue(MetaPropertyStr.L, out libMarkElement) &&
-                root.TryGetValue(MetaPropertyStr.D, out dataElement);
-
 #endif
-            if (isWrapped)
+            if (detectMode == DetectMode.Auto)
             {
+                // 自动探测是不是 Wrapper 结构
 #if FANTASY_NET
-                string? libraryMark = LibMark_Element.GetString();
+                using JsonDocument document = JsonDocument.Parse(json);
+                JsonElement root = document.RootElement;
+
+                isWrapped = root.ValueKind == JsonValueKind.Object &&
+                            root.TryGetProperty(MetaPropertyStr.L, out LibMark_Element) &&
+                            root.TryGetProperty(MetaPropertyStr.D, out Data_Element);
 #endif
 #if FANTASY_UNITY
-                string libraryMark = libMarkElement.Value<string>();
+                var root = JObject.Parse(json);
+                isWrapped =
+                    root.Type == JTokenType.Object &&
+                    root.TryGetValue(MetaPropertyStr.L, out libMarkElement) &&
+                    root.TryGetValue(MetaPropertyStr.D, out dataElement);
 #endif
+            }
+            else if (detectMode == DetectMode.MustBeWrapper)
+            {
+                isWrapped = true;
+            }
+            else if (detectMode == DetectMode.MustBeNormal) {
+                isWrapped = false;
+            }
+
+            if (isWrapped)
+            {
+                string? libraryMark = default;
+                if (detectMode == DetectMode.Auto)
+#if FANTASY_NET
+                    libraryMark = LibMark_Element.GetString();
+#endif
+#if FANTASY_UNITY
+                    libraryMark = libMarkElement.Value<string>();
+#endif
+                else if (settings != null)
+                    libraryMark = settings.Value.GetLibraryMark();
+                else
+                    libraryMark = Mark.M;
+
 
                 // 获取或构造闭合泛型 Wrapper<T> 类型
                 Type wrapperType = _wrapperCache.GetOrAdd(type, typeof(JsonWrapper<>).MakeGenericType(type));
@@ -511,30 +584,21 @@ namespace Fantasy.Helper
             else  // --- 处理未经包装的JSON  ---
             {
                 settings ??= new JsonSettings();
-                JsonSerializerSettings options = MakeNewtonsoftSettings(settings.Value, isCacheThreadSafe);
-
-                try
+                switch(settings.Value.Library)
                 {
-                    return JsonConvert.DeserializeObject(json, type, MakeNewtonsoftSettings(settings.Value, isCacheThreadSafe));
-                }
-                catch (Exception ex)
-                {
-                    // 如果 Newtonsoft 失败，改库尝试
-                    try
-                    {
+                    case Library.Newtonsoft:
+                        return JsonConvert.DeserializeObject(json, type, MakeNewtonsoftSettings(settings.Value, isCacheThreadSafe));
 #if FANTASY_NET
+                    case Library.Microsoft:
                         return MicrosoftJsonSerializer.Deserialize(json, type, MakeMicrosoftOptions(settings.Value, isCacheThreadSafe));
 #endif
 #if FANTASY_UNITY
+                    case Library.UnityJson:
                         return JsonUtility.FromJson(json, type);
 #endif
-                    }
-                    catch (Exception)
-                    {
-                        // 全都失败
+                    default:
                         throw
-                        new Exception($"Deserialize UnWrapped Type Failed for {type.Name}. Msg: \n {ex.Message}", ex);
-                    }
+                        new Exception($"Deserialize UnWrapped Type Failed for {type.Name}");
                 }
             }
         }
@@ -547,9 +611,9 @@ namespace Fantasy.Helper
         /// <param name="settings">序列化器设置</param>
         /// <param name="isCacheThreadSafe">将缓存设置为线程安全, 默认为 false ;如果开启线程安全, 自动加锁会导致性能略微降低. </param>
         /// <returns>反序列化后的对象。</returns>
-        public static T Deserialize<T>(this string json, JsonSettings? settings = null, bool isCacheThreadSafe = false)
+        public static T Deserialize<T>(this string json, JsonSettings? settings = null, DetectMode detectMode = DetectMode.MustBeWrapper, bool isCacheThreadSafe = false)
         {
-            return (T)Deserialize(json, typeof(T), settings, isCacheThreadSafe);
+            return (T)Deserialize(json, typeof(T), settings, detectMode, isCacheThreadSafe);
         }
 
         /// <summary>

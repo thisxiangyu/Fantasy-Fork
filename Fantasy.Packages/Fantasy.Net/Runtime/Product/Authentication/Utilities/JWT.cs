@@ -102,7 +102,7 @@ namespace Fantasy.Product.Authentication
                 try
                 {
                     string json = await FileHelper.GetTextByRelativePath(configfile);
-                    var config = json.Deserialize<JwtConfig>();
+                    var config = json.Deserialize<JwtConfig>(detectMode: DetectMode.MustBeNormal);
 
                     if (string.IsNullOrWhiteSpace(config.SecretKey))
                         throw new($"JWT config conatains a null or white-space secret key.");
