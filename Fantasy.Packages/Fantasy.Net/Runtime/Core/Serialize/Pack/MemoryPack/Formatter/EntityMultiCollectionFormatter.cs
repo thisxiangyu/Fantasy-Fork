@@ -33,7 +33,7 @@ namespace Fantasy.Entitas
             {
                 var entity = kv.Value;
                 
-                if (entity is not ISupportedSerialize)
+                if ( !entity.IsDbSet(out var _) && entity is not ISupportedSerialize)
                 {
                     continue;
                 }

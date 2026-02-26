@@ -23,7 +23,7 @@ namespace Fantasy.Entitas
                 writer.WriteNullCollectionHeader();
                 return;
             }
-            
+
             var count = 0;
             var formatter = writer.GetFormatter<Entity>();
             ref var spanReference = ref writer.GetSpanReference(4);
@@ -32,16 +32,16 @@ namespace Fantasy.Entitas
             foreach (var kv in value)
             {
                 var entity = kv.Value;
-                
-                if (entity is not ISupportedSerialize)
+
+                if (!entity.IsDbSet(out var _) && entity is not ISupportedSerialize)
                 {
                     continue;
                 }
-                
+
                 ++count;
                 formatter.Serialize(ref writer, ref entity!);
             }
-            
+
             Unsafe.WriteUnaligned(ref spanReference, count);
         }
 #if FANTASY_UNITY
@@ -65,9 +65,9 @@ namespace Fantasy.Entitas
             {
                 value.Clear();
             }
-            
+
             var formatter = reader.GetFormatter<Entity>();
-            
+
             for (var i = 0; i < length; i++)
             {
                 Entity entity = null;

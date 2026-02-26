@@ -100,7 +100,6 @@
     <ItemGroup>
       <Folder Include="Migrations\" />
       <Folder Include="Migrations\PgSessionMigrations\" />
-      <Folder Include="Runtime\Core\Serialize\Pack\" />
       <Folder Include="Runtime\Core\World\" />
       <Folder Include="Runtime\Product\Authentication\Solutions\FaceID\" />
       <Folder Include="Runtime\Product\Authentication\Solutions\QRCode\" />

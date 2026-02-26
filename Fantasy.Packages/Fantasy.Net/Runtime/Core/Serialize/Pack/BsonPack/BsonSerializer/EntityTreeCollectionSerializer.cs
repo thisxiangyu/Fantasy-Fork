@@ -38,7 +38,7 @@ public sealed class EntityTreeCollectionSerializer: IBsonSerializer
         
         foreach (var (_, entity) in childrenCollection)
         {
-            if (entity is ISupportedSerialize)
+            if ( entity.IsDbSet(out var _))
             {
                 bsonSerializer.Serialize(context, entity);
             }

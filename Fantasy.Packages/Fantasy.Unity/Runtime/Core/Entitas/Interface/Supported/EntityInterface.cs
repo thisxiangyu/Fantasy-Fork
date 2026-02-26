@@ -11,7 +11,9 @@ namespace Fantasy.Entitas.Interface
     }
 
     /// <summary>
-    /// Entity支持数据库/序列化
+    /// 实体支持序列化。当实体标记为<see cref="Database.Attributes.DbSetAttribute"/>时, 必然为支持序列化, 
+    /// 但是当未标记为<see cref="Database.Attributes.DbSetAttribute"/>时, 说明可以序列化(用于传输或自行持久化)
+    /// 但是不一定存入数据库。
     /// </summary>
     public interface ISupportedSerialize
     {

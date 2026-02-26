@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Runtime.CompilerServices;
 using Fantasy.Entitas.Interface;
+using Fantasy.Entitas.TypeMeta;
 using MemoryPack;
 using MemoryPack.Formatters;
 // ReSharper disable SuspiciousTypeConversion.Global
@@ -39,7 +40,7 @@ namespace Fantasy.Entitas
             {
                 var entity = kv.Value;
 
-                if (entity is not ISupportedSerialize)
+                if (!entity.IsDbSet(out var _) && entity is not ISupportedSerialize)
                 {
                     continue;
                 }
