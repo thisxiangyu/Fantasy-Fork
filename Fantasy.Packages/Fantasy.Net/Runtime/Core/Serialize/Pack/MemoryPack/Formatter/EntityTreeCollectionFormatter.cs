@@ -1,3 +1,4 @@
+using System;
 using System.Buffers;
 using System.Runtime.CompilerServices;
 using Fantasy.Entitas.Interface;
@@ -79,7 +80,14 @@ namespace Fantasy.Entitas
             {
                 Entity entity = null;
                 formatter.Deserialize(ref reader, ref entity);
-                value.Add(entity.TypeHashCode, entity);
+                try
+                {
+                    value.Add(entity.TypeHashCode, entity);
+                }
+                catch (Exception ex)
+                {
+                    throw new($"{entity.GetType()}({entity.TypeHashCode}) deserialization err :{ex}");
+                }
             }
         }
     }
