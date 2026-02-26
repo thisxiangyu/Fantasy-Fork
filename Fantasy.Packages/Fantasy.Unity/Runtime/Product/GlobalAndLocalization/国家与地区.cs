@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using Fantasy.Database.Attributes;
 using Fantasy.Entitas;
+using MemoryPack;
 
 #if FANTASY_UNITY
 using UnityEngine.Networking;
@@ -10,7 +11,8 @@ using UnityEngine.Networking;
 namespace Fantasy.GlobalAndLocalization
 {
     [DbSet(IsEmbedded = true)]
-    public class 国家与地区相关信息: Entity
+    [MemoryPackable]
+    public partial class 国家与地区相关信息 : Entity
     {
         /// <summary>
         /// 据<see cref="区域码"/>
