@@ -133,6 +133,7 @@ namespace Fantasy.Entitas
         private bool? _isEmbeddedCache;
         //基于接口判断
         // Note: 目前暂不使用这个, 因为用接口标记DbSet属性 似乎不太优雅。有待后续评估。
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsEmbeddedIDbSet()
         {
             if (_isEmbeddedCache == null)
@@ -141,13 +142,12 @@ namespace Fantasy.Entitas
             return _isEmbeddedCache.Value;
         }
         //基于DbSetAttri判断
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool? IsAnnotatedAsEmbedded()
         {
             if (_isEmbeddedCache == null)
             {
-                long code = TypeHashCache.GetHashCode(this.Type);
-
-                if(TypeDbSetChecker.InfoByHash.TryGetValue(code, out var value))
+                if(IsDbSet(out var value))
                 {
                     _isEmbeddedCache = value.IsEmbedded();
                 }
@@ -156,14 +156,19 @@ namespace Fantasy.Entitas
                     _isEmbeddedCache = null; 
                 }
             }
-
             return _isEmbeddedCache;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool IsDbSet(out TypeDbSetCache typeDbSetCache)
+        {
+            return TypeDbSetChecker.InfoByHash.TryGetValue(TypeHashCode, out typeDbSetCache);
         }
 
         #endregion
 
         [BsonIgnore]
-        [MemoryPackIgnore]
+        [MemoryPackInclude]
         [IgnoreDataMember]
         [ProtoIgnore]
         [NotMapped]
@@ -174,9 +179,8 @@ namespace Fantasy.Entitas
         protected EntityTreeCollection Single;
 
         [BsonIgnore]
-        [MemoryPackIgnore]
+        [MemoryPackInclude]
         [IgnoreDataMember]
-        [ProtoIgnore]
         [NotMapped]
 #if FANTASY_NET
         [MJ.JsonIgnore]
@@ -184,18 +188,21 @@ namespace Fantasy.Entitas
         [NJ.JsonIgnore]
         protected EntityMultiCollection Multi;
 
-        [BsonElement("s")][BsonIgnoreIfNull][MemoryPackInclude] protected ReuseList<Entity> EmbbededSingle;
-        [BsonElement("m")][BsonIgnoreIfNull][MemoryPackInclude] protected ReuseList<Entity> EmbbededMulti;
+        [BsonElement("s")][BsonIgnoreIfNull][MemoryPackIgnore][ProtoIgnore] protected ReuseList<Entity> EmbbededSingle;
+        [BsonElement("m")][BsonIgnoreIfNull][MemoryPackIgnore][ProtoIgnore] protected ReuseList<Entity> EmbbededMulti;
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal ReuseList<Entity> GetCollectionOfEmbbededSingle() {
             return EmbbededSingle;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal ReuseList<Entity> GetCollectionOfEmbbedMulti()
         {
             return EmbbededMulti;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void TryEmbbedSingle(Entity subEntity) {
             if (subEntity.IsAnnotatedAsEmbedded() == true)
             {
@@ -203,6 +210,7 @@ namespace Fantasy.Entitas
                 EmbbededSingle.Add(subEntity);
             }
         }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void TryEmbbedMulti(Entity subEntity)
         {
             if (subEntity.IsAnnotatedAsEmbedded() == true)
@@ -211,6 +219,7 @@ namespace Fantasy.Entitas
                 EmbbededMulti.Add(subEntity);
             }
         }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void TryEmbbedSingle<T>(T subEntity) where T : Entity
         {
             if (TypeDbSetChecker<T>.IsEmbedded)
@@ -219,6 +228,7 @@ namespace Fantasy.Entitas
                 EmbbededSingle.Add(subEntity);
             }
         }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void TryEmbbedMulti<T>(T subEntity) where T : Entity
         {
             if (TypeDbSetChecker<T>.IsEmbedded)
@@ -227,6 +237,7 @@ namespace Fantasy.Entitas
                 EmbbededMulti.Add(subEntity);
             }
         }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void TryRemoveEmbeddedSingle(Entity subEntity)
         {
             if (EmbbededSingle != null)
@@ -239,6 +250,7 @@ namespace Fantasy.Entitas
                 }
             }
         }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void TryRemoveEmbeddedMulti(Entity subEntity)
         {
             if (EmbbededMulti != null)
@@ -992,19 +1004,23 @@ namespace Fantasy.Entitas
 
                 if (Single != null && Single.Count > 0)
                 {
+                    EmbbededSingle.Clear();
                     foreach (var (_, entity) in Single)
                     {
                         entity.Parent = this;
                         entity.Type = entity.GetType();
+                        TryEmbbedSingle(entity);
                         entity.Deserialize(scene, resetId);
                     }
                 }
 
                 if (Multi != null && Multi.Count > 0)
                 {
+                    EmbbededMulti.Clear();
                     foreach (var (_, entity) in Multi)
                     {
                         entity.Parent = this;
+                        TryEmbbedMulti(entity);
                         entity.Deserialize(scene, resetId);
                     }
                 }
