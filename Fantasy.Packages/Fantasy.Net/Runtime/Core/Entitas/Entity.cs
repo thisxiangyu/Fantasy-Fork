@@ -626,6 +626,65 @@ namespace Fantasy.Entitas
 
         #endregion
 
+
+        #region ExchangeSubEntity
+
+        /// <summary>
+        /// 与一个目标实体交换<see cref="Tree"/>
+        /// </summary>
+        public void ExchangeTreeWith(Entity targetEntity)
+        {
+            EntityTreeCollection target_single = targetEntity.Single;
+            targetEntity.Single = Single;
+            Single = target_single;
+
+            if(Single != null)
+            {
+                foreach (var kv in Single)
+                {
+                    kv.Value.Parent = this;
+                    kv.Value.Scene = Scene;
+                }
+            }
+            if (targetEntity.Single != null)
+            {
+                foreach (var kv in targetEntity.Single)
+                {
+                    kv.Value.Parent = targetEntity;
+                    kv.Value.Scene = targetEntity.Scene;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 与一个目标实体交换<see cref="Multi"/>
+        /// </summary>
+        public void ExchangeMultiWith(Entity targetEntity)
+        {
+            EntityMultiCollection target_multi = targetEntity.Multi;
+            targetEntity.Multi = Multi;
+            Multi = target_multi;
+
+            if(Multi!=null)
+            {
+                foreach (var kv in Multi)
+                {
+                    kv.Value.Parent = this;
+                    kv.Value.Scene = Scene;
+                }
+            }
+            if (targetEntity.Multi != null)
+            {
+                foreach (var kv in targetEntity.Multi)
+                {
+                    kv.Value.Parent = targetEntity;
+                    kv.Value.Scene = targetEntity.Scene;
+                }
+            }
+        }
+
+        #endregion
+
         #region HasSubEntity
 
         /// <summary>
@@ -1007,7 +1066,7 @@ namespace Fantasy.Entitas
                     foreach (var (_, entity) in Single)
                     {
                         entity.Parent = this;
-                        entity.Type = entity.GetType();
+                        entity.Type = null;
                         TryEmbbedSingle(entity);
                         entity.Deserialize(scene, resetId);
                     }
