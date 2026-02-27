@@ -75,6 +75,7 @@ namespace Fantasy.Entitas
                 formatter.Deserialize(ref reader, ref entity);
                 try
                 {
+                    entity.InitType();
                     value.Add(entity.Id, entity);
                 }
                 catch (Exception ex)

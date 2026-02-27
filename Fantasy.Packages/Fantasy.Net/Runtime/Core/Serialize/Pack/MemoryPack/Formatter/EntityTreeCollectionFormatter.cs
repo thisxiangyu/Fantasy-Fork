@@ -82,6 +82,7 @@ namespace Fantasy.Entitas
                 formatter.Deserialize(ref reader, ref entity);
                 try
                 {
+                    entity.InitType();
                     value.Add(entity.TypeHashCode, entity);
                 }
                 catch (Exception ex)

@@ -33,8 +33,8 @@ namespace Fantasy.Entitas
             }
 
             var count = 0;
-        var formatter = writer.GetFormatter<Entity>();
-        ref var spanReference = ref writer.GetSpanReference(4);
+            var formatter = writer.GetFormatter<Entity>();
+            ref var spanReference = ref writer.GetSpanReference(4);
             writer.Advance(4);
 
             foreach (var kv in value)
@@ -46,8 +46,8 @@ namespace Fantasy.Entitas
                     continue;
                 }
 
-++count;
-formatter.Serialize(ref writer, ref entity!);
+                ++count;
+                formatter.Serialize(ref writer, ref entity!);
             }
 
             Unsafe.WriteUnaligned(ref spanReference, count);
@@ -59,36 +59,37 @@ formatter.Serialize(ref writer, ref entity!);
         public override void Deserialize(ref MemoryPackReader reader, scoped ref EntityTreeCollection? value)
 #endif
         {
-    if (!reader.TryReadCollectionHeader(out var length))
-    {
-        value = null;
-        return;
-    }
+            if (!reader.TryReadCollectionHeader(out var length))
+            {
+                value = null;
+                return;
+            }
 
-    if (value == null)
-    {
-        value = EntityTreeCollection.Create(true);
-    }
-    else
-    {
-        value.Clear();
-    }
+            if (value == null)
+            {
+                value = EntityTreeCollection.Create(true);
+            }
+            else
+            {
+                value.Clear();
+            }
 
-    var formatter = reader.GetFormatter<Entity>();
+            var formatter = reader.GetFormatter<Entity>();
 
-    for (var i = 0; i < length; i++)
-    {
-        Entity entity = null;
-        formatter.Deserialize(ref reader, ref entity);
-        try
-        {
-            value.Add(entity.TypeHashCode, entity);
+            for (var i = 0; i < length; i++)
+            {
+                Entity entity = null;
+                formatter.Deserialize(ref reader, ref entity);
+                try
+                {
+                    entity.InitType();
+                    value.Add(entity.TypeHashCode, entity);
+                }
+                catch (Exception ex)
+                {
+                    throw new($"{entity.GetType()}({entity.TypeHashCode}) deserialization err :{ex}");
+                }
+            }
         }
-        catch (Exception ex)
-        {
-            throw new($"{entity.GetType()}({entity.TypeHashCode}) deserialization err :{ex}");
-        }
-    }
-}
     }
 }

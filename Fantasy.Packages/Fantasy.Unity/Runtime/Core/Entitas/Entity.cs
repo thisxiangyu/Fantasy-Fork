@@ -998,8 +998,7 @@ namespace Fantasy.Entitas
             try
             {
                 Scene = scene;
-                Type ??= GetType();
-                TypeHashCode = TypeHashCache.GetHashCode(Type);
+                InitType();
                 RuntimeId = Scene.RuntimeIdFactory.Create(false);
                 if (resetId)
                 {
@@ -1045,6 +1044,12 @@ namespace Fantasy.Entitas
 
                 Log.Error(e);
             }
+        }
+
+        public void InitType()
+        {
+            Type ??= GetType();
+            TypeHashCode = TypeHashCache.GetHashCode(Type);
         }
 
         #endregion
