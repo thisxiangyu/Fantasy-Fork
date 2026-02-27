@@ -988,7 +988,7 @@ namespace Fantasy.Entitas
         /// </summary>
         /// <param name="scene">Scene</param>
         /// <param name="resetId">是否是重新生成实体的Id,如果是数据库加载过来的一般是不需要的</param>
-        public void Deserialize(Scene scene, bool resetId = false)
+        public virtual void Deserialize(Scene scene, bool resetId = false)
         {
             if (RuntimeId != 0)
             {
