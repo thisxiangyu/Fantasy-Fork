@@ -633,6 +633,12 @@ namespace Fantasy.Entitas
 
         #region ExchangeSubEntity
 
+        public void ExchangeSubEntitiesWith(Entity targetEntity)
+        {
+            ExchangeTreeWith(targetEntity);
+            ExchangeMultiWith(targetEntity);
+        }
+
         /// <summary>
         /// 与一个目标实体交换<see cref="Tree"/>
         /// </summary>
