@@ -93,7 +93,7 @@ namespace Fantasy.Async
         /// <param name="tag">用于查询协程锁的标记，可不传入，只有在超时的时候排查是哪个锁超时时使用</param>
         /// <param name="timeOut">等待多久会超时，当到达设定的时候会把当前锁给按照超时处理</param>
         /// <returns></returns>
-        public async FTask<WaitCoroutineLock> Wait(long waitForId, string tag = null, int timeOut = 30000)
+        public async FTask<WaitCoroutineLock> Wait(long waitForId, string tag = null, int timeOut = 10000)
         {
             var waitCoroutineLock = CoroutineLockComponent.WaitCoroutineLockPool.Rent(this, ref waitForId, tag, timeOut);
 
@@ -233,7 +233,7 @@ namespace Fantasy.Async
         /// 串行等待某个Id。且同时会总体限流: 超过锁所设定上限数量值的并发FTask等到有空余任务位后再执行。
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async FTask<WaitCoroutineLock> Wait(long waitForId, string tag = null, int timeOut = 11000)
+        public async FTask<WaitCoroutineLock> Wait(long waitForId, string tag = null, int timeOut = 10000)
         {
             // 先标记 active 增加（只在成功进入临界区时最终减掉）
             Interlocked.Increment(ref _activeCount);
@@ -265,7 +265,7 @@ namespace Fantasy.Async
         /// 限流: 超过锁所设定上限数量值的并发FTask等到有空余任务位后再执行。
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async FTask<WaitCoroutineLock> WaitIfTooMuch(string tag = null, int timeOut = 11000)
+        public async FTask<WaitCoroutineLock> WaitIfTooMuch(string tag = null, int timeOut = 10000)
         {
             // 先标记 active 增加（只在成功进入临界区时最终减掉）
             Interlocked.Increment(ref _activeCount);
