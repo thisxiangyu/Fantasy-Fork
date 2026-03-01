@@ -859,8 +859,12 @@ namespace Fantasy.Database
         /// <returns>如果未找到则为 null。</returns>
         public async FTask<T?> SingleOrDefault<T>(Expression<Func<T, bool>> filter, bool isDeserialize = true, string table = null) where T : Entity
         {
-            var res = await Set<T>().SingleOrDefaultAsync(filter);
-            if(isDeserialize)
+            T res = null;
+            using (await pg.FlowLock.WaitIfTooMuch())
+            {
+                res = await Set<T>().SingleOrDefaultAsync(filter);
+            }
+            if(isDeserialize && res != null)
                 res.Deserialize(pg.Scene);
             return res;
         }
@@ -925,17 +929,19 @@ namespace Fantasy.Database
         /// <returns>满足条件的行列表。</returns>
         public async FTask<List<T>> Query<T>(Expression<Func<T, bool>> filter, bool isDeserialize = true, string table = null) where T : Entity
         {
-            var list = await Set<T>().Where(filter).ToListAsync();
-            if (!isDeserialize || list.Count == 0 )
+            List<T> list;
+            using (await pg.FlowLock.WaitIfTooMuch())
+            {
+                list = await Set<T>().Where(filter).ToListAsync();
+            }
+            if (!isDeserialize || list == null || list.Count == 0 )
             {
                 return list;
             }
-
             foreach (var entity in list)
             {
                 entity.Deserialize(pg.Scene);
             }
-
             return list;
         }
 
@@ -1011,25 +1017,30 @@ namespace Fantasy.Database
                         Log.Warning($"Dapper does not support Linq filter, this Query for \"{typeof(T)}\" appended on {parentId} has switched to EFCore-Mode automatically");
                 }
 
-                return AppendFromDb(await query.ToListAsync(), parent); 
+                using (await pg.FlowLock.WaitIfTooMuch())
+                {
+                    return AppendFromDb(await query.ToListAsync(), parent);
+                }
             }
             else if (Mode == PreferSqlMode.Dapper)
             {
-                var Connection = await GetOpenedConnection();
+                using (await pg.FlowLock.WaitIfTooMuch())
+                {
+                    var Connection = await GetOpenedConnection();
 
-                //统一事务, 直接传入EFCore的上下文事务需转为Dapper可用的数据库事务
-                var transa = transaction;
-                if (transaction is IDbContextTransaction contextTransa)
-                    transa = contextTransa.GetDbTransaction();
+                    //统一事务, 直接传入EFCore的上下文事务需转为Dapper可用的数据库事务
+                    var transa = transaction;
+                    if (transaction is IDbContextTransaction contextTransa)
+                        transa = contextTransa.GetDbTransaction();
 
-                var result = await Connection.QueryAsync<T>(
+                    IEnumerable<T> result = await Connection.QueryAsync<T>(
                     sql: $@"
                             {SQL.QUERY_BY_PARENT(GetFullTableName<T>())}
                             ",
                     transaction: transa as IDbTransaction,
                     param: new { ParentType = parentType, ParentId = parentId });
-
-                return AppendFromDb(result, parent);
+                    return AppendFromDb(result, parent);
+                }
             }
             else throw new Exception("Unexpected : Unknown ORM Mode in PgSession.");
         }
@@ -1085,36 +1096,44 @@ namespace Fantasy.Database
 
                 var task1 = query1.ToListAsync();
                 var task2 = query2.ToListAsync();
-                await Task.WhenAll(task1, task2);
 
-                var t1Results = AppendFromDb(await task1, parent);
-                var t2Results = AppendFromDb(await task2, parent);
+                using (await pg.FlowLock.WaitIfTooMuch())
+                {
+                    await Task.WhenAll(task1, task2);
 
-                return (t1Results, t2Results);
+                    var t1Results = AppendFromDb(await task1, parent);
+                    var t2Results = AppendFromDb(await task2, parent);
+
+                    return (t1Results, t2Results);
+                }
             }
             else if (Mode == PreferSqlMode.Dapper) // Dapper 模式(此模式下 filter1 和 filter2 必定为 null)
             {
-                var Connection = await GetOpenedConnection();
-                string T1Name = GetFullTableName<T1>();
-                string T2Name = GetFullTableName<T2>();
+                using (await pg.FlowLock.WaitIfTooMuch())
+                {
+                    var Connection = await GetOpenedConnection();
 
-                //统一事务, 直接传入EFCore的上下文事务需转为Dapper可用的数据库事务
-                var transa = transaction;
-                if (transaction is IDbContextTransaction contextTransa)
-                    transa = contextTransa.GetDbTransaction();
+                    string T1Name = GetFullTableName<T1>();
+                    string T2Name = GetFullTableName<T2>();
 
-                var multi = await Connection.QueryMultipleAsync(
-                    sql: $@"
-                        {SQL.QUERY_BY_PARENT(T1Name)}
-                        {SQL.QUERY_BY_PARENT(T2Name)}
-                        ",
-                    transaction: transa as IDbTransaction,
-                    param: new { ParentType = parentType, ParentId = parentId });
+                    //统一事务, 直接传入EFCore的上下文事务需转为Dapper可用的数据库事务
+                    var transa = transaction;
+                    if (transaction is IDbContextTransaction contextTransa)
+                        transa = contextTransa.GetDbTransaction();
 
-                var t1Results = AppendFromDb(await multi.ReadAsync<T1>(), parent);
-                var t2Results = AppendFromDb(await multi.ReadAsync<T2>(), parent);
+                    var multi = await Connection.QueryMultipleAsync(
+                        sql: $@"
+                            {SQL.QUERY_BY_PARENT(T1Name)}
+                            {SQL.QUERY_BY_PARENT(T2Name)}
+                            ",
+                        transaction: transa as IDbTransaction,
+                        param: new { ParentType = parentType, ParentId = parentId });
 
-                return (t1Results, t2Results);
+                    var t1Results = AppendFromDb(await multi.ReadAsync<T1>(), parent);
+                    var t2Results = AppendFromDb(await multi.ReadAsync<T2>(), parent);
+
+                    return (t1Results, t2Results);
+                }
             }
             else
             {
@@ -1184,41 +1203,48 @@ namespace Fantasy.Database
                 var task1 = query1.ToListAsync();
                 var task2 = query2.ToListAsync();
                 var task3 = query3.ToListAsync();
-                await Task.WhenAll(task1, task2, task3);
 
-                var t1Results = AppendFromDb(await task1, parent);
-                var t2Results = AppendFromDb(await task2, parent);
-                var t3Results = AppendFromDb(await task3, parent);
+                using (await pg.FlowLock.WaitIfTooMuch())
+                {
+                    await Task.WhenAll(task1, task2, task3);
 
-                return (t1Results, t2Results, t3Results);
+                    var t1Results = AppendFromDb(await task1, parent);
+                    var t2Results = AppendFromDb(await task2, parent);
+                    var t3Results = AppendFromDb(await task3, parent);
+
+                    return (t1Results, t2Results, t3Results);
+                }
             }
             else if (Mode == PreferSqlMode.Dapper) // Dapper 模式(此模式下 filter 必定为 null)
             {
-                var Connection = await GetOpenedConnection();
-                string T1Name = GetFullTableName<T1>();
-                string T2Name = GetFullTableName<T2>();
-                string T3Name = GetFullTableName<T3>();
+                using (await pg.FlowLock.WaitIfTooMuch())
+                {
+                    var Connection = await GetOpenedConnection();
+                    string T1Name = GetFullTableName<T1>();
+                    string T2Name = GetFullTableName<T2>();
+                    string T3Name = GetFullTableName<T3>();
 
 
-                //统一事务, 直接传入EFCore的上下文事务需转为Dapper可用的数据库事务
-                var transa = transaction;
-                if (transaction is IDbContextTransaction contextTransa)
-                    transa = contextTransa.GetDbTransaction();
+                    //统一事务, 直接传入EFCore的上下文事务需转为Dapper可用的数据库事务
+                    var transa = transaction;
+                    if (transaction is IDbContextTransaction contextTransa)
+                        transa = contextTransa.GetDbTransaction();
 
-                var multi = await Connection.QueryMultipleAsync(
-                    sql: $@"
-                {SQL.QUERY_BY_PARENT(T1Name)}
-                {SQL.QUERY_BY_PARENT(T2Name)}
-                {SQL.QUERY_BY_PARENT(T3Name)}
-                ",
-                    transaction: transa as IDbTransaction,
-                    param: new { ParentType = parentType, ParentId = parentId });
+                    var multi = await Connection.QueryMultipleAsync(
+                            sql: $@"
+                        {SQL.QUERY_BY_PARENT(T1Name)}
+                        {SQL.QUERY_BY_PARENT(T2Name)}
+                        {SQL.QUERY_BY_PARENT(T3Name)}
+                        ",
+                        transaction: transa as IDbTransaction,
+                        param: new { ParentType = parentType, ParentId = parentId });
 
-                var t1Results = AppendFromDb(await multi.ReadAsync<T1>(), parent);
-                var t2Results = AppendFromDb(await multi.ReadAsync<T2>(), parent);
-                var t3Results = AppendFromDb(await multi.ReadAsync<T3>(), parent);
+                    var t1Results = AppendFromDb(await multi.ReadAsync<T1>(), parent);
+                    var t2Results = AppendFromDb(await multi.ReadAsync<T2>(), parent);
+                    var t3Results = AppendFromDb(await multi.ReadAsync<T3>(), parent);
 
-                return (t1Results, t2Results, t3Results);
+                    return (t1Results, t2Results, t3Results);
+                }
             }
             else
             {
@@ -1299,43 +1325,50 @@ namespace Fantasy.Database
                 var task2 = query2.ToListAsync();
                 var task3 = query3.ToListAsync();
                 var task4 = query4.ToListAsync();
-                await Task.WhenAll(task1, task2, task3, task4);
 
-                var t1Results = AppendFromDb(await task1, parent);
-                var t2Results = AppendFromDb(await task2, parent);
-                var t3Results = AppendFromDb(await task3, parent);
-                var t4Results = AppendFromDb(await task4, parent);
+                using (await pg.FlowLock.WaitIfTooMuch())
+                {
+                    await Task.WhenAll(task1, task2, task3, task4);
 
-                return (t1Results, t2Results, t3Results, t4Results);
+                    var t1Results = AppendFromDb(await task1, parent);
+                    var t2Results = AppendFromDb(await task2, parent);
+                    var t3Results = AppendFromDb(await task3, parent);
+                    var t4Results = AppendFromDb(await task4, parent);
+
+                    return (t1Results, t2Results, t3Results, t4Results);
+                }
             }
             else if (Mode == PreferSqlMode.Dapper) // Dapper 模式(此模式下 filter 必定为 null)
             {
-                var Connection = await GetOpenedConnection();
-                string T1Name = GetFullTableName<T1>();
-                string T2Name = GetFullTableName<T2>();
-                string T3Name = GetFullTableName<T3>();
-                string T4Name = GetFullTableName<T4>();
+                using (await pg.FlowLock.WaitIfTooMuch())
+                {
+                    var Connection = await GetOpenedConnection();
+                    string T1Name = GetFullTableName<T1>();
+                    string T2Name = GetFullTableName<T2>();
+                    string T3Name = GetFullTableName<T3>();
+                    string T4Name = GetFullTableName<T4>();
 
-                var transa = transaction;
-                if (transaction is IDbContextTransaction contextTransa)
-                    transa = contextTransa.GetDbTransaction();
+                    var transa = transaction;
+                    if (transaction is IDbContextTransaction contextTransa)
+                        transa = contextTransa.GetDbTransaction();
 
-                var multi = await Connection.QueryMultipleAsync(
-                    sql: $@"
-                {SQL.QUERY_BY_PARENT(T1Name)}
-                {SQL.QUERY_BY_PARENT(T2Name)}
-                {SQL.QUERY_BY_PARENT(T3Name)}
-                {SQL.QUERY_BY_PARENT(T4Name)}
-                ",
-                    transaction: transa as IDbTransaction,
-                    param: new { ParentType = parentType, ParentId = parentId });
+                    var multi = await Connection.QueryMultipleAsync(
+                        sql: $@"
+                        {SQL.QUERY_BY_PARENT(T1Name)}
+                        {SQL.QUERY_BY_PARENT(T2Name)}
+                        {SQL.QUERY_BY_PARENT(T3Name)}
+                        {SQL.QUERY_BY_PARENT(T4Name)}
+                        ",
+                        transaction: transa as IDbTransaction,
+                        param: new { ParentType = parentType, ParentId = parentId });
 
-                var t1Results = AppendFromDb(await multi.ReadAsync<T1>(), parent);
-                var t2Results = AppendFromDb(await multi.ReadAsync<T2>(), parent);
-                var t3Results = AppendFromDb(await multi.ReadAsync<T3>(), parent);
-                var t4Results = AppendFromDb(await multi.ReadAsync<T4>(), parent);
+                    var t1Results = AppendFromDb(await multi.ReadAsync<T1>(), parent);
+                    var t2Results = AppendFromDb(await multi.ReadAsync<T2>(), parent);
+                    var t3Results = AppendFromDb(await multi.ReadAsync<T3>(), parent);
+                    var t4Results = AppendFromDb(await multi.ReadAsync<T4>(), parent);
 
-                return (t1Results, t2Results, t3Results, t4Results);
+                    return (t1Results, t2Results, t3Results, t4Results);
+                }
             }
             else
             {
@@ -1427,47 +1460,54 @@ namespace Fantasy.Database
                 var task3 = query3.ToListAsync();
                 var task4 = query4.ToListAsync();
                 var task5 = query5.ToListAsync();
-                await Task.WhenAll(task1, task2, task3, task4, task5);
 
-                var t1Results = AppendFromDb(await task1, parent);
-                var t2Results = AppendFromDb(await task2, parent);
-                var t3Results = AppendFromDb(await task3, parent);
-                var t4Results = AppendFromDb(await task4, parent);
-                var t5Results = AppendFromDb(await task5, parent);
+                using (await pg.FlowLock.WaitIfTooMuch())
+                {
+                    await Task.WhenAll(task1, task2, task3, task4, task5);
 
-                return (t1Results, t2Results, t3Results, t4Results, t5Results);
+                    var t1Results = AppendFromDb(await task1, parent);
+                    var t2Results = AppendFromDb(await task2, parent);
+                    var t3Results = AppendFromDb(await task3, parent);
+                    var t4Results = AppendFromDb(await task4, parent);
+                    var t5Results = AppendFromDb(await task5, parent);
+
+                    return (t1Results, t2Results, t3Results, t4Results, t5Results);
+                }
             }
             else if (Mode == PreferSqlMode.Dapper) // Dapper 模式(此模式下 filter 必定为 null)
             {
-                var Connection = await GetOpenedConnection();
-                string T1Name = GetFullTableName<T1>();
-                string T2Name = GetFullTableName<T2>();
-                string T3Name = GetFullTableName<T3>();
-                string T4Name = GetFullTableName<T4>();
-                string T5Name = GetFullTableName<T5>();
+                using (await pg.FlowLock.WaitIfTooMuch())
+                {
+                    var Connection = await GetOpenedConnection();
+                    string T1Name = GetFullTableName<T1>();
+                    string T2Name = GetFullTableName<T2>();
+                    string T3Name = GetFullTableName<T3>();
+                    string T4Name = GetFullTableName<T4>();
+                    string T5Name = GetFullTableName<T5>();
 
-                var transa = transaction;
-                if (transaction is IDbContextTransaction contextTransa)
-                    transa = contextTransa.GetDbTransaction();
+                    var transa = transaction;
+                    if (transaction is IDbContextTransaction contextTransa)
+                        transa = contextTransa.GetDbTransaction();
 
-                var multi = await Connection.QueryMultipleAsync(
-                    sql: $@"
-                {SQL.QUERY_BY_PARENT(T1Name)}
-                {SQL.QUERY_BY_PARENT(T2Name)}
-                {SQL.QUERY_BY_PARENT(T3Name)}
-                {SQL.QUERY_BY_PARENT(T4Name)}
-                {SQL.QUERY_BY_PARENT(T5Name)}
-                ",
-                     transaction: transa as IDbTransaction,
-                    param: new { ParentType = parentType, ParentId = parentId });
+                    var multi = await Connection.QueryMultipleAsync(
+                        sql: $@"
+                    {SQL.QUERY_BY_PARENT(T1Name)}
+                    {SQL.QUERY_BY_PARENT(T2Name)}
+                    {SQL.QUERY_BY_PARENT(T3Name)}
+                    {SQL.QUERY_BY_PARENT(T4Name)}
+                    {SQL.QUERY_BY_PARENT(T5Name)}
+                    ",
+                         transaction: transa as IDbTransaction,
+                        param: new { ParentType = parentType, ParentId = parentId });
 
-                var t1Results = AppendFromDb(await multi.ReadAsync<T1>(), parent);
-                var t2Results = AppendFromDb(await multi.ReadAsync<T2>(), parent);
-                var t3Results = AppendFromDb(await multi.ReadAsync<T3>(), parent);
-                var t4Results = AppendFromDb(await multi.ReadAsync<T4>(), parent);
-                var t5Results = AppendFromDb(await multi.ReadAsync<T5>(), parent);
+                    var t1Results = AppendFromDb(await multi.ReadAsync<T1>(), parent);
+                    var t2Results = AppendFromDb(await multi.ReadAsync<T2>(), parent);
+                    var t3Results = AppendFromDb(await multi.ReadAsync<T3>(), parent);
+                    var t4Results = AppendFromDb(await multi.ReadAsync<T4>(), parent);
+                    var t5Results = AppendFromDb(await multi.ReadAsync<T5>(), parent);
 
-                return (t1Results, t2Results, t3Results, t4Results, t5Results);
+                    return (t1Results, t2Results, t3Results, t4Results, t5Results);
+                }
             }
             else
             {
@@ -1487,27 +1527,31 @@ namespace Fantasy.Database
             var JOIN_SQL = @"
 
             ";
-            var Connection = await GetOpenedConnection();
 
-            IEnumerable<TResult> result = await Connection.QueryAsync(
-                sql: JOIN_SQL,
-                map: mapFunc,
-                param: new { ParentType = parentType, ParentId = parentId },
-                splitOn: DbSetProperty.MultiEntitiesRowSplitOn, 
-                types: types
-                );
-
-            if (!isDeserialize || result.Count() == 0)
+            using (await pg.FlowLock.WaitIfTooMuch())
             {
+                var Connection = await GetOpenedConnection();
+
+                IEnumerable<TResult> result = await Connection.QueryAsync(
+                    sql: JOIN_SQL,
+                    map: mapFunc,
+                    param: new { ParentType = parentType, ParentId = parentId },
+                    splitOn: DbSetProperty.MultiEntitiesRowSplitOn,
+                    types: types
+                    );
+
+                if (!isDeserialize || result.Count() == 0)
+                {
+                    return result;
+                }
+
+                foreach (TResult? res in result)
+                {
+                    //TODO
+
+                }
                 return result;
             }
-
-            foreach (TResult? res in result)
-            {
-                //TODO
-
-            }
-            return result;
         }
 
         /// <summary>
@@ -1878,7 +1922,7 @@ namespace Fantasy.Database
         {
             if (entity == null)
             {
-                Log.Error($"save entities is null: {typeof(T).Name}");
+                Log.Error($"Entity is null: {entity.GetType()}");
                 return;
             }
 
@@ -1896,14 +1940,18 @@ namespace Fantasy.Database
                         }
                     case PreferSqlMode.Dapper:
                         {
-                            var _connection =  await GetOpenedConnection();
-                            
+                            var connection = await GetOpenedConnection();
+
+                            // TODO
+                            var sql = $@"
+                                    ";
+
+                            await connection.ExecuteAsync(sql, entity);
 
                             break;
                         }
                 }              
             }
-            await FTask.CompletedTask;
         }
 
         /// <summary>
@@ -2051,43 +2099,45 @@ namespace Fantasy.Database
                 Log.Debug($"{entity.Type.Name}中有{singleCount}个single(s),其中{embbededCount}个嵌入");
                 Log.Debug($"{entity.Type.Name}转为Json: \n{entity.ToJson(new JsonSettings(Library.Microsoft),true)}");
 #endif
-
-                if (TypeDbSetChecker<T>.IsAsDoc)
+                using (await pg.FlowLock.Wait(entity.Id))
                 {
-                    //----------文档式存储----------
-                    EntityDocumentDTC docData = MultiThreadPoolStacks.Rent<EntityDocumentDTC>();
-                    docData.ParentId = entity.Parent.Id;
-                    docData.ParentType = entity.Parent.TypeHashCode;
-                    docData.Json = entity;
-
-                    var shadowDbSet = Set<EntityDocumentDTC>(TypeDbSetChecker<T>.ShadowName!);
-                    shadowDbSet.Add(docData);
-
-                    var count = await SaveChangesAsync();
-
-                    MultiThreadPoolStacks.Return(docData);
-                    Entry(docData).State = EntityState.Detached;
-                }
-                else
-                {
-                    //----------表格式存储----------
-                    var entry = Entry(entity);
-                    Set<T>().Add(entity);
-                    Set<T>().Add(entity);
-                    var parent = entity.Parent;
-                    if(parent != null)
+                    if (TypeDbSetChecker<T>.IsAsDoc)
                     {
-                        Entry(entity).Property<long>(DbSetProperty.ParentType).CurrentValue = parent.TypeHashCode;
-                        Entry(entity).Property<long>(DbSetProperty.ParentId).CurrentValue = parent.Id;
-                    }
-                    //更新影子属性的值
-                    Entry(entity).Property<ReuseList<Entity>>(DbSetProperty.JsonSingle).CurrentValue = entity.GetCollectionOfEmbbededSingle();
-                    Entry(entity).Property<ReuseList<Entity>>(DbSetProperty.JsonMulti).CurrentValue = entity.GetCollectionOfEmbbedMulti();
+                        //----------文档式存储----------
+                        EntityDocumentDTC docData = MultiThreadPoolStacks.Rent<EntityDocumentDTC>();
+                        docData.ParentId = entity.Parent.Id;
+                        docData.ParentType = entity.Parent.TypeHashCode;
+                        docData.Json = entity;
 
-                    //Note: 暂时不支持二进制存储
-                    //Entry(entity).Property<byte[]>(DbSetProperty.BytesSingle).CurrentValue = 1;
-                    //Entry(entity).Property<byte[]>(DbSetProperty.BytesMulti).CurrentValue = 1;
-                    var count = await SaveChangesAsync();
+                        var shadowDbSet = Set<EntityDocumentDTC>(TypeDbSetChecker<T>.ShadowName!);
+                        shadowDbSet.Add(docData);
+
+                        var count = await SaveChangesAsync();
+
+                        MultiThreadPoolStacks.Return(docData);
+                        Entry(docData).State = EntityState.Detached;
+                    }
+                    else
+                    {
+                        //----------表格式存储----------
+                        var entry = Entry(entity);
+                        Set<T>().Add(entity);
+                        Set<T>().Add(entity);
+                        var parent = entity.Parent;
+                        if (parent != null)
+                        {
+                            Entry(entity).Property<long>(DbSetProperty.ParentType).CurrentValue = parent.TypeHashCode;
+                            Entry(entity).Property<long>(DbSetProperty.ParentId).CurrentValue = parent.Id;
+                        }
+                        //更新影子属性的值
+                        Entry(entity).Property<ReuseList<Entity>>(DbSetProperty.JsonSingle).CurrentValue = entity.GetCollectionOfEmbbededSingle();
+                        Entry(entity).Property<ReuseList<Entity>>(DbSetProperty.JsonMulti).CurrentValue = entity.GetCollectionOfEmbbedMulti();
+
+                        //Note: 暂时不支持二进制存储
+                        //Entry(entity).Property<byte[]>(DbSetProperty.BytesSingle).CurrentValue = 1;
+                        //Entry(entity).Property<byte[]>(DbSetProperty.BytesMulti).CurrentValue = 1;
+                        var count = await SaveChangesAsync();
+                    }
                 }
             }
             catch (Exception ex) { 
@@ -2143,8 +2193,11 @@ namespace Fantasy.Database
 
             try
             {
-                await Set<T>().AddRangeAsync(validList);
-                var count = await SaveChangesAsync();
+                using (await pg.FlowLock.WaitIfTooMuch())
+                {
+                    await Set<T>().AddRangeAsync(validList);
+                    var count = await SaveChangesAsync();
+                }
             }
             catch (Exception ex)
             {

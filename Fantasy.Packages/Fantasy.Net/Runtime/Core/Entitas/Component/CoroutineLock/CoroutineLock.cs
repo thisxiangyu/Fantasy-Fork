@@ -233,7 +233,7 @@ namespace Fantasy.Async
         /// 串行等待某个Id。且同时会总体限流: 超过锁所设定上限数量值的并发FTask等到有空余任务位后再执行。
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async FTask<WaitCoroutineLock> Wait(long waitForId, string tag = null, int timeOut = 30000)
+        public async FTask<WaitCoroutineLock> Wait(long waitForId, string tag = null, int timeOut = 11000)
         {
             // 先标记 active 增加（只在成功进入临界区时最终减掉）
             Interlocked.Increment(ref _activeCount);
@@ -246,7 +246,7 @@ namespace Fantasy.Async
                 // 按 id 串行等待
                 if (!await _idSem[idIndex].WaitAsync(timeOut, cancelToken.Token))
                 {
-                    throw new TimeoutException($"[FlowLock] timeout Id={waitForId} ToParentIs={tag ?? "null"}");
+                    throw new TimeoutException($"[FlowLock] timeout Id={waitForId} tag={tag ?? "null"}");
                 }
 
                 // 成功进入临界区：登记 tag
@@ -265,7 +265,7 @@ namespace Fantasy.Async
         /// 限流: 超过锁所设定上限数量值的并发FTask等到有空余任务位后再执行。
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async FTask<WaitCoroutineLock> WaitIfTooMuch(string tag = null, int timeOut = 30000)
+        public async FTask<WaitCoroutineLock> WaitIfTooMuch(string tag = null, int timeOut = 11000)
         {
             // 先标记 active 增加（只在成功进入临界区时最终减掉）
             Interlocked.Increment(ref _activeCount);
@@ -278,7 +278,7 @@ namespace Fantasy.Async
 
                 if (!await _idSem[idx].WaitAsync(timeOut, cancelToken.Token))
                 {
-                    throw new TimeoutException($"[FlowLock] timeout ToParentIs={tag ?? "null"}");
+                    throw new TimeoutException($"[FlowLock] timeout tag={tag ?? "null"}");
                 }
                 // 成功进入临界区：登记 tag
                 //_tagMap[(int)idx] = (tag, DateTime.UtcNow);

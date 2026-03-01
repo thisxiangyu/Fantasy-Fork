@@ -39,7 +39,7 @@ namespace Fantasy.Async
     /// <summary>
     /// 协程锁。对协程锁的基本抽象, 方便用于扩展协程锁。
     /// </summary>
-    internal interface ICoroutineLock: ILock
+    internal interface ICoroutineLock : ILock
     {
         public Scene Scene { get; }
         public CoroutineLockComponent CoroutineLockComponent { get; }
@@ -195,7 +195,7 @@ namespace Fantasy.Async
         /// <summary>
         /// 取当前临界区中的 FTask 数量
         /// </summary>
-        public int ActiveCount(){ return _activeCount; }
+        public int ActiveCount() { return _activeCount; }
         private int _activeCount = 0;
         ///// <summary>
         ///// 提供读取当前活跃 tag（监控用）
@@ -233,7 +233,7 @@ namespace Fantasy.Async
         /// 串行等待某个Id。且同时会总体限流: 超过锁所设定上限数量值的并发FTask等到有空余任务位后再执行。
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async FTask<WaitCoroutineLock> Wait(long waitForId, string tag = null, int timeOut = 30000)
+        public async FTask<WaitCoroutineLock> Wait(long waitForId, string tag = null, int timeOut = 11000)
         {
             // 先标记 active 增加（只在成功进入临界区时最终减掉）
             Interlocked.Increment(ref _activeCount);
@@ -246,7 +246,7 @@ namespace Fantasy.Async
                 // 按 id 串行等待
                 if (!await _idSem[idIndex].WaitAsync(timeOut, cancelToken.Token))
                 {
-                    throw new TimeoutException($"[FlowLock] timeout Id={waitForId} ToParentIs={tag ?? "null"}");
+                    throw new TimeoutException($"[FlowLock] timeout Id={waitForId} tag={tag ?? "null"}");
                 }
 
                 // 成功进入临界区：登记 tag
@@ -265,7 +265,7 @@ namespace Fantasy.Async
         /// 限流: 超过锁所设定上限数量值的并发FTask等到有空余任务位后再执行。
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async FTask<WaitCoroutineLock> WaitIfTooMuch(string tag = null, int timeOut = 30000)
+        public async FTask<WaitCoroutineLock> WaitIfTooMuch(string tag = null, int timeOut = 11000)
         {
             // 先标记 active 增加（只在成功进入临界区时最终减掉）
             Interlocked.Increment(ref _activeCount);
@@ -278,7 +278,7 @@ namespace Fantasy.Async
 
                 if (!await _idSem[idx].WaitAsync(timeOut, cancelToken.Token))
                 {
-                    throw new TimeoutException($"[FlowLock] timeout ToParentIs={tag ?? "null"}");
+                    throw new TimeoutException($"[FlowLock] timeout tag={tag ?? "null"}");
                 }
                 // 成功进入临界区：登记 tag
                 //_tagMap[(int)idx] = (tag, DateTime.UtcNow);
@@ -294,7 +294,7 @@ namespace Fantasy.Async
         /// <summary>
         /// 释放
         /// </summary>
-        public void Release(long waitingKey) 
+        public void Release(long waitingKey)
         {
             int idIndex = (int)waitingKey;
             if (idIndex < 0 || idIndex >= FTaskFlowLimit)
@@ -349,7 +349,7 @@ namespace Fantasy.Async
                 _idSem = new SemaphoreSlim[updateLimit];
                 for (int i = 0; i < updateLimit; i++)
                     _idSem[i] = new SemaphoreSlim(1, 1);
-            } 
+            }
 
             //_tagMap.Clear();
             Interlocked.Exchange(ref _activeCount, 0);
@@ -368,7 +368,8 @@ namespace Fantasy.Async
                 while (sem.CurrentCount < 1)
                 {
                     try { sem.Release(); }
-                    catch (SemaphoreFullException) {
+                    catch (SemaphoreFullException)
+                    {
                         break;     // 已经满额，无需再释放；预期内行为
                     }
                 }
@@ -409,5 +410,5 @@ namespace Fantasy.Async
 
             _idSem = null;
         }
-    }  
+    }
 }

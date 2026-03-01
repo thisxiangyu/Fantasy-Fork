@@ -27,7 +27,7 @@ namespace Fantasy.Database
     public sealed partial class PostgreSQL : IDatabase, IRawHandler<NpgsqlDataSource>
     {
         internal FTaskFlowLock FlowLock { get; private set; }
-        internal const int FTaskCountLimit = 1024;
+        internal const int FTaskCountLimit = 180;
 
         /// <summary>
         /// 所在Scene
