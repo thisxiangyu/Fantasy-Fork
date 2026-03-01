@@ -240,6 +240,10 @@ namespace Fantasy.Database
         /// </summary>
         FTask Save<T>(T entity, string name = null) where T : Entity, new();
         /// <summary>
+        /// 保存类型 <typeparamref name="T"/> 实体部分字段到指定存储集中。
+        /// </summary>
+        FTask SavePartial<T>(T? entity, string name = null, params string[] propertyNames) where T : Entity, new();
+        /// <summary>
         /// 保存一组实体到数据库中，根据实体列表的 ID 进行区分和存储。
         /// </summary>
         FTask Save(long id, List<Entity> entities);

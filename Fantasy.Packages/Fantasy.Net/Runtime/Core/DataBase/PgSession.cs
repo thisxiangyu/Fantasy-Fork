@@ -1913,11 +1913,8 @@ namespace Fantasy.Database
         }
 
         /// <summary>
-        /// 保存实体对象到数据库（加锁）。
+        /// 保存实体对象到数据库（全量）。
         /// </summary>
-        /// <typeparam name="T">实体类型。</typeparam>
-        /// <param name="entity">要保存的实体对象。</param>
-        /// <param name="table">表名称。</param>
         public async FTask Save<T>(T? entity, string table = null) where T : Entity, new()
         {
             if (entity == null)
@@ -1951,6 +1948,50 @@ namespace Fantasy.Database
                             break;
                         }
                 }              
+            }
+        }
+
+        /// <summary>
+        /// 保存实体对象到数据库（部分字段）。
+        /// </summary>
+        public async FTask SavePartial<T>(T? entity, string table = null, params string[] propertyNames) where T : Entity, new()
+        {
+            if (entity == null)
+            {
+                Log.Error($"Entity is null: {entity.GetType()}");
+                return;
+            }
+
+            using (await pg.FlowLock.Wait(entity.Id))
+            {
+                switch (Mode)
+                {
+                    case PreferSqlMode.EFCore:
+                        {
+                            Attach(entity);
+                            var entry = Entry(entity);
+
+                            foreach (var field in propertyNames)
+                            {
+                                entry.Property(field).IsModified = true;
+                            }
+
+                            await SaveChangesAsync();
+                            break;
+                        }
+                    case PreferSqlMode.Dapper:
+                        {
+                            var connection = await GetOpenedConnection();
+
+                            // TODO
+                            var sql = $@"
+                                    ";
+
+                            await connection.ExecuteAsync(sql, entity);
+
+                            break;
+                        }
+                }
             }
         }
 

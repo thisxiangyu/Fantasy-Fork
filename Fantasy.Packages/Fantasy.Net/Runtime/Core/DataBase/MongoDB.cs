@@ -33,7 +33,7 @@ namespace Fantasy.Database
         private MongoClient _mongoClient;
         private MongoSession _dbSession;
         internal FTaskFlowLock FlowLock { get; private set; }
-        internal const int FTaskCountLimit = 20;
+        internal const int FTaskCountLimit = 200;
 
         /// <summary>
         /// Scene

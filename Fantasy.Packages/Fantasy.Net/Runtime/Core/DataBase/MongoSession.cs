@@ -765,11 +765,8 @@ namespace Fantasy.Database
         }
 
         /// <summary>
-        /// 保存实体对象到数据库（加锁）。
+        /// 保存实体对象到数据库（全量）。
         /// </summary>
-        /// <typeparam name="T">实体类型。</typeparam>
-        /// <param name="entity">要保存的实体对象。</param>
-        /// <param name="collection">集合名称。</param>
         public async FTask Save<T>(T? entity, string collection = null) where T : Entity, new()
         {
             if (entity == null)
@@ -784,6 +781,47 @@ namespace Fantasy.Database
             using (await mongo.FlowLock.Wait(clone.Id))
             {
                 await GetCollection<T>(collection).ReplaceOneAsync(d => d.Id == clone.Id, clone, new ReplaceOptions { IsUpsert = true });
+            }
+        }
+
+        /// <summary>
+        /// 保存实体对象到数据库（部分字段）。
+        /// </summary>
+        public async FTask SavePartial<T>(T? entity,string collection,params string[] propertyNames) where T : Entity, new()
+        {
+            if (entity == null)
+            {
+                Log.Error($"Entity is null: {entity.GetType()}");
+                return;
+            }
+
+            if (propertyNames == null || propertyNames.Length == 0)
+                return;
+
+            using (await mongo.FlowLock.Wait(entity.Id))
+            {
+                var updates = new List<UpdateDefinition<T>>();
+
+                var type = typeof(T);
+
+                foreach (var name in propertyNames)
+                {
+                    var prop = type.GetProperty(name);
+                    if (prop == null)
+                        throw new InvalidOperationException(
+                            $"Property '{name}' not found on {type.Name}");
+
+                    var value = prop.GetValue(entity);
+
+                    updates.Add(Builders<T>.Update.Set(name, value));
+                }
+
+                var combinedUpdate = Builders<T>.Update.Combine(updates);
+
+                await GetCollection<T>(collection).UpdateOneAsync(
+                    x => x.Id == entity.Id,
+                    combinedUpdate,
+                    new UpdateOptions { IsUpsert = false });
             }
         }
 
