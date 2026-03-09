@@ -34,7 +34,7 @@ namespace Fantasy.Helper
     /// 一个Json包装器, 用于包装额外可解析的标头或标尾信息到框架序列化的Json中
     /// </summary>
     [Serializable]
-    public class JsonWrapper<T>: IDataAccessible
+    public class JsonWrapper<T> : IDataAccessible
     {
         /// <summary>
         /// 表示序列化库提供方
@@ -108,8 +108,9 @@ namespace Fantasy.Helper
         public Library Library;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public string GetLibraryMark() {
-            switch(Library)
+        public string GetLibraryMark()
+        {
+            switch (Library)
             {
                 case Library.Newtonsoft:
                     return Mark.N;
@@ -303,18 +304,18 @@ namespace Fantasy.Helper
                 }
             }
             else lock (_lock_M)
+            {
+                for (int i = _lockedCache_M.Count - 1; i >= 0; i--)
                 {
-                    for (int i = _lockedCache_M.Count - 1; i >= 0; i--)
-                    {
-                        var (item1, item2) = _lockedCache_M[i];
-                        if (!item1.Equals(settings))
-                            continue;
+                    var (item1, item2) = _lockedCache_M[i];
+                    if (!item1.Equals(settings))
+                        continue;
 
-                        if (item2 == null)
-                            _lockedCache_M.RemoveAt(i);
-                        else return item2;
-                    }
+                    if (item2 == null)
+                        _lockedCache_M.RemoveAt(i);
+                    else return item2;
                 }
+            }
 
             var opt = new JsonSerializerOptions
             {
@@ -332,9 +333,9 @@ namespace Fantasy.Helper
                 _serializerSettingsCache_M.Add((settings, opt));
             }
             else lock (_lock_M)
-                {
-                    _lockedCache_M.Add((settings, opt));
-                }
+            {
+                _lockedCache_M.Add((settings, opt));
+            }
 
             return opt;
         }
@@ -356,19 +357,19 @@ namespace Fantasy.Helper
                 }
             }
             else lock (_lock_N)
+            {
+                for (int i = _lockedCache_N.Count - 1; i >= 0; i--)
                 {
-                    for (int i = _lockedCache_N.Count - 1; i >= 0; i--)
-                    {
-                        var (item1, item2) = _lockedCache_N[i];
+                    var (item1, item2) = _lockedCache_N[i];
 
-                        if (!item1.Equals(settings))
-                            continue;
+                    if (!item1.Equals(settings))
+                        continue;
 
-                        if (item2 == null)
-                            _lockedCache_N.RemoveAt(i);
-                        else return item2; //直接返回已缓存的设置
-                    }
+                    if (item2 == null)
+                        _lockedCache_N.RemoveAt(i);
+                    else return item2; //直接返回已缓存的设置
                 }
+            }
 
             var setting = new JsonSerializerSettings
             {
@@ -384,9 +385,9 @@ namespace Fantasy.Helper
                 _serializerSettingsCache_N.Add((settings, setting));
             }
             else lock (_lock_N)
-                {
-                    _lockedCache_N.Add((settings, setting));
-                }
+            {
+                _lockedCache_N.Add((settings, setting));
+            }
 
             return setting;
         }
@@ -461,14 +462,14 @@ namespace Fantasy.Helper
         /// <param name="opts">序列化器设置</param>
         public static ReadOnlySpan<byte> ToJsonBytes<T>(this T t, JsonSerializerOptions? opts = null)
         {
-            if(t==null)
+            if (t == null)
                 return null;
 
             var bufferWriter = new ArrayBufferWriter<byte>();
             using var writer = new Utf8JsonWriter(bufferWriter);
             MicrosoftJsonSerializer.Serialize(writer, t, microsoftDefaultOptions);
             writer.Flush();
-            return bufferWriter.WrittenSpan;      
+            return bufferWriter.WrittenSpan;
         }
 #endif
 
@@ -520,7 +521,8 @@ namespace Fantasy.Helper
             {
                 isWrapped = true;
             }
-            else if (detectMode == DetectMode.MustBeNormal) {
+            else if (detectMode == DetectMode.MustBeNormal)
+            {
                 isWrapped = false;
             }
 
@@ -584,7 +586,7 @@ namespace Fantasy.Helper
             else  // --- 处理未经包装的JSON  ---
             {
                 settings ??= new JsonSettings();
-                switch(settings.Value.Library)
+                switch (settings.Value.Library)
                 {
                     case Library.Newtonsoft:
                         return JsonConvert.DeserializeObject(json, type, MakeNewtonsoftSettings(settings.Value, isCacheThreadSafe));
@@ -609,6 +611,9 @@ namespace Fantasy.Helper
         /// <typeparam name="T">目标对象的类型。</typeparam>
         /// <param name="json">要反序列化的 JSON 字符串。</param>
         /// <param name="settings">序列化器设置</param>
+        /// <param name="detectMode">指定为<see cref="DetectMode.MustBeNormal"/>
+        /// 或者<see cref="DetectMode.MustBeWrapper"/> 跳过自动检测, 性能更好；
+        /// 设置为<see cref="DetectMode.Auto"/>如果开启, 会自动检测是否Wrapped、自动检测是哪个库, 代价是性能较差。 </param>
         /// <param name="isCacheThreadSafe">将缓存设置为线程安全, 默认为 false ;如果开启线程安全, 自动加锁会导致性能略微降低. </param>
         /// <returns>反序列化后的对象。</returns>
         public static T Deserialize<T>(this string json, JsonSettings? settings = null, DetectMode detectMode = DetectMode.MustBeWrapper, bool isCacheThreadSafe = false)

@@ -611,6 +611,9 @@ namespace Fantasy.Helper
         /// <typeparam name="T">目标对象的类型。</typeparam>
         /// <param name="json">要反序列化的 JSON 字符串。</param>
         /// <param name="settings">序列化器设置</param>
+        /// <param name="detectMode">指定为<see cref="DetectMode.MustBeNormal"/>
+        /// 或者<see cref="DetectMode.MustBeWrapper"/> 跳过自动检测, 性能更好；
+        /// 设置为<see cref="DetectMode.Auto"/>如果开启, 会自动检测是否Wrapped、自动检测是哪个库, 代价是性能较差。 </param>
         /// <param name="isCacheThreadSafe">将缓存设置为线程安全, 默认为 false ;如果开启线程安全, 自动加锁会导致性能略微降低. </param>
         /// <returns>反序列化后的对象。</returns>
         public static T Deserialize<T>(this string json, JsonSettings? settings = null, DetectMode detectMode = DetectMode.MustBeWrapper, bool isCacheThreadSafe = false)
