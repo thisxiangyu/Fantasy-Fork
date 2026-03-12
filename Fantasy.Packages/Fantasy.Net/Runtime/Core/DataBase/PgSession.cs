@@ -2131,12 +2131,15 @@ namespace Fantasy.Database
             {
 #if DESIGN_TIME
                 var single = entity.GetSingle();
-                int singleCount = single.Count();
+                int singleCount = single == null ? 0:single.Count();
                 int embbededCount = 0;
-                foreach (var kv in single)
+                if(single!=null)
                 {
-                    if (kv.Value.IsAnnotatedAsEmbedded() == true)
-                        embbededCount++;
+                    foreach (var kv in single)
+                    {
+                        if (kv.Value.IsAnnotatedAsEmbedded() == true)
+                            embbededCount++;
+                    }
                 }
                 Log.Debug($"{entity.Type.Name}中有{singleCount}个single(s),其中{embbededCount}个嵌入");
                 Log.Debug($"{entity.Type.Name}转为Json: \n{entity.ToJson(new JsonSettings(Library.Microsoft),true)}");
