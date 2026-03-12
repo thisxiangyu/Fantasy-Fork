@@ -622,6 +622,52 @@ namespace Fantasy.Entitas
         }
 
         /// <summary>
+        /// 尝试添加一个子实体到当前实体上
+        /// </summary>
+        public bool TryAddComponent<T>(T subEntity) where T : Entity, new()
+        {
+            if (this == subEntity)
+            {
+                Log.Error("Cannot add oneself to one's own subEntitys");
+                return false;
+            }
+
+            if (subEntity.IsDisposed)
+            {
+                Log.Error($"SubEntity is Disposed {typeof(T).FullName}");
+                return false;
+            }
+
+            subEntity.Parent?.RemoveComponent(subEntity, false);
+
+            if (TypeSupportedChecker<T>.IsMulti)
+            {
+                Multi ??= EntityMultiCollection.Create(true);
+
+                if (Multi.TryAdd(subEntity.Id, subEntity))
+                {
+                    TryEmbbedMulti(subEntity);
+                }
+                else return false;
+            }
+            else
+            {
+                var typeHashCode = subEntity.TypeHashCode;
+                Single ??= EntityTreeCollection.Create(true);
+
+                if (Single.TryAdd(typeHashCode, subEntity))
+                {
+                    TryEmbbedSingle(subEntity);
+                }
+                else return false;
+            }
+
+            subEntity.Parent = this;
+            subEntity.Scene = Scene;
+            return true;
+        }
+
+        /// <summary>
         /// 添加一个子实体到当前实体上
         /// </summary>
         /// <param name="type">子实体的类型</param>
