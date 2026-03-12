@@ -188,6 +188,18 @@ namespace Fantasy.Entitas
         [NJ.JsonIgnore]
         protected EntityMultiCollection Multi;
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public EntityTreeCollection GetSingle()
+        {
+            return Single;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public EntityMultiCollection GetMulti()
+        {
+            return Multi;
+        }
+
         [BsonElement("s")][BsonIgnoreIfNull][MemoryPackIgnore][ProtoIgnore] protected ReuseList<Entity> EmbbededSingle;
         [BsonElement("m")][BsonIgnoreIfNull][MemoryPackIgnore][ProtoIgnore] protected ReuseList<Entity> EmbbededMulti;
 
@@ -1111,80 +1123,6 @@ namespace Fantasy.Entitas
             TypeHashCode = TypeHashCache.GetHashCode(Type);
         }
 
-        #endregion
-
-        #region ForEach
-
-        /// <summary>
-        /// 查询当前实体下的实现了IMultiAppended接口的实体
-        /// </summary>
-        [BsonIgnore]
-#if FANTASY_NET
-        [NotMapped]
-        [MJ.JsonIgnore]
-#endif
-        [NJ.JsonIgnore]
-        [MemoryPackIgnore]
-        [IgnoreDataMember]
-        [ProtoIgnore]
-        public IEnumerable<Entity> ForEachAllMulti
-        {
-            get
-            {
-                if (Multi == null)
-                {
-                    yield break;
-                }
-
-                foreach (var (_, supportedMultiEntity) in Multi)
-                {
-                    yield return supportedMultiEntity;
-                }
-            }
-        }
-        /// <summary>
-        /// 查找当前实体下的所有某个类型的MultiAppended的子实体
-        /// </summary>
-        public IEnumerable<T> ForEachMulti<T>() where T : Entity, IMultiAppended
-        {
-            if (Multi == null)
-            {
-                yield break;
-            }
-
-            foreach (var (_, entity) in Multi)
-            {
-                if(entity is T res)
-                    yield return res;
-            }
-        }
-        /// <summary>
-        /// 查找当前实体下的所有子实体，不包括实现IMultiAppended接口的实体
-        /// </summary>
-        [BsonIgnore]
-#if FANTASY_NET
-        [NotMapped]
-        [MJ.JsonIgnore]
-#endif
-        [NJ.JsonIgnore]
-        [MemoryPackIgnore]
-        [IgnoreDataMember]
-        [ProtoIgnore]
-        public IEnumerable<Entity> ForEachAllSingle
-        {
-            get
-            {
-                if (Single == null)
-                {
-                    yield break;
-                }
-
-                foreach (var (_, entity) in Single)
-                {
-                    yield return entity;
-                }
-            }
-        }
         #endregion
 
         #region Dispose
