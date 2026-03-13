@@ -79,7 +79,7 @@ namespace Fantasy.Entitas.TypeMeta
     /// <item><description>适合在泛型方法中使用，如 GetComponent&lt;P&gt;()</description></item>
     /// </list>
     /// </remarks>
-    internal static class TypeHashCache<T>
+    public static class TypeHashCache<T>
     {
         /// <summary>
         /// 获取实体类型 <typeparamref name="T"/> 的哈希码。
