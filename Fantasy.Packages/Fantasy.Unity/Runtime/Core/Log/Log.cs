@@ -23,6 +23,10 @@ namespace Fantasy
         /// 紧急情况
         /// </summary>
         CriticalEmergency,
+        /// <summary>
+        /// 非预期情况
+        /// </summary>
+        Unexpected,
     }
 
     /// <summary>
@@ -43,11 +47,11 @@ namespace Fantasy
                 _logCore = new ConsoleLog();  
 #endif
 #if FANTASY_UNITY
-                _logCore = new UnityLog(); 
-#endif         
+                _logCore = new UnityLog();
+#endif
                 return;
             }
-            
+
             _logCore = log;
 #if FANTASY_NET
             _logCore.Initialize(ProgramDefine.RuntimeMode);
@@ -106,7 +110,7 @@ namespace Fantasy
         /// </summary>
         /// <param name="msg">日志消息。</param>
         /// <param name="errType">报错类型。</param>
-        public static void Error(string msg,ErrType errType = ErrType.UnDefined)
+        public static void Error(string msg, ErrType errType = ErrType.UnDefined)
         {
             var st = new StackTrace(1, true);
             string prefix = errType == ErrType.UnDefined ? string.Empty : $" ({errType}!) ";

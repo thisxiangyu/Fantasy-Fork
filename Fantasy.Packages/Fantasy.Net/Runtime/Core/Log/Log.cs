@@ -23,6 +23,10 @@ namespace Fantasy
         /// 紧急情况
         /// </summary>
         CriticalEmergency,
+        /// <summary>
+        /// 非预期情况
+        /// </summary>
+        Unexpected,
     }
 
     /// <summary>
