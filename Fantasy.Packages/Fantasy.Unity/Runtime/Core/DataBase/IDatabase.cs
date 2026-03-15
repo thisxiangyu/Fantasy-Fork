@@ -200,7 +200,7 @@ namespace Fantasy.Database
         /// </summary>
         FTask<T> First<T>(string json, string[] cols, bool isDeserialize = false, string name = null) where T : Entity;
         /// <summary>
-        /// 查询指定存储集中唯一一个实体。
+        /// 查询指定存储集中唯一一个实体。如果重复会报错。
         /// </summary>
         FTask<T?> SingleOrDefault<T>(Expression<Func<T, bool>> filter, bool isDeserialize = true, string table = null) where T : Entity;
         /// <summary>
