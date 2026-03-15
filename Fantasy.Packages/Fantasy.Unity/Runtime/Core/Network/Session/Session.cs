@@ -44,12 +44,13 @@ namespace Fantasy.Network
         /// 当前Session的终结点信息
         /// </summary>
         public IPEndPoint RemoteEndPoint { get; private set; }
-        private ANetworkMessageScheduler NetworkMessageScheduler { get; set;}
+        private ANetworkMessageScheduler NetworkMessageScheduler { get; set; }
         internal readonly Dictionary<long, FTask<IResponse>> RequestCallback = new();
         /// <summary>
         /// Session的Dispose委托
         /// </summary>
         internal event Action OnDispose;
+        public event Action OnWillDispose;
 #if FANTASY_NET
         internal RouteComponent RouteComponent;
         internal SessionRoamingComponent SessionRoamingComponent;
@@ -169,6 +170,7 @@ namespace Fantasy.Network
             RouteComponent = null;
             AddressableRouteComponent = null;
 #endif
+            OnWillDispose?.Invoke();
             base.Dispose();
 
             // 终止所有等待中的请求回调
@@ -176,7 +178,8 @@ namespace Fantasy.Network
             {
                 requestCallback.SetException(new Exception($"session is dispose: {Id}"));
             }
-            
+
+            OnWillDispose = null;
             RequestCallback.Clear();
             OnDispose?.Invoke();
         }
@@ -187,10 +190,10 @@ namespace Fantasy.Network
             {
                 return;
             }
-            
+
             Channel.Send(rpcId, address, null, message, messageType);
         }
-        
+
         /// <summary>
         /// 发送一个消息
         /// </summary>
@@ -206,7 +209,7 @@ namespace Fantasy.Network
 
             Channel.Send(rpcId, address, null, message, typeof(T));
         }
-        
+
         /// <summary>
         /// 发送一个RPC消息
         /// </summary>
@@ -219,9 +222,9 @@ namespace Fantasy.Network
             {
                 return null;
             }
-            
+
             var requestCallback = FTask<IResponse>.Create();
-            var rpcId = ++_rpcId; 
+            var rpcId = ++_rpcId;
             RequestCallback.Add(rpcId, requestCallback);
             Send<T>(request, rpcId, address);
             return requestCallback;

@@ -50,6 +50,7 @@ namespace Fantasy.Network
         /// Session的Dispose委托
         /// </summary>
         internal event Action OnDispose;
+        public event Action OnWillDispose;
 #if FANTASY_NET
         internal RouteComponent RouteComponent;
         internal SessionRoamingComponent SessionRoamingComponent;
@@ -169,6 +170,7 @@ namespace Fantasy.Network
             RouteComponent = null;
             AddressableRouteComponent = null;
 #endif
+            OnWillDispose?.Invoke();
             base.Dispose();
 
             // 终止所有等待中的请求回调
@@ -176,7 +178,8 @@ namespace Fantasy.Network
             {
                 requestCallback.SetException(new Exception($"session is dispose: {Id}"));
             }
-            
+
+            OnWillDispose = null;
             RequestCallback.Clear();
             OnDispose?.Invoke();
         }
