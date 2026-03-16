@@ -196,7 +196,7 @@ namespace Fantasy
         {
             if (!IsPool()) return; 
             Tag = default;
-            Data = default;
+            Data = null;
             MessageObjectPool<C2G_TestRequest>.Return(this);
         }
         public uint OpCode() { return OuterOpcode.C2G_TestRequest; } 
@@ -205,7 +205,7 @@ namespace Fantasy
         [ProtoMember(1)]
         public string Tag { get; set; }
         [ProtoMember(2)]
-        public byte Data { get; set; }
+        public List<byte> Data { get; set; }
     }
     [Serializable]
     [ProtoContract]
@@ -1859,6 +1859,90 @@ namespace Fantasy
         public string Tag { get; set; }
     }
     /// <summary>
+    /// 客户端向服务器发送登录连接消息（Roaming）
+    /// </summary>
+    [Serializable]
+    [ProtoContract]
+    public partial class C2G_LoginRoamingRequest : AMessage, IRequest
+    {
+        public static C2G_LoginRoamingRequest Create(bool autoReturn = true)
+        {
+            var c2G_LoginRoamingRequest = MessageObjectPool<C2G_LoginRoamingRequest>.Rent();
+            c2G_LoginRoamingRequest.AutoReturn = autoReturn;
+            
+            if (!autoReturn)
+            {
+                c2G_LoginRoamingRequest.SetIsPool(false);
+            }
+            
+            return c2G_LoginRoamingRequest;
+        }
+        
+        public void Return()
+        {
+            if (!AutoReturn)
+            {
+                SetIsPool(true);
+                AutoReturn = true;
+            }
+            else if (!IsPool())
+            {
+                return;
+            }
+            Dispose();
+        }
+
+        public void Dispose()
+        {
+            if (!IsPool()) return; 
+            MessageObjectPool<C2G_LoginRoamingRequest>.Return(this);
+        }
+        public uint OpCode() { return OuterOpcode.C2G_LoginRoamingRequest; } 
+        [ProtoIgnore]
+        public G2C_ConnectRoamingResponse ResponseType { get; set; }
+    }
+    [Serializable]
+    [ProtoContract]
+    public partial class G2C_LoginRoamingResponse : AMessage, IResponse
+    {
+        public static G2C_LoginRoamingResponse Create(bool autoReturn = true)
+        {
+            var g2C_LoginRoamingResponse = MessageObjectPool<G2C_LoginRoamingResponse>.Rent();
+            g2C_LoginRoamingResponse.AutoReturn = autoReturn;
+            
+            if (!autoReturn)
+            {
+                g2C_LoginRoamingResponse.SetIsPool(false);
+            }
+            
+            return g2C_LoginRoamingResponse;
+        }
+        
+        public void Return()
+        {
+            if (!AutoReturn)
+            {
+                SetIsPool(true);
+                AutoReturn = true;
+            }
+            else if (!IsPool())
+            {
+                return;
+            }
+            Dispose();
+        }
+
+        public void Dispose()
+        {
+            if (!IsPool()) return; 
+            ErrorCode = 0;
+            MessageObjectPool<G2C_LoginRoamingResponse>.Return(this);
+        }
+        public uint OpCode() { return OuterOpcode.G2C_LoginRoamingResponse; } 
+        [ProtoMember(1)]
+        public uint ErrorCode { get; set; }
+    }
+    /// <summary>
     /// 通知Gate服务器发送一个内网消息通知Map服务器向Gate服务器注册一个领域事件
     /// </summary>
     [Serializable]
@@ -2193,6 +2277,174 @@ namespace Fantasy
         public uint OpCode() { return OuterOpcode.G2C_MapUnsubscribeSphereEventResponse; } 
         [ProtoMember(1)]
         public uint ErrorCode { get; set; }
+    }
+    [Serializable]
+    [ProtoContract]
+    public partial class ChatInfoData : AMessage, IDisposable
+    {
+        public static ChatInfoData Create(bool autoReturn = true)
+        {
+            var chatInfoData = MessageObjectPool<ChatInfoData>.Rent();
+            chatInfoData.AutoReturn = autoReturn;
+            
+            if (!autoReturn)
+            {
+                chatInfoData.SetIsPool(false);
+            }
+            
+            return chatInfoData;
+        }
+        
+        public void Return()
+        {
+            if (!AutoReturn)
+            {
+                SetIsPool(true);
+                AutoReturn = true;
+            }
+            else if (!IsPool())
+            {
+                return;
+            }
+            Dispose();
+        }
+
+        public void Dispose()
+        {
+            if (!IsPool()) return; 
+            Data = null;
+            MessageObjectPool<ChatInfoData>.Return(this);
+        }
+        [ProtoMember(1)]
+        public byte[] Data { get; set; }
+    }
+    [Serializable]
+    [MemoryPackable]
+    public partial class TestMemoryPackInfo : AMessage, IDisposable
+    {
+        public static TestMemoryPackInfo Create(bool autoReturn = true)
+        {
+            var testMemoryPackInfo = MessageObjectPool<TestMemoryPackInfo>.Rent();
+            testMemoryPackInfo.AutoReturn = autoReturn;
+            
+            if (!autoReturn)
+            {
+                testMemoryPackInfo.SetIsPool(false);
+            }
+            
+            return testMemoryPackInfo;
+        }
+        
+        public void Return()
+        {
+            if (!AutoReturn)
+            {
+                SetIsPool(true);
+                AutoReturn = true;
+            }
+            else if (!IsPool())
+            {
+                return;
+            }
+            Dispose();
+        }
+
+        public void Dispose()
+        {
+            if (!IsPool()) return; 
+            A = default;
+            MessageObjectPool<TestMemoryPackInfo>.Return(this);
+        }
+        [MemoryPackOrder(1)]
+        public string A { get; set; }
+    }
+    [Serializable]
+    [MemoryPackable]
+    public partial class C2G_TestMemoryPackRequest : AMessage, IRequest
+    {
+        public static C2G_TestMemoryPackRequest Create(bool autoReturn = true)
+        {
+            var c2G_TestMemoryPackRequest = MessageObjectPool<C2G_TestMemoryPackRequest>.Rent();
+            c2G_TestMemoryPackRequest.AutoReturn = autoReturn;
+            
+            if (!autoReturn)
+            {
+                c2G_TestMemoryPackRequest.SetIsPool(false);
+            }
+            
+            return c2G_TestMemoryPackRequest;
+        }
+        
+        public void Return()
+        {
+            if (!AutoReturn)
+            {
+                SetIsPool(true);
+                AutoReturn = true;
+            }
+            else if (!IsPool())
+            {
+                return;
+            }
+            Dispose();
+        }
+
+        public void Dispose()
+        {
+            if (!IsPool()) return; 
+            MessageObjectPool<C2G_TestMemoryPackRequest>.Return(this);
+        }
+        public uint OpCode() { return OuterOpcode.C2G_TestMemoryPackRequest; } 
+        [MemoryPackIgnore]
+        public G2C_TestMemoryPackResponse ResponseType { get; set; }
+    }
+    [Serializable]
+    [MemoryPackable]
+    public partial class G2C_TestMemoryPackResponse : AMessage, IResponse
+    {
+        public static G2C_TestMemoryPackResponse Create(bool autoReturn = true)
+        {
+            var g2C_TestMemoryPackResponse = MessageObjectPool<G2C_TestMemoryPackResponse>.Rent();
+            g2C_TestMemoryPackResponse.AutoReturn = autoReturn;
+            
+            if (!autoReturn)
+            {
+                g2C_TestMemoryPackResponse.SetIsPool(false);
+            }
+            
+            return g2C_TestMemoryPackResponse;
+        }
+        
+        public void Return()
+        {
+            if (!AutoReturn)
+            {
+                SetIsPool(true);
+                AutoReturn = true;
+            }
+            else if (!IsPool())
+            {
+                return;
+            }
+            Dispose();
+        }
+
+        public void Dispose()
+        {
+            if (!IsPool()) return; 
+            ErrorCode = 0;
+            if (Info != null)
+            {
+                Info.Dispose();
+                Info = null;
+            }
+            MessageObjectPool<G2C_TestMemoryPackResponse>.Return(this);
+        }
+        public uint OpCode() { return OuterOpcode.G2C_TestMemoryPackResponse; } 
+        [MemoryPackOrder(1)]
+        public uint ErrorCode { get; set; }
+        [MemoryPackOrder(2)]
+        public TestMemoryPackInfo Info { get; set; }
     }
     /// <summary>
     /// 客户端登陆到Gate服务器
@@ -2566,6 +2818,7 @@ namespace Fantasy
         {
             if (!IsPool()) return; 
             ErrorCode = 0;
+            foreach (var __t in Data) __t.Dispose();
             Data.Clear();
             MessageObjectPool<M2C_MoveResponse>.Return(this);
         }

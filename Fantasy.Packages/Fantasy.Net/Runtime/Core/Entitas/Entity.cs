@@ -126,7 +126,7 @@ namespace Fantasy.Entitas
 #endif
         [NJ.JsonIgnore]
         [MemoryPackIgnore]
-        public long TypeHashCode { get; private set; }
+        public long TypeHashCode { get; protected set; }
 
         #region 判断是否为嵌入式DbSet, 目前有基于接口和基于Attri两种判断方式,未来可能只保留一种
 

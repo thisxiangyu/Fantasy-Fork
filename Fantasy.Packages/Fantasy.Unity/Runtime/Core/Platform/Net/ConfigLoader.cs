@@ -7,6 +7,7 @@ using Fantasy.IdFactory;
 using Fantasy.Network;
 using Fantasy.Platform.Net;
 // ReSharper disable ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
+#pragma warning disable CS8604 // Possible null reference argument.
 
 namespace Fantasy;
 
@@ -288,7 +289,8 @@ public static class ConfigLoader
     /// </summary>
     private static string? GetOptionalAttribute(XmlNode? node, string attributeName)
     {
-        return node?.Attributes?[attributeName]?.Value;
+        var value = node?.Attributes?[attributeName]?.Value;
+        return string.IsNullOrWhiteSpace(value) ? null : value;
     }
 
     /// <summary>

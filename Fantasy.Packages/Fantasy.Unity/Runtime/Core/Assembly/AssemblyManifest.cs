@@ -190,6 +190,7 @@ namespace Fantasy.Assembly
             { 
                 Scene.SceneTypeDictionary = sceneTypeDictionary.ToFrozenDictionary();
             }
+            
             customInterfaceRegistrar.Register(manifest._customInterfaces);
             Manifests.TryAdd(assemblyManifestId, manifest);
             AssemblyLifecycle.OnLoad(manifest).Coroutine();

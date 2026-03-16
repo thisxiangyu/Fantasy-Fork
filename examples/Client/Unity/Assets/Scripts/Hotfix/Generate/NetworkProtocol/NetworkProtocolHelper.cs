@@ -51,7 +51,7 @@ namespace Fantasy
 			return (G2C_TestResponse)await session.Call(C2G_TestRequest_request);
 		}
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		public static async FTask<G2C_TestResponse> C2G_TestRequest(this Session session, string tag, byte data)
+		public static async FTask<G2C_TestResponse> C2G_TestRequest(this Session session, string tag, List<byte> data)
 		{
 			using var C2G_TestRequest_request = Fantasy.C2G_TestRequest.Create();
 			C2G_TestRequest_request.Tag = tag;
@@ -372,6 +372,17 @@ namespace Fantasy
 			session.Send(C2G_TestRoamingToRoaming_message);
 		}
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public static async FTask<G2C_ConnectRoamingResponse> C2G_LoginRoamingRequest(this Session session, C2G_LoginRoamingRequest C2G_LoginRoamingRequest_request)
+		{
+			return (G2C_ConnectRoamingResponse)await session.Call(C2G_LoginRoamingRequest_request);
+		}
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public static async FTask<G2C_ConnectRoamingResponse> C2G_LoginRoamingRequest(this Session session)
+		{
+			using var C2G_LoginRoamingRequest_request = Fantasy.C2G_LoginRoamingRequest.Create();
+			return (G2C_ConnectRoamingResponse)await session.Call(C2G_LoginRoamingRequest_request);
+		}
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static async FTask<G2C_SubscribeSphereEventResponse> C2G_SubscribeSphereEventRequest(this Session session, C2G_SubscribeSphereEventRequest C2G_SubscribeSphereEventRequest_request)
 		{
 			return (G2C_SubscribeSphereEventResponse)await session.Call(C2G_SubscribeSphereEventRequest_request);
@@ -414,6 +425,17 @@ namespace Fantasy
 		{
 			using var C2G_MapUnsubscribeSphereEventRequest_request = Fantasy.C2G_MapUnsubscribeSphereEventRequest.Create();
 			return (G2C_MapUnsubscribeSphereEventResponse)await session.Call(C2G_MapUnsubscribeSphereEventRequest_request);
+		}
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public static async FTask<G2C_TestMemoryPackResponse> C2G_TestMemoryPackRequest(this Session session, C2G_TestMemoryPackRequest C2G_TestMemoryPackRequest_request)
+		{
+			return (G2C_TestMemoryPackResponse)await session.Call(C2G_TestMemoryPackRequest_request);
+		}
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public static async FTask<G2C_TestMemoryPackResponse> C2G_TestMemoryPackRequest(this Session session)
+		{
+			using var C2G_TestMemoryPackRequest_request = Fantasy.C2G_TestMemoryPackRequest.Create();
+			return (G2C_TestMemoryPackResponse)await session.Call(C2G_TestMemoryPackRequest_request);
 		}
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static async FTask<G2C_LoginGameResponse> C2G_LoginGameRequest(this Session session, C2G_LoginGameRequest C2G_LoginGameRequest_request)
