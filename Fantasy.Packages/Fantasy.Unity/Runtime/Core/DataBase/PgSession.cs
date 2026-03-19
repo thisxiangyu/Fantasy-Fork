@@ -1982,6 +1982,13 @@ namespace Fantasy.Database
                 {
                     case PreferSqlMode.EFCore:
                         {
+                            var local = Set<T>().Local.FirstOrDefault(entry => entry.Id == entity.Id);
+                            if (local != null)
+                            {
+                                // 如果内存里已经有了，就把旧的踢出去 (Detached)
+                                Entry(local).State = EntityState.Detached;
+                            }
+
                             Attach(entity);
                             var entry = Entry(entity);
 

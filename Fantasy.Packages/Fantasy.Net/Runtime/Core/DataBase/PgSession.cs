@@ -864,7 +864,7 @@ namespace Fantasy.Database
             T res = null;
             using (await pg.FlowLock.WaitIfTooMuch())
             {
-                res = await Set<T>().SingleOrDefaultAsync(filter);
+                res = await Set<T>().AsNoTracking().SingleOrDefaultAsync(filter);
 
                 if (res == null)
                 {
@@ -943,7 +943,7 @@ namespace Fantasy.Database
             List<T> list;
             using (await pg.FlowLock.WaitIfTooMuch())
             {
-                list = await Set<T>().Where(filter).ToListAsync();
+                list = await Set<T>().AsNoTracking().Where(filter).ToListAsync();
             }
 
             if (list == null || list.Count == 0 )          

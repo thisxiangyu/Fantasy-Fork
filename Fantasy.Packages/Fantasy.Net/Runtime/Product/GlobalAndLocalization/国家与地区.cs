@@ -18,7 +18,7 @@ namespace Fantasy.GlobalAndLocalization
         /// 据<see cref="区域码"/>
         /// </summary>
         public string 当前所在国家或地区 { get; set; } = "Unknown";
-        public string 当前所选语言码 { get; set; } = "en";
+        public string 当前所选语言码 { get; set; } = string.Empty;
 
 #if FANTASY_UNITY
         public IEnumerator 快速获取当前IP区域代码(Action<string> callback)
