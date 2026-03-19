@@ -113,7 +113,7 @@ namespace Fantasy
         public static void Error(string msg,ErrType errType = ErrType.UnDefined)
         {
             var st = new StackTrace(1, true);
-            string prefix = errType == ErrType.UnDefined ? string.Empty : $" ({errType}!) ";
+            string prefix = errType == ErrType.UnDefined ? string.Empty : $"({errType})";
             _logCore.Error($"{prefix}{msg}\n{st}");
         }
 
@@ -124,7 +124,7 @@ namespace Fantasy
         /// <param name="e">异常对象。</param>
         public static void Error(Exception e, ErrType errType = ErrType.UnDefined)
         {
-            string prefix = errType == ErrType.UnDefined ? string.Empty : $" ({errType}!) ";
+            string prefix = errType == ErrType.UnDefined ? string.Empty : $"({errType})";
             if (e.Data.Contains("StackTrace"))
             {
                 _logCore.Error($"{prefix}{e.Data["StackTrace"]}\n{e}");
@@ -184,7 +184,7 @@ namespace Fantasy
         public static void Error(string message, ErrType errType = ErrType.UnDefined, params object[] args)
         {
             var st = new StackTrace(1, true);
-            string prefix = errType == ErrType.UnDefined ? string.Empty : $" ({errType}!) ";
+            string prefix = errType == ErrType.UnDefined ? string.Empty : $"({errType})";
             var s = string.Format($"{prefix}{message}", args) + '\n' + st;
             _logCore.Error(s);
         }

@@ -34,6 +34,15 @@ namespace Fantasy.Entitas
     /// Entity接口
     /// </summary>
     public interface IEntity : IDisposable, IPool { }
+
+    /// <summary>
+    /// 反序列化复原方式
+    /// </summary>
+    public enum DeserializationRestore
+    {
+        FixEmbbeded,
+        TryEmbbed,
+    }
     
     /// <summary>
     /// Entity的抽象类，各类业务Entity皆继承于此。
@@ -176,7 +185,7 @@ namespace Fantasy.Entitas
         [MJ.JsonIgnore]
 #endif
         [NJ.JsonIgnore]
-        protected EntityTreeCollection Single;
+        public EntityTreeCollection Single;
 
         [BsonIgnore]
         [MemoryPackInclude]
@@ -186,33 +195,12 @@ namespace Fantasy.Entitas
         [MJ.JsonIgnore]
 #endif
         [NJ.JsonIgnore]
-        protected EntityMultiCollection Multi;
+        public EntityMultiCollection Multi;
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public EntityTreeCollection GetSingle()
-        {
-            return Single;
-        }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public EntityMultiCollection GetMulti()
-        {
-            return Multi;
-        }
+        [NotMapped][BsonElement("s")][BsonIgnoreIfNull][MemoryPackIgnore][ProtoIgnore] public ReuseList<Entity> EmbbededSingle { get; set; }
+        [NotMapped][BsonElement("m")][BsonIgnoreIfNull][MemoryPackIgnore][ProtoIgnore] public ReuseList<Entity> EmbbededMulti { get; set; }
 
-        [BsonElement("s")][BsonIgnoreIfNull][MemoryPackIgnore][ProtoIgnore] protected ReuseList<Entity> EmbbededSingle;
-        [BsonElement("m")][BsonIgnoreIfNull][MemoryPackIgnore][ProtoIgnore] protected ReuseList<Entity> EmbbededMulti;
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal ReuseList<Entity> GetCollectionOfEmbbededSingle() {
-            return EmbbededSingle;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal ReuseList<Entity> GetCollectionOfEmbbedMulti()
-        {
-            return EmbbededMulti;
-        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void TryEmbbedSingle(Entity subEntity) {
@@ -275,7 +263,6 @@ namespace Fantasy.Entitas
                 }
             }
         }
-
 
         /// <summary>
         /// 获得父Entity
@@ -1105,8 +1092,9 @@ namespace Fantasy.Entitas
         /// 所以必须要执行一下这个反序列化的方法才可以使用。
         /// </summary>
         /// <param name="scene">Scene</param>
+        /// <param name="restore">反序列化还原的方式, 不同方式做不同处理</param>
         /// <param name="resetId">是否是重新生成实体的Id,如果是数据库加载过来的一般是不需要的</param>
-        public virtual void Deserialize(Scene scene, bool resetId = false)
+        public virtual void Deserialize(Scene scene, DeserializationRestore restore, bool resetId = false)
         {
             if (RuntimeId != 0)
             {
@@ -1123,27 +1111,60 @@ namespace Fantasy.Entitas
                     Id = RuntimeId;
                 }
 
-                if (Single != null && Single.Count > 0)
+                switch(restore)
                 {
-                    EmbbededSingle.Clear();
-                    foreach (var (_, entity) in Single)
-                    {
-                        entity.Parent = this;
-                        entity.Type = null;
-                        TryEmbbedSingle(entity);
-                        entity.Deserialize(scene, resetId);
-                    }
-                }
+                    // 将嵌入数据, 恢复到正常实体层级中
+                    case DeserializationRestore.FixEmbbeded:
+                        {
+                            if (EmbbededSingle?.Count > 0)
+                            {
+                                Single ??= EntityTreeCollection.Create(true);
+                                foreach (var entity in EmbbededSingle)
+                                {
+                                    entity.Parent = this;
+                                    entity.Deserialize(scene, restore, resetId);
+                                    Single.TryAdd(entity.TypeHashCode, entity);
+                                }
+                            }
 
-                if (Multi != null && Multi.Count > 0)
-                {
-                    EmbbededMulti.Clear();
-                    foreach (var (_, entity) in Multi)
-                    {
-                        entity.Parent = this;
-                        TryEmbbedMulti(entity);
-                        entity.Deserialize(scene, resetId);
-                    }
+                            if (EmbbededMulti?.Count > 0)
+                            {
+                                Multi ??= EntityMultiCollection.Create(true);
+                                foreach (var entity in EmbbededMulti)
+                                {
+                                    entity.Parent = this;
+                                    entity.Deserialize(scene, restore, resetId);
+                                    Multi.TryAdd(entity.Id, entity);
+                                }
+                            }
+                        }
+                        break;
+                    // 检测嵌入数据并尝试填充
+                    case DeserializationRestore.TryEmbbed:
+                        {
+                            if (Single?.Count > 0)
+                            {
+                                EmbbededSingle.Clear();
+                                foreach (var (_, entity) in Single)
+                                {
+                                    entity.Parent = this;
+                                    TryEmbbedSingle(entity);
+                                    entity.Deserialize(scene, restore, resetId);
+                                }
+                            }
+
+                            if (Multi?.Count > 0)
+                            {
+                                EmbbededMulti.Clear();
+                                foreach (var (_, entity) in Multi)
+                                {
+                                    entity.Parent = this;
+                                    TryEmbbedMulti(entity);
+                                    entity.Deserialize(scene, restore, resetId);
+                                }
+                            }
+                        }
+                        break;
                 }
 
                 scene.AddEntity(this);

@@ -196,7 +196,7 @@ namespace Fantasy.Database
 
             if (isDeserialize && v != null)
             {
-                v.Deserialize(mongo.Scene);
+                v.Deserialize(mongo.Scene, DeserializationRestore.FixEmbbeded);
             }
 
             return v;
@@ -219,7 +219,7 @@ namespace Fantasy.Database
 
                 if (isDeserialize && v != null)
                 {
-                    v.Deserialize(mongo.Scene);
+                    v.Deserialize(mongo.Scene, DeserializationRestore.FixEmbbeded);
                 }
 
                 return v;
@@ -289,7 +289,7 @@ namespace Fantasy.Database
 
                 foreach (var entity in list)
                 {
-                    entity.Deserialize(mongo.Scene);
+                    entity.Deserialize(mongo.Scene, DeserializationRestore.FixEmbbeded);
                 }
 
                 return list;
@@ -328,7 +328,7 @@ namespace Fantasy.Database
 
                 foreach (var entity in list)
                 {
-                    entity.Deserialize(mongo.Scene);
+                    entity.Deserialize(mongo.Scene, DeserializationRestore.FixEmbbeded);
                 }
 
                 return list;
@@ -369,7 +369,7 @@ namespace Fantasy.Database
 
                 foreach (var entity in list)
                 {
-                    entity.Deserialize(mongo.Scene);
+                    entity.Deserialize(mongo.Scene, DeserializationRestore.FixEmbbeded);
                 }
 
                 return list;
@@ -393,7 +393,7 @@ namespace Fantasy.Database
 
                 if (isDeserialize && t != null)
                 {
-                    t.Deserialize(mongo.Scene);
+                    t.Deserialize(mongo.Scene, DeserializationRestore.FixEmbbeded);
                 }
 
                 return t;
@@ -429,7 +429,7 @@ namespace Fantasy.Database
 
                 if (isDeserialize && t != null)
                 {
-                    t.Deserialize(mongo.Scene);
+                    t.Deserialize(mongo.Scene, DeserializationRestore.FixEmbbeded);
                 }
 
                 return t;
@@ -447,7 +447,7 @@ namespace Fantasy.Database
                             .Find(filter)
                             .SingleOrDefaultAsync();
             if (isDeserialize)
-                res.Deserialize(mongo.Scene);
+                res.Deserialize(mongo.Scene, DeserializationRestore.FixEmbbeded);
             return res;
         }
 
@@ -483,7 +483,7 @@ namespace Fantasy.Database
 
                 foreach (var entity in list)
                 {
-                    entity.Deserialize(mongo.Scene);
+                    entity.Deserialize(mongo.Scene, DeserializationRestore.FixEmbbeded);
                 }
 
                 return list;
@@ -512,7 +512,7 @@ namespace Fantasy.Database
 
                 foreach (var entity in list)
                 {
-                    entity.Deserialize(mongo.Scene);
+                    entity.Deserialize(mongo.Scene, DeserializationRestore.FixEmbbeded);
                 }
 
                 return list;
@@ -548,7 +548,7 @@ namespace Fantasy.Database
 
                     if (isDeserialize)
                     {
-                        e.Deserialize(mongo.Scene);
+                        e.Deserialize(mongo.Scene, DeserializationRestore.FixEmbbeded);
                     }
 
                     result.Add(e);
@@ -579,7 +579,7 @@ namespace Fantasy.Database
 
                 foreach (var entity in list)
                 {
-                    entity.Deserialize(mongo.Scene);
+                    entity.Deserialize(mongo.Scene, DeserializationRestore.FixEmbbeded);
                 }
 
                 return list;
@@ -620,7 +620,7 @@ namespace Fantasy.Database
 
                 foreach (var entity in list)
                 {
-                    entity.Deserialize(mongo.Scene);
+                    entity.Deserialize(mongo.Scene, DeserializationRestore.FixEmbbeded);
                 }
 
                 return list;
@@ -651,7 +651,7 @@ namespace Fantasy.Database
 
                 foreach (var entity in list)
                 {
-                    entity.Deserialize(mongo.Scene);
+                    entity.Deserialize(mongo.Scene, DeserializationRestore.FixEmbbeded);
                 }
 
                 return list;
@@ -687,7 +687,7 @@ namespace Fantasy.Database
 
                 foreach (var entity in list)
                 {
-                    entity.Deserialize(mongo.Scene);
+                    entity.Deserialize(mongo.Scene, DeserializationRestore.FixEmbbeded);
                 }
 
                 return list;
@@ -728,7 +728,7 @@ namespace Fantasy.Database
 
                 foreach (var entity in list)
                 {
-                    entity.Deserialize(mongo.Scene);
+                    entity.Deserialize(mongo.Scene, DeserializationRestore.FixEmbbeded);
                 }
 
                 return list;

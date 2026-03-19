@@ -228,15 +228,15 @@ namespace Fantasy.Helper
             /// <summary>
             /// 序列化库
             /// </summary>
-            public const string L = "$L";
+            public const string L = "L";
             /// <summary>
             /// 数据存放处
             /// </summary>
-            public const string D = "$D";
+            public const string D = "D";
             /// <summary>
             /// 类型标识
             /// </summary>
-            public const string T = "$T";
+            public const string T = "T";
         }
 
         #region 把JsonSettings分别映射到提供方的设置项
@@ -304,18 +304,18 @@ namespace Fantasy.Helper
                 }
             }
             else lock (_lock_M)
+            {
+                for (int i = _lockedCache_M.Count - 1; i >= 0; i--)
                 {
-                    for (int i = _lockedCache_M.Count - 1; i >= 0; i--)
-                    {
-                        var (item1, item2) = _lockedCache_M[i];
-                        if (!item1.Equals(settings))
-                            continue;
+                    var (item1, item2) = _lockedCache_M[i];
+                    if (!item1.Equals(settings))
+                        continue;
 
-                        if (item2 == null)
-                            _lockedCache_M.RemoveAt(i);
-                        else return item2;
-                    }
+                    if (item2 == null)
+                        _lockedCache_M.RemoveAt(i);
+                    else return item2;
                 }
+            }
 
             var opt = new JsonSerializerOptions
             {
@@ -333,9 +333,9 @@ namespace Fantasy.Helper
                 _serializerSettingsCache_M.Add((settings, opt));
             }
             else lock (_lock_M)
-                {
-                    _lockedCache_M.Add((settings, opt));
-                }
+            {
+                _lockedCache_M.Add((settings, opt));
+            }
 
             return opt;
         }
@@ -462,14 +462,14 @@ namespace Fantasy.Helper
         /// <param name="opts">序列化器设置</param>
         public static ReadOnlySpan<byte> ToJsonBytes<T>(this T t, JsonSerializerOptions? opts = null)
         {
-            if(t==null)
+            if (t == null)
                 return null;
 
             var bufferWriter = new ArrayBufferWriter<byte>();
             using var writer = new Utf8JsonWriter(bufferWriter);
             MicrosoftJsonSerializer.Serialize(writer, t, microsoftDefaultOptions);
             writer.Flush();
-            return bufferWriter.WrittenSpan;      
+            return bufferWriter.WrittenSpan;
         }
 #endif
 
@@ -537,9 +537,9 @@ namespace Fantasy.Helper
                     libraryMark = libMarkElement.Value<string>();
 #endif
                 else if (settings != null)
-                            libraryMark = settings.Value.GetLibraryMark();
-                        else
-                            libraryMark = Mark.M;
+                    libraryMark = settings.Value.GetLibraryMark();
+                else
+                    libraryMark = Mark.M;
 
 
                 // 获取或构造闭合泛型 Wrapper<T> 类型
@@ -568,7 +568,7 @@ namespace Fantasy.Helper
 #if FANTASY_UNITY
                             if (settings != null)
                                 Log.Info("You are trying to use advanced JsonSettings whitch may not be supported by Unity Json Utility.");
-                            
+
                             var wrapper = JsonUtility.FromJson(json, wrapperType);
                             return wrapper is IDataAccessible w ? w.AccessData() : null;
 #endif

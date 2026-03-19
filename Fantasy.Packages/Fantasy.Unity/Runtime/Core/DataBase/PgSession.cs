@@ -15,8 +15,8 @@ using Fantasy.Entitas.TypeMeta;
 using Fantasy.Helper;
 using Fantasy.Pool;
 using Fantasy.Product;
-using MemoryPack;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -247,13 +247,15 @@ namespace Fantasy.Database
                     if (typeof(Entity).IsAssignableFrom(type))
                     {
                         //承载Embedded实体的影子属性, 自定义序列化转化逻辑
-                        entityBuilder.Property<ReuseList<Entity>>(DbSetProperty.JsonSingle).HasColumnType("jsonb")
+                        entityBuilder.Property<ReuseList<Entity>>(nameof(Entity.EmbbededSingle)).HasColumnType("jsonb")
+                            .HasColumnName(DbSetProperty.JsonSingle)
                             .HasConversion(
                                            entityList => entityList.ToJson(_jsonSettings, true),
                                            jsonStr => jsonStr.Deserialize<ReuseList<Entity>>(_jsonSettings,DetectMode.MustBeWrapper,true)
                                            )
                             .IsRequired(false);
-                        entityBuilder.Property<ReuseList<Entity>>(DbSetProperty.JsonMulti).HasColumnType("jsonb")
+                        entityBuilder.Property<ReuseList<Entity>>(nameof(Entity.EmbbededMulti)).HasColumnType("jsonb")
+                            .HasColumnName(DbSetProperty.JsonMulti)
                             .HasConversion(
                                            entityList => entityList.ToJson(_jsonSettings, true),
                                            jsonStr => jsonStr.Deserialize<ReuseList<Entity>>(_jsonSettings, DetectMode.MustBeWrapper,true)
@@ -564,7 +566,7 @@ namespace Fantasy.Database
                 return entity;
             }
 
-            entity.Deserialize(pg.Scene);
+            entity.Deserialize(pg.Scene, DeserializationRestore.FixEmbbeded);
 
             return entity;
         }
@@ -854,7 +856,7 @@ namespace Fantasy.Database
 
         /// <summary>
         /// 通过指定过滤条件查询并返回满足条件的一行。
-        /// 如果超过一行会报错(说明逻辑错误或数据库中存储了不在预期内的额外数据)。
+        /// 超过一行会报错(说明逻辑错误或数据库中存储了不在预期内的额外数据)。
         /// </summary>
         /// <returns>如果未找到则为 null。</returns>
         public async FTask<T?> SingleOrDefault<T>(Expression<Func<T, bool>> filter, bool isDeserialize = true, string table = null) where T : Entity
@@ -863,9 +865,18 @@ namespace Fantasy.Database
             using (await pg.FlowLock.WaitIfTooMuch())
             {
                 res = await Set<T>().SingleOrDefaultAsync(filter);
+
+                if (res == null)
+                {
+                    return res;
+                }
             }
-            if(isDeserialize && res != null)
-                res.Deserialize(pg.Scene);
+
+            if (isDeserialize)
+            { 
+                res.Deserialize(pg.Scene, DeserializationRestore.FixEmbbeded); 
+            }
+            
             return res;
         }
 
@@ -934,13 +945,16 @@ namespace Fantasy.Database
             {
                 list = await Set<T>().Where(filter).ToListAsync();
             }
-            if (!isDeserialize || list == null || list.Count == 0 )
-            {
+
+            if (list == null || list.Count == 0 )          
                 return list;
-            }
-            foreach (var entity in list)
+
+            if (isDeserialize)
             {
-                entity.Deserialize(pg.Scene);
+                foreach (var entity in list)
+                {
+                    entity.Deserialize(pg.Scene, DeserializationRestore.FixEmbbeded);
+                }
             }
             return list;
         }
@@ -954,7 +968,7 @@ namespace Fantasy.Database
 
             foreach (var entity in entities)
             {
-                entity.Deserialize(pg.Scene);
+                entity.Deserialize(pg.Scene, DeserializationRestore.FixEmbbeded);
                 parent.AddComponent(entity);
             }
             return entities;
@@ -2130,7 +2144,7 @@ namespace Fantasy.Database
             try
             {
 #if DESIGN_TIME
-                var single = entity.GetSingle();
+                var single = entity.Single;
                 int singleCount = single == null ? 0:single.Count();
                 int embbededCount = 0;
                 if(single!=null)
@@ -2167,16 +2181,16 @@ namespace Fantasy.Database
                         //----------表格式存储----------
                         var entry = Entry(entity);
                         Set<T>().Add(entity);
-                        Set<T>().Add(entity);
                         var parent = entity.Parent;
                         if (parent != null)
                         {
+                            //更新影子属性的值
                             Entry(entity).Property<long>(DbSetProperty.ParentType).CurrentValue = parent.TypeHashCode;
                             Entry(entity).Property<long>(DbSetProperty.ParentId).CurrentValue = parent.Id;
                         }
                         //更新影子属性的值
-                        Entry(entity).Property<ReuseList<Entity>>(DbSetProperty.JsonSingle).CurrentValue = entity.GetCollectionOfEmbbededSingle();
-                        Entry(entity).Property<ReuseList<Entity>>(DbSetProperty.JsonMulti).CurrentValue = entity.GetCollectionOfEmbbedMulti();
+                        //Entry(entity).Property<ReuseList<Entity>>(DbSetProperty.JsonSingle).CurrentValue = entity.EmbbededSingle;
+                        //Entry(entity).Property<ReuseList<Entity>>(DbSetProperty.JsonMulti).CurrentValue = entity.EmbbededMulti;
 
                         //Note: 暂时不支持二进制存储
                         //Entry(entity).Property<byte[]>(DbSetProperty.BytesSingle).CurrentValue = 1;

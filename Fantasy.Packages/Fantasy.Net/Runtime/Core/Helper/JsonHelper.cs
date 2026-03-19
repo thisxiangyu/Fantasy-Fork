@@ -228,15 +228,15 @@ namespace Fantasy.Helper
             /// <summary>
             /// 序列化库
             /// </summary>
-            public const string L = "$L";
+            public const string L = "L";
             /// <summary>
             /// 数据存放处
             /// </summary>
-            public const string D = "$D";
+            public const string D = "D";
             /// <summary>
             /// 类型标识
             /// </summary>
-            public const string T = "$T";
+            public const string T = "T";
         }
 
         #region 把JsonSettings分别映射到提供方的设置项

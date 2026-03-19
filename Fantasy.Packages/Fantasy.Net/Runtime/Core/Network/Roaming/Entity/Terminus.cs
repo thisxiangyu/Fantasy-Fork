@@ -361,12 +361,12 @@ public sealed partial class Terminus : Entity
     {
         // 首先恢复漫游终端的序列化数据。并且注册到框架中。
         
-        Deserialize(scene);
+        Deserialize(scene, DeserializationRestore.TryEmbbed);
         TerminusId = RuntimeId;
         
         if (TerminusEntity != null)
         {
-            TerminusEntity.Deserialize(scene);
+            TerminusEntity.Deserialize(scene, DeserializationRestore.TryEmbbed);
             TerminusId = TerminusEntity.RuntimeId;
         }
         
