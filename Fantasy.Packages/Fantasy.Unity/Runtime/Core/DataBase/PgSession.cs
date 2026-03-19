@@ -864,7 +864,7 @@ namespace Fantasy.Database
             T res = null;
             using (await pg.FlowLock.WaitIfTooMuch())
             {
-                res = await Set<T>().SingleOrDefaultAsync(filter);
+                res = await Set<T>().AsNoTracking().SingleOrDefaultAsync(filter);
 
                 if (res == null)
                 {
@@ -943,7 +943,7 @@ namespace Fantasy.Database
             List<T> list;
             using (await pg.FlowLock.WaitIfTooMuch())
             {
-                list = await Set<T>().Where(filter).ToListAsync();
+                list = await Set<T>().AsNoTracking().Where(filter).ToListAsync();
             }
 
             if (list == null || list.Count == 0 )          
@@ -1982,13 +1982,6 @@ namespace Fantasy.Database
                 {
                     case PreferSqlMode.EFCore:
                         {
-                            var local = Set<T>().Local.FirstOrDefault(entry => entry.Id == entity.Id);
-                            if (local != null)
-                            {
-                                // 如果内存里已经有了，就把旧的踢出去 (Detached)
-                                Entry(local).State = EntityState.Detached;
-                            }
-
                             Attach(entity);
                             var entry = Entry(entity);
 
