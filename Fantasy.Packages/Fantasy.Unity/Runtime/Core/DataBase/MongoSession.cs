@@ -1043,15 +1043,24 @@ namespace Fantasy.Database
             return data == null ? 0 : Convert.ToInt64(data["Result"]);
         }
 
-        /// <summary>
-        /// MongoDB不需要这个方法, 仅占位实现
-        /// </summary>
+        #endregion
+
+        #region Detach, MongoDB不需要这些方法, 仅占位实现
         public void ClearTracker()
         {
             
         }
 
+        public void Detach(Entity entity, bool cascade)
+        {
+
+        }
+
+        public void DetachExisting<T>(T entity) where T : Entity
+        { 
+        
+        }
         #endregion
-    }
+        }
 }
 #endif

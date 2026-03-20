@@ -2456,9 +2456,75 @@ namespace Fantasy.Database
             return 1;
         }
 
+        #endregion
+
+        #region Detach
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void ClearTracker() {
+        public void ClearTracker()
+        {
             ChangeTracker.Clear();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Detach(Entity entity, bool cascade)
+        {
+            try
+            {
+                if ( entity!= null && entity.IsDbSet(out var _) && entity.IsAnnotatedAsEmbedded() == false)
+                {
+                    Entry(entity).State = EntityState.Detached;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"解除{GetType()}的EFCore跟踪失败: {ex}");
+            }
+
+            if (cascade)
+            {
+                if(entity.Single != null)
+                {
+                    foreach (var kv in entity.Single)
+                    {
+                        Detach(kv.Value, true);
+                    }
+                }
+                if (entity.Multi != null)
+                {
+                    foreach (var kv in entity.Multi)
+                    {
+                        Detach(kv.Value, true);
+                    }
+                }
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void DetachExisting<T>(T entity) where T : Entity
+        {
+            if (entity == null || !entity.IsDbSet(out var _) || entity.IsAnnotatedAsEmbedded() == true)
+            {
+                return;
+            }
+
+            try
+            {
+                var tracked = Set<T>().Local.FirstOrDefault(e => e.Id == entity.Id);
+
+                if (tracked != null)
+                {
+                    // 如果占坑者和当前 entity 引用不同，则把占坑者踢出
+                    if (!ReferenceEquals(tracked, entity))
+                    {
+                        Detach(tracked, cascade: true); // 踢掉老的
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"解除{GetType()}的EFCore跟踪失败: {ex}");
+            }           
         }
 
         #endregion

@@ -276,9 +276,17 @@ namespace Fantasy.Database
         /// </summary>
         FTask<long> Sum<T>(Expression<Func<T, bool>> filter, Expression<Func<T, object>> sumExpression, string name = null) where T : Entity;
         /// <summary>
-        /// 解除跟踪
+        /// 清除所有跟踪
         /// </summary>
         void ClearTracker();
+        /// <summary>
+        /// 解除跟踪。允许级联解除。
+        /// </summary>
+        void Detach(Entity entity, bool cascade);
+        /// <summary>
+        /// 解除已有的占位者的跟踪。
+        /// </summary>
+        void DetachExisting<T>(T entity) where T : Entity;
     }
 }
 
