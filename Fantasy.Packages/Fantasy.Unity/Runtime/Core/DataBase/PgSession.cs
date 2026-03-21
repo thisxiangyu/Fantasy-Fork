@@ -2517,7 +2517,7 @@ namespace Fantasy.Database
                     // 如果占坑者和当前 entity 引用不同，则把占坑者踢出
                     if (!ReferenceEquals(tracked, entity))
                     {
-                        Detach(tracked, cascade: true); // 踢掉老的
+                        Detach(tracked, cascade: false); // 踢掉老的
                     }
                 }
             }
