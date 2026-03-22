@@ -64,7 +64,7 @@ namespace Fantasy
         /// <param name="msg">日志消息。</param>
         public static void Trace(string msg)
         {
-            var st = new StackTrace(1, true);
+            var st = new StackTrace(1, false);
             _logCore.Trace($"{msg}\n{st}");
         }
 
