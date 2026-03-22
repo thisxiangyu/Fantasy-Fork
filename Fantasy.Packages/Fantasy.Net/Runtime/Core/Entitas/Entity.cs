@@ -197,6 +197,36 @@ namespace Fantasy.Entitas
         [NJ.JsonIgnore]
         public EntityMultiCollection Multi;
 
+        /// <summary>
+        /// 销毁Multi中某个类型的所有实体。可选: 指定一些特定实体不要移除。
+        /// </summary>
+        public void DisposeAllInMultiTyped<T>(
+            Entity execpt1 = null, Entity execpt2 = null, Entity execpt3 = null, Entity execpt4 = null) where T:Entity 
+        {
+            ReuseList<Entity> removing = ReuseList<Entity>.Create();
+            foreach (var kv in Multi) {
+                var enti = kv.Value;
+                if (enti is T)
+                {
+                    if (execpt1 != null && enti == execpt1)
+                        continue;
+                    if (execpt2 != null && enti == execpt2)
+                        continue;
+                    if (execpt3 != null && enti == execpt3)
+                        continue;
+                    if (execpt4 != null && enti == execpt4)
+                        continue;
+
+                    removing.Add(enti);
+                }
+            }
+            for(int i = removing.Count-1; i>=0; i--)
+            {
+                var shallBeRemoved = removing[i];
+                shallBeRemoved.Dispose();
+            }
+            removing.Dispose();
+        }
 
         [NotMapped][BsonElement("s")][BsonIgnoreIfNull][MemoryPackIgnore][ProtoIgnore] public ReuseList<Entity> EmbbededSingle { get; set; }
         [NotMapped][BsonElement("m")][BsonIgnoreIfNull][MemoryPackIgnore][ProtoIgnore] public ReuseList<Entity> EmbbededMulti { get; set; }
@@ -537,7 +567,7 @@ namespace Fantasy.Entitas
                 }
                 else if (Single.ContainsKey(typeHashCode))
                 {
-                    Log.Error($"type:{type.FullName} If you want to add multiple entites of the same type, please implement IMultiAppended");
+                    Log.Error($"type:{subEntity.GetType()} If you want to add multiple entites of the same type, please implement IMultiAppended");
                     return;
                 }
 
@@ -592,7 +622,7 @@ namespace Fantasy.Entitas
                 }
                 else if (Single.ContainsKey(typeHashCode))
                 {
-                    Log.Error($"type:{typeof(T).FullName} If you want to append multiple entites of the same type, please implement IMultiAppended");
+                    Log.Error($"type:{subEntity.GetType()} If you want to append multiple entites of the same type, please implement IMultiAppended");
                     return;
                 }
 
