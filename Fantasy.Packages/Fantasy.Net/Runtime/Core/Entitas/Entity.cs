@@ -704,34 +704,36 @@ namespace Fantasy.Entitas
 
         #region ExchangeSubEntity
 
-        public void ExchangeSubEntitiesWith(Entity targetEntity) {
-            ExchangeTreeWith(targetEntity);
-            ExchangeMultiWith(targetEntity);
+        public void ExchangeSubEntitiesWith(Entity targetEntity, Action<Entity> onGiven = null, Action<Entity> onGotten = null) {
+            ExchangeTreeWith(targetEntity, onGiven, onGotten);
+            ExchangeMultiWith(targetEntity, onGiven, onGotten);
         }
 
         /// <summary>
         /// 与一个目标实体交换<see cref="Tree"/>
         /// </summary>
-        public void ExchangeTreeWith(Entity targetEntity)
+        public void ExchangeTreeWith(Entity targetEntity, Action<Entity> onGiven = null, Action<Entity> onGotten = null)
         {
-            EntityTreeCollection target_single = targetEntity.Single;
-            targetEntity.Single = Single;
-            Single = target_single;
+            // 交换引用
+            (targetEntity.Single, Single) = (Single, targetEntity.Single);
+            (targetEntity.EmbbededSingle, EmbbededSingle) = (EmbbededSingle, targetEntity.EmbbededSingle);
 
-            if(Single != null)
+            if (Single != null)
             {
-                foreach (var kv in Single)
+                foreach (var entity in Single.Values)
                 {
-                    kv.Value.Parent = this;
-                    kv.Value.Scene = Scene;
+                    entity.Parent = this;
+                    entity.Scene = this.Scene;
+                    onGotten?.Invoke(entity);
                 }
             }
             if (targetEntity.Single != null)
             {
-                foreach (var kv in targetEntity.Single)
+                foreach (var entity in targetEntity.Single.Values)
                 {
-                    kv.Value.Parent = targetEntity;
-                    kv.Value.Scene = targetEntity.Scene;
+                    entity.Parent = targetEntity;
+                    entity.Scene = targetEntity.Scene;
+                    onGiven?.Invoke(entity);
                 }
             }
         }
@@ -739,26 +741,28 @@ namespace Fantasy.Entitas
         /// <summary>
         /// 与一个目标实体交换<see cref="Multi"/>
         /// </summary>
-        public void ExchangeMultiWith(Entity targetEntity)
+        public void ExchangeMultiWith(Entity targetEntity, Action<Entity> onGiven = null, Action<Entity> onGotten = null)
         {
-            EntityMultiCollection target_multi = targetEntity.Multi;
-            targetEntity.Multi = Multi;
-            Multi = target_multi;
+            // 交换引用
+            (targetEntity.Multi, Multi) = (Multi, targetEntity.Multi);
+            (targetEntity.EmbbededMulti, EmbbededMulti) = (EmbbededMulti, targetEntity.EmbbededMulti);
 
-            if(Multi!=null)
+            if (Multi != null)
             {
-                foreach (var kv in Multi)
+                foreach (var entity in Multi.Values) 
                 {
-                    kv.Value.Parent = this;
-                    kv.Value.Scene = Scene;
+                    entity.Parent = this;
+                    entity.Scene = this.Scene;
+                    onGotten?.Invoke(entity);
                 }
             }
             if (targetEntity.Multi != null)
             {
-                foreach (var kv in targetEntity.Multi)
+                foreach (var entity in targetEntity.Multi.Values)
                 {
-                    kv.Value.Parent = targetEntity;
-                    kv.Value.Scene = targetEntity.Scene;
+                    entity.Parent = targetEntity;
+                    entity.Scene = targetEntity.Scene;
+                    onGiven?.Invoke(entity);
                 }
             }
         }
@@ -1174,22 +1178,36 @@ namespace Fantasy.Entitas
                         {
                             if (Single?.Count > 0)
                             {
-                                EmbbededSingle.Clear();
+                                if(EmbbededSingle != null)
+                                    EmbbededSingle.Clear();
+                                else
+                                    EmbbededSingle = ReuseList<Entity>.Create();
+
                                 foreach (var (_, entity) in Single)
                                 {
                                     entity.Parent = this;
-                                    TryEmbbedSingle(entity);
+                                    if (entity.IsAnnotatedAsEmbedded() == true)
+                                    {
+                                        EmbbededSingle.Add(entity);
+                                    }
                                     entity.Deserialize(scene, restore, resetId);
                                 }
                             }
 
                             if (Multi?.Count > 0)
                             {
-                                EmbbededMulti.Clear();
+                                if (EmbbededMulti != null)
+                                    EmbbededMulti.Clear();
+                                else
+                                    EmbbededMulti = ReuseList<Entity>.Create();
+
                                 foreach (var (_, entity) in Multi)
                                 {
                                     entity.Parent = this;
-                                    TryEmbbedMulti(entity);
+                                    if (entity.IsAnnotatedAsEmbedded() == true)
+                                    {
+                                        EmbbededMulti.Add(entity);
+                                    }
                                     entity.Deserialize(scene, restore, resetId);
                                 }
                             }
