@@ -244,25 +244,25 @@ namespace Fantasy.Database
 
         // PgSession有四种不同的情况:
         // 池化和非池化、配置表和非配置表
-        PgSession GetSession(bool useSessionFromPool = true) {
+        PgSession GetSession(IServiceProvider scopedProvider, bool useSessionFromPool = true) {
             if (IsForConnfig)
             {
                 if (useSessionFromPool)
-                    return ServiceProvider.GetRequiredService<PgSessionForConfig>();
+                    return scopedProvider.GetRequiredService<PgSessionForConfig>();
                 else
-                    return ServiceProvider.GetRequiredService<PgSessionUnPooledForConfig>();
+                    return scopedProvider.GetRequiredService<PgSessionUnPooledForConfig>();
             }
             else
             {
                 if (useSessionFromPool)
-                    return ServiceProvider.GetRequiredService<PgSession>();
+                    return scopedProvider.GetRequiredService<PgSession>();
                 else
-                    return ServiceProvider.GetRequiredService<PgSessionUnPooled>();
+                    return scopedProvider.GetRequiredService<PgSessionUnPooled>();
             }
         }
 
-        PgSession GetSessionAndInit(bool useSessionFromPool = true) {
-            PgSession res = GetSession(useSessionFromPool);
+        PgSession GetSessionAndInit(IServiceProvider scopedProvider, bool useSessionFromPool = true) {
+            PgSession res = GetSession(scopedProvider,useSessionFromPool);
             res.SetPg(this);
             return res;
         }
@@ -284,13 +284,14 @@ namespace Fantasy.Database
             var scope = ServiceProvider.CreateAsyncScope();
             try
             {
-                session = GetSessionAndInit(useSessionFromPool);
+                var scopedProvider = scope.ServiceProvider;
+                session = GetSessionAndInit(scopedProvider, useSessionFromPool);
                 return scope;
             }
             catch (Exception ex)
             {
                 scope.Dispose();
-                throw new Exception($"( Critical Emergency! PgSQL failed to get connection! ) \n " +
+                throw new Exception($"(PgSQL failed to get connection!) \n " +
                                     $"{GetConnectionInfoWithoutPassword()}\n ", ex);
             }
         }
@@ -312,13 +313,14 @@ namespace Fantasy.Database
             var scope = ServiceProvider.CreateAsyncScope();
             try
             {
-                session = GetSessionAndInit(useSessionFromPool);
+                var scopedProvider = scope.ServiceProvider;
+                session = GetSessionAndInit(scopedProvider, useSessionFromPool);
                 return scope;
             }
             catch (Exception ex)
             {
                 scope.Dispose();
-                throw new Exception($"( Critical Emergency! PgSQL failed to get connection! ) \n " +
+                throw new Exception($"(PgSQL failed to get connection! ) \n " +
                                     $"{GetConnectionInfoWithoutPassword()}\n ", ex);
             }
         }

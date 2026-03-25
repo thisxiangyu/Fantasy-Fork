@@ -18,7 +18,7 @@ namespace Fantasy.Database
     /// <summary>
     /// MongoDB的会话,适用于数据库基本CRUD操作
     /// </summary>
-    public sealed partial class MongoSession : DbContext, IDbSession, IDisposable
+    public sealed partial class MongoSession : DbContext, IDbSession
     {
         private MongoDb mongo;
 

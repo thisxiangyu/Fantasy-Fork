@@ -141,7 +141,7 @@ namespace Fantasy.Database
     /// <summary>
     /// 表示用于执行数据库 CRUD 操作的数据库会话接口
     /// </summary>
-    public interface IDbSession : IDisposable,IAsyncDisposable
+    public interface IDbSession
     {
         /// <summary>
         /// 在指定的存储集中检索类型 <typeparamref name="T"/> 的实体数量。
