@@ -196,12 +196,14 @@ namespace Fantasy.Async
         /// 取当前临界区中的 FTask 数量
         /// </summary>
         public int ActiveCount() { return _activeCount; }
+
+        /// <summary>
+        /// 当前等待中的任务数量（排队中）
+        /// </summary>
+        public int WaitingCount() { return _waitingCount; }
+
         private int _activeCount = 0;
-        ///// <summary>
-        ///// 提供读取当前活跃 tag（监控用）
-        ///// </summary>
-        //public IReadOnlyDictionary<int, (string tag, DateTime start)> ActiveTags => _tagMap;
-        //private readonly ConcurrentDictionary<int, (string tag, DateTime start)> _tagMap = new();
+        private int _waitingCount = 0;
 
         private SemaphoreSlim[] _idSem;// 按 ID 串行
         private long loopingNumber = 0; // 一个自循环的数字, 用来限流
@@ -213,10 +215,7 @@ namespace Fantasy.Async
         /// 锁职责
         public long LockDuty { get; private set; }
 
-        /// <summary>
-        /// 构造函数, 传入初始化设置
-        /// </summary>
-        internal FTaskFlowLock(int flowLimit, CoroutineLockComponent coroutineLockComponent, long lockDuty)
+        public FTaskFlowLock(int flowLimit, CoroutineLockComponent coroutineLockComponent, long lockDuty)
         {
             _idSem = new SemaphoreSlim[flowLimit];
             for (int i = 0; i < flowLimit; i++)
@@ -235,28 +234,35 @@ namespace Fantasy.Async
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async FTask<WaitCoroutineLock> Wait(long waitForId, string tag = null, int timeOut = 10000)
         {
-            // 先标记 active 增加（只在成功进入临界区时最终减掉）
-            Interlocked.Increment(ref _activeCount);
+            // 标记进入等待队列
+            Interlocked.Increment(ref _waitingCount);
 
-            long idIndex = Math.Abs(waitForId % FTaskFlowLimit);
-            var cancelToken = new CancellationTokenSource(timeOut); // 超时打断
+            long idIndex = (waitForId & long.MaxValue) % FTaskFlowLimit;
+
+            bool entered = false;
 
             try
             {
                 // 按 id 串行等待
-                if (!await _idSem[idIndex].WaitAsync(timeOut, cancelToken.Token))
+                if (!await _idSem[idIndex].WaitAsync(timeOut))
                 {
                     throw new TimeoutException($"[FlowLock] timeout Id={waitForId} tag={tag ?? "null"}");
                 }
 
-                // 成功进入临界区：登记 tag
-                //_tagMap[(int)idIndex] = (tag, DateTime.UtcNow); 
+                entered = true;
+
+                // 等待结束 -> 进入临界区
+                Interlocked.Decrement(ref _waitingCount);
+                Interlocked.Increment(ref _activeCount);
 
                 return CoroutineLockComponent.WaitCoroutineLockPool.Rent(this, ref idIndex, tag, timeOut);
             }
             catch
             {
-                Interlocked.Decrement(ref _activeCount); // 失败，activeCount 回退
+                // 如果还在等待阶段就失败，需要回退 waitingCount
+                if (!entered)
+                    Interlocked.Decrement(ref _waitingCount);
+
                 throw;
             }
         }
@@ -267,26 +273,33 @@ namespace Fantasy.Async
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async FTask<WaitCoroutineLock> WaitIfTooMuch(string tag = null, int timeOut = 10000)
         {
-            // 先标记 active 增加（只在成功进入临界区时最终减掉）
-            Interlocked.Increment(ref _activeCount);
-            var cancelToken = new CancellationTokenSource(timeOut);// TODO 这里CancelToken的逻辑可能可以优化, 等我研究一下再来改进, 先不要在乎这些细节
+            // 标记进入等待队列
+            Interlocked.Increment(ref _waitingCount);
+
+            bool entered = false;
 
             try
             {
-                // 仅限流 (关键点: 通过原子自增, 然后取模, 让索引始终在 0 到 (FTaskFlowLimit-1) 之间循环旋转)
-                long idx = Interlocked.Increment(ref loopingNumber) % FTaskFlowLimit;
+                long idx = (Interlocked.Increment(ref loopingNumber) & long.MaxValue) % FTaskFlowLimit;
 
-                if (!await _idSem[idx].WaitAsync(timeOut, cancelToken.Token))
+                if (!await _idSem[idx].WaitAsync(timeOut))
                 {
                     throw new TimeoutException($"[FlowLock] timeout tag={tag ?? "null"}");
                 }
-                // 成功进入临界区：登记 tag
-                //_tagMap[(int)idx] = (tag, DateTime.UtcNow);
+
+                entered = true;
+
+                // 等待结束 -> 进入临界区
+                Interlocked.Decrement(ref _waitingCount);
+                Interlocked.Increment(ref _activeCount);
+
                 return CoroutineLockComponent.WaitCoroutineLockPool.Rent(this, ref idx, tag, timeOut);
             }
             catch
             {
-                Interlocked.Decrement(ref _activeCount); // 失败，activeCount 回退
+                if (!entered)
+                    Interlocked.Decrement(ref _waitingCount);
+
                 throw;
             }
         }
@@ -303,16 +316,6 @@ namespace Fantasy.Async
                 return;
             }
 
-            //_tagMap.TryRemove(idIndex, out _); // 移除 tag 信息（如果存在）
-            try
-            {
-                _idSem[idIndex].Release();
-            }
-            catch (SemaphoreFullException)
-            {
-                Log.Error($"FTaskFlowLock.Release: id lock {idIndex} release twice?");  // 防御性记录调试信息
-            }
-
             // active count 自减
             int newVal = Interlocked.Decrement(ref _activeCount);
             if (newVal < 0)
@@ -320,28 +323,38 @@ namespace Fantasy.Async
                 Log.Error($"FTaskFlowLock.Release: _activeCount became negative ({newVal}). Resetting to 0.");
                 Interlocked.Exchange(ref _activeCount, 0);
             }
+
+            try
+            {
+                _idSem[idIndex].Release();
+            }
+            catch (SemaphoreFullException)
+            {
+                Log.Error($"FTaskFlowLock.Release: id lock {idIndex} release twice?");
+            }
         }
 
-        /// <summary>
-        /// 重置锁以供复用, 注：1. 限流大小不改变。 2.请先确保已CleanAsync。
-        /// </summary>
         public FTaskFlowLock Reset(CoroutineLockComponent coroutineLockComponent, long newLockDuty)
         {
             Scene = coroutineLockComponent.Scene;
             CoroutineLockComponent = coroutineLockComponent;
             LockDuty = newLockDuty;
 
-            //_tagMap.Clear();
             Interlocked.Exchange(ref _activeCount, 0);
+            Interlocked.Exchange(ref _waitingCount, 0);
+
             EnsureSemaphoresRelease();
             return this;
         }
 
-        /// <summary>
-        /// 重置锁限流大小, 以供复用 ，注: 1.会触发信号量重新实例化。 2.请先确保已CleanAsync，请勿在还有FTask未完成时动态调用该方法。
-        /// </summary>
         public FTaskFlowLock ResizeLimit(int updateLimit)
         {
+            // ❗禁止运行时 resize（否则会丢锁）
+            if (Volatile.Read(ref _activeCount) != 0 || Volatile.Read(ref _waitingCount) != 0)
+            {
+                throw new InvalidOperationException("Cannot resize FTaskFlowLock while in use");
+            }
+
             FTaskFlowLimit = updateLimit;
 
             if (updateLimit > _idSem.Length)
@@ -351,17 +364,19 @@ namespace Fantasy.Async
                     _idSem[i] = new SemaphoreSlim(1, 1);
             }
 
-            //_tagMap.Clear();
-            Interlocked.Exchange(ref _activeCount, 0);
-            EnsureSemaphoresRelease();
             return this;
         }
-
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void EnsureSemaphoresRelease()
         {
-            // 每个 idSem 都恢复成 1
+            // 仅允许在完全空闲状态调用
+            if (Volatile.Read(ref _activeCount) != 0 || Volatile.Read(ref _waitingCount) != 0)
+            {
+                Log.Error("EnsureSemaphoresRelease called while in use!");
+                return;
+            }
+
             for (int i = 0; i < _idSem.Length; i++)
             {
                 var sem = _idSem[i];
@@ -370,35 +385,24 @@ namespace Fantasy.Async
                     try { sem.Release(); }
                     catch (SemaphoreFullException)
                     {
-                        break;     // 已经满额，无需再释放；预期内行为
+                        break;
                     }
                 }
             }
         }
 
-        /// <summary>
-        /// 清理(异步)
-        /// </summary>
-        /// <returns></returns>
         public async FTask<FTaskFlowLock> CleanAsync()
         {
-            // 等待正在执行的任务（已进入临界区）的计数归零
-            while (Volatile.Read(ref _activeCount) > 0)
+            while ((Volatile.Read(ref _activeCount) | Volatile.Read(ref _waitingCount)) != 0)
             {
-                await Task.Delay(20);
+                await Task.Delay(1);
             }
 
-            // 清理内部字典
-            //_tagMap.Clear();
             Scene = null;
             CoroutineLockComponent = null;
             return this;
         }
 
-        /// <summary>
-        /// 销毁(异步)
-        /// </summary>
-        /// <returns></returns>
         public async ValueTask DisposeAsync()
         {
             await CleanAsync();
