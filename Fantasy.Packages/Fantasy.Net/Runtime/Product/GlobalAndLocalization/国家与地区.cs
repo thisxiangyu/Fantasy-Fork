@@ -12,13 +12,13 @@ namespace Fantasy.GlobalAndLocalization
 {
     [DbSet(IsEmbedded = true)]
     [MemoryPackable]
-    public partial class 国家与地区相关信息: Entity
+    public partial class 国家与地区相关信息 : Entity
     {
         /// <summary>
         /// 据<see cref="区域码"/>
         /// </summary>
-        public string 当前所在国家或地区 { get; set; } = "Unknown";
-        public string 当前所选语言码 { get; set; } = string.Empty;
+        public string 当前所在国家或地区 { get; set; } = string.Empty;
+        public string 当前所选语言码 { get; set; } = "en";
 
 #if FANTASY_UNITY
         public IEnumerator 快速获取当前IP区域代码(Action<string> callback)
