@@ -88,11 +88,11 @@ namespace Fantasy.Scheduler
             Scene.GetSession(address).Send(message, 0, address);
         }
 
-        public void Send(long address, MemoryStreamBuffer memoryStream)
+        public void Send(long address, uint protocolCode, Type messageType, MemoryStreamBuffer memoryStream)
         {
             uint rpcId = 0;
             PacketParser.Pack(ref rpcId, ref address, memoryStream, null, null);
-            Scene.GetSession(address).Send(memoryStream);
+            Scene.GetSession(address).Send(memoryStream, messageType, protocolCode);
         }
 
         internal void Send(long address, Type messageType, APackInfo packInfo)
@@ -114,17 +114,17 @@ namespace Fantasy.Scheduler
                 return;
             }
             
-            uint rpcId = 0;
-            long address = 0;
-            var memoryStreamBuffer = new MemoryStreamBuffer(MemoryStreamBufferSource.Pack, capacity, addressCollection.Count);
+            var rpcId = 0U;
+            var address = 0L;
+            var protocolCode = message.OpCode();
+            
+            using var memoryStreamBuffer = new MemoryStreamBuffer(MemoryStreamBufferSource.MultiPack, capacity, addressCollection.Count);
             
             PacketParser.PackMemoryStream(ref rpcId, ref address, message, typeof(T), memoryStreamBuffer);
             
             foreach (var sendAddress in addressCollection)
             {
-                var sendRefAddress = sendAddress;
-                PacketParser.Pack(ref rpcId, ref sendRefAddress, memoryStreamBuffer, null, null);
-                Scene.GetSession(address).Send(memoryStreamBuffer);
+                Scene.GetSession(sendAddress).Send(memoryStreamBuffer, typeof(T), protocolCode, rpcId, sendAddress);
             }
         }
 
@@ -139,16 +139,16 @@ namespace Fantasy.Scheduler
             var rpcId = ++_rpcId;
             var session = Scene.GetSession(address);
             var requestCallback = FTask<IResponse>.Create(false);
-            RequestCallback.Add(rpcId, MessageSender.Create(rpcId, requestType, requestCallback));
+            RequestCallback.Add(rpcId, MessageSender.Create(rpcId, packInfo.ProtocolCode, requestType, requestCallback));
             session.Send(rpcId, address, requestType, packInfo);
             return await requestCallback;
         }
 
-        public async FTask<IResponse> Call<T>(Session session, long address, T request) where T : IAddressMessage
+        public async FTask<IResponse> Call<T>(Session session, long address, T request) where T : IAddressRequest
         {
             var rpcId = ++_rpcId;
             var requestCallback = FTask<IResponse>.Create(false);
-            RequestCallback.Add(rpcId, MessageSender.Create(rpcId, request, requestCallback));
+            RequestCallback.Add(rpcId, MessageSender.Create<T>(rpcId, request.OpCode(), requestCallback));
             session.Send(request, rpcId, address);
             return await requestCallback;
         }
@@ -164,17 +164,17 @@ namespace Fantasy.Scheduler
             var rpcId = ++_rpcId;
             var session = Scene.GetSession(address);
             var requestCallback = FTask<IResponse>.Create(false);
-            RequestCallback.Add(rpcId, MessageSender.Create(rpcId, request, requestCallback));
+            RequestCallback.Add(rpcId, MessageSender.Create<T>(rpcId, request.OpCode(), requestCallback));
             session.Send<T>(request, rpcId, address);
             return await requestCallback;
         }
         
-        public async FTask SendAddressable<T>(long addressableId, T message) where T : IAddressMessage
+        public async FTask SendAddressable<T>(long addressableId, T message) where T : IAddressableMessage
         {
             await CallAddressable(addressableId, message);
         }
         
-        public async FTask<IResponse> CallAddressable<T>(long addressableId, T request) where T : IAddressMessage
+        public async FTask<IResponse> CallAddressable<T>(long addressableId, T request) where T : IAddressableMessage
         {
             var failCount = 0;
             
@@ -228,7 +228,7 @@ namespace Fantasy.Scheduler
         {
             if (!RequestCallback.Remove(rpcId, out var routeMessageSender))
             {
-                throw new Exception($"not found rpc, response.RpcId:{rpcId} response message: {response.GetType().Name} Process:{Scene.Process.Id} Scene:{Scene.SceneConfigId}");
+                Log.Error($"not found rpc, response.RpcId:{rpcId} response message: {response.GetType().Name} Process:{Scene.Process.Id} Scene:{Scene.SceneConfigId}");
             }
 
             ResponseHandler(routeMessageSender, response);
@@ -240,9 +240,9 @@ namespace Fantasy.Scheduler
             if (response.ErrorCode == InnerErrorCode.ErrRouteTimeout)
             {
 #if FANTASY_DEVELOP
-                messageSender.Tcs.SetException(new Exception($"Rpc error: request, 注意Address消息超时，请注意查看是否死锁或者没有reply: Address: {messageSender.Address} {messageSender.Request.ToJson()}, response: {response}"));
+                messageSender.Tcs.SetException(new Exception($"Rpc error: request, 注意Address消息超时，请注意查看是否死锁或者没有reply: {messageSender.MessageType}, response: {response}"));
 #else
-                messageSender.Tcs.SetException(new Exception($"Rpc error: request, 注意Address消息超时，请注意查看是否死锁或者没有reply: Address: {messageSender.Address} {messageSender.Request}, response: {response}"));
+                messageSender.Tcs.SetException(new Exception($"Rpc error: request, 注意Address消息超时，请注意查看是否死锁或者没有reply: {messageSender.MessageType}, response: {response}"));
 #endif
                 messageSender.Dispose();
                 return;
@@ -256,30 +256,24 @@ namespace Fantasy.Scheduler
         {
             try
             {
-                switch (messageSender.Request)
+                if (!RequestCallback.Remove(rpcId))
                 {
-                    case IAddressMessage:
-                    {
-                        // IAddressMessage是个特殊的RPC协议、这里不处理就可以了。
-                        break;
-                    }
-                    case IRequest iRequest:
-                    {
-                        var responseRpcId = messageSender.RpcId;
-                        var response = MessageDispatcherComponent.CreateResponse(iRequest.OpCode(), InnerErrorCode.ErrRpcFail);
-                        ResponseHandler(responseRpcId, response);
-                        Log.Warning($"timeout rpcId:{rpcId} responseRpcId:{responseRpcId} {iRequest.ToJson()}");
-                        break;
-                    }
-                    default:
-                    {
-                        Log.Error(messageSender.Request != null
-                            ? $"Unsupported protocol type {messageSender.Request.GetType()} rpcId:{rpcId} messageSender.Request != null"
-                            : $"Unsupported protocol type:{messageSender.MessageType} rpcId:{rpcId}");
-                        RequestCallback.Remove(rpcId);
-                        break;
-                    }
+                    messageSender.Dispose();
+                    return;
                 }
+
+                var requestOpCode = messageSender.ProtocolCode;
+
+                if (requestOpCode == 0)
+                {
+                    messageSender.Tcs.SetException(new Exception($"Timeout rpcId:{rpcId}, unsupported protocol type:{messageSender.MessageType}"));
+                    messageSender.Dispose();
+                    return;
+                }
+
+                var response = MessageDispatcherComponent.CreateResponse(requestOpCode, InnerErrorCode.ErrRpcFail);
+                ResponseHandler(messageSender, response);
+                Log.Warning($"timeout rpcId:{rpcId} messageType:{messageSender.MessageType} protocolCode:{messageSender.ProtocolCode}");
             }
             catch (Exception e)
             {

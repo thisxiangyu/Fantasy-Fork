@@ -38,7 +38,7 @@ public sealed class EntityTreeCollectionSerializer: IBsonSerializer
         
         foreach (var (_, entity) in childrenCollection)
         {
-            if (entity is ISupportedSerialize)
+            if (entity is ISupportedSerialize and not ISupportedSeparateTable)
             {
                 bsonSerializer.Serialize(context, entity);
             }
@@ -46,6 +46,6 @@ public sealed class EntityTreeCollectionSerializer: IBsonSerializer
         bsonWriter.WriteEndArray();
     }
 
-    public Type ValueType { get; }
+    public Type ValueType => typeof(EntityTreeCollection);
 }
 #endif

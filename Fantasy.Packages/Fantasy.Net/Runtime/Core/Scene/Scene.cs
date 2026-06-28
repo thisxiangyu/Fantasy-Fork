@@ -104,6 +104,11 @@ namespace Fantasy
         internal ANetwork InnerNetwork { get; private set; }
         internal ANetwork OuterNetwork { get; private set; }
         /// <summary>
+        /// Log
+        /// </summary>
+        public string LogSceneName { get; private set; }
+        
+        /// <summary>
         /// 获取Scene对应的SceneConfig
         /// </summary>
         public SceneConfig SceneConfig => SceneConfigData.Instance.Get(SceneConfigId);
@@ -114,9 +119,14 @@ namespace Fantasy
         /// </summary>
         public ThreadSynchronizationContext ThreadSynchronizationContext { get; internal set; }
         /// <summary>
+        /// Scene的调度器
+        /// </summary>
+        internal ISceneScheduler SceneScheduler { get; private set; }
+        /// <summary>
         /// 当前Scene的下创建的Entity
         /// </summary>
         private readonly Dictionary<long, Entity> _entities = new Dictionary<long, Entity>();
+        
         #endregion
 
         #region IdFactory
@@ -236,6 +246,7 @@ namespace Fantasy
                 return;
             }
             
+            SceneScheduler?.Remove(this);
             base.Dispose();
             _entities.Remove(RuntimeId);
 
@@ -270,6 +281,10 @@ namespace Fantasy
 #if FANTASY_NET
                     Process.RemoveScene(this, false);
                     Process.RemoveSceneToProcess(this);
+                    if (World != null)
+                    {
+                        World.Dispose();
+                    }
 #endif
                     EntityComponent.Dispose();
                     EntityPool.Dispose();
@@ -300,11 +315,7 @@ namespace Fantasy
             MessageDispatcherComponent = null;
             PoolGeneratorComponent = null;
 #if FANTASY_NET
-            if (World != null)
-            {
-                World.Dispose();
-                World = null;
-            }
+            World = null;
             Process = null;
             SceneType = 0;
             SceneConfigId = 0;
@@ -318,6 +329,7 @@ namespace Fantasy
             UnityNetwork = null;
             SceneLateUpdate = null;
 #endif
+            SceneScheduler = null;
             ThreadSynchronizationContext = null;
             SceneRuntimeType = SceneRuntimeType.None;
         }
@@ -373,19 +385,6 @@ namespace Fantasy
                 throw new Exception($"Scene ID ({sceneId}) exceeds the maximum allowed value of 65535.");
             }
 
-            //
-            // if (world > byte.MaxValue - 1)
-            // {
-            //     throw new Exception($"World ID ({world}) exceeds the maximum allowed value of 255.");
-            // }
-
-            // var sceneId = (uint)(++_unitySceneId + world * 1000);
-            //
-            // if (sceneId > 255255)
-            // {
-            //     throw new Exception($"Scene ID ({sceneId}) exceeds the maximum allowed value of 255255.");
-            // }
-
             var scene = new Scene();
             scene.Scene = scene;
             scene.Parent = scene;
@@ -397,16 +396,31 @@ namespace Fantasy
             scene.RuntimeId = IdFactoryHelper.RuntimeId(false, 0, sceneId, world, 0);
             scene.AddEntity(scene);
             await SetScheduler(scene, sceneRuntimeMode);
-            scene.ThreadSynchronizationContext.Post(() =>
+
+            var tcs = FTask<Scene>.Create(false);
+            
+            scene.ThreadSynchronizationContext.Post(() => { OnEvent().Coroutine();});
+            
+            return await tcs;
+            
+            async FTask OnEvent()
             {
-                scene.EventComponent.PublishAsync(new OnCreateScene(scene)).Coroutine();
-            });
-            return scene;
+                try
+                {
+                    await scene.EventComponent.PublishAsync(new OnCreateScene(scene));
+                }
+                catch (Exception e)
+                {
+                    tcs.SetException(e);
+                }
+                
+                tcs.SetResult(scene);
+            }
         }
-        public Session Connect(string remoteAddress, NetworkProtocolType networkProtocolType, Action onConnectComplete, Action onConnectFail, Action onConnectDisconnect, bool isHttps, int connectTimeout = 5000)
+        public Session Connect(string remoteAddress, NetworkProtocolType networkProtocolType, Action onConnectComplete, Action onConnectFail, Action onConnectDisconnect, bool isHttps, int connectTimeout = 5000, bool enableReceiveMessageJsonLog = false)
         {
             UnityNetwork?.Dispose();
-            UnityNetwork = NetworkProtocolFactory.CreateClient(this, networkProtocolType, NetworkTarget.Outer);
+            UnityNetwork = NetworkProtocolFactory.CreateClient(this, networkProtocolType, NetworkTarget.Outer, enableReceiveMessageJsonLog);
             Session = UnityNetwork.Connect(remoteAddress, onConnectComplete, onConnectFail, onConnectDisconnect, isHttps, connectTimeout);
             return Session;
         }
@@ -441,6 +455,7 @@ namespace Fantasy
             scene.SceneType = sceneConfig.SceneType;
             scene.SceneConfigId = sceneConfig.Id;
             await SetScheduler(scene, sceneConfig.SceneRuntimeMode);
+            scene.LogSceneName = $"{sceneConfig.SceneTypeString}_{sceneConfig.Id}";
             
             if (sceneConfig.WorldConfigId != 0)
             {
@@ -463,18 +478,31 @@ namespace Fantasy
             Process.AddScene(scene);
             process.AddSceneToProcess(scene);
             
-            scene.ThreadSynchronizationContext.Post(() =>
-            {
-                if (sceneConfig.SceneTypeString == "Addressable")
-                {
-                    // 如果是AddressableScene,自动添加上AddressableManageComponent。
-                    scene.AddComponent<AddressableManageComponent>(); 
-                }
-                
-                scene.EventComponent.PublishAsync(new OnCreateScene(scene)).Coroutine();
-            });
+            var tcs = FTask<Scene>.Create(false);
             
-            return scene;
+            scene.ThreadSynchronizationContext.Post(() => {OnEvent().Coroutine();});
+
+            return await tcs;
+            
+            async FTask OnEvent()
+            {
+                try
+                {
+                    if (sceneConfig.SceneTypeString == "Addressable")
+                    {
+                        // 如果是AddressableScene,自动添加上AddressableManageComponent。
+                        scene.AddComponent<AddressableManageComponent>();
+                    }
+
+                    await scene.EventComponent.PublishAsync(new OnCreateScene(scene));
+                }
+                catch (Exception e)
+                {
+                    tcs.SetException(e);
+                }
+
+                tcs.SetResult(scene);   
+            }
         }
 
         /// <summary>
@@ -505,60 +533,33 @@ namespace Fantasy
             scene.RuntimeId = scene.RuntimeIdFactory.Create(false);
             scene.AddEntity(scene);
             scene.Initialize(parentScene);
-            scene.ThreadSynchronizationContext.Post(() => OnEvent().Coroutine());
+            scene.ThreadSynchronizationContext.Post(() => {OnEvent().Coroutine();});
             return await tcs;
 
             async FTask OnEvent()
             {
-                if (onSubSceneSetup != null)
+                try
                 {
-                    await onSubSceneSetup(scene, parentScene);
+                    if (onSubSceneSetup != null)
+                    {
+                        await onSubSceneSetup(scene, parentScene);
+                    }
+
+                    await scene.EventComponent.PublishAsync(new OnCreateScene(scene));
+
+                    if (onSubSceneCreated != null)
+                    {
+                        await onSubSceneCreated(scene, parentScene);
+                    }
                 }
-
-                await scene.EventComponent.PublishAsync(new OnCreateScene(scene));
-
-                if (onSubSceneCreated != null)
+                catch (Exception e)
                 {
-                    await onSubSceneCreated(scene, parentScene);
+                    tcs.SetException(e);
                 }
 
                 tcs.SetResult(scene);
             }
         }
-        // /// <summary>
-        // /// 在Scene下面创建一个子Scene，一般用于副本，或者一些特殊的场景。
-        // /// </summary>
-        // /// <param name="parentScene">主Scene的实例</param>
-        // /// <param name="sceneType">SceneType，可以在SceneType里找到，例如:SceneType.Addressable</param>
-        // /// <param name="onSubSceneComplete">子Scene创建成功后执行的委托，可以传递null</param>
-        // /// <returns></returns>
-        // public static async FTask<SubScene> CreateSubScene(Scene parentScene, int sceneType, Action<SubScene, Scene> onSubSceneComplete = null)
-        // {
-        //     var tcs = FTask<SubScene>.Create(false);
-        //     var scene = new SubScene();
-        //     scene.Scene = scene;
-        //     scene.Parent = scene;
-        //     scene.RootScene = parentScene;
-        //     scene.Type = typeof(SubScene);
-        //     scene.SceneType = sceneType;
-        //     scene.World = parentScene.World;
-        //     scene.Process = parentScene.Process;
-        //     scene.SceneRuntimeType = SceneRuntimeType.SubScene;
-        //     scene.EntityIdFactory = parentScene.EntityIdFactory;
-        //     scene.RuntimeIdFactory = parentScene.RuntimeIdFactory;
-        //     scene.Id = scene.EntityIdFactory.Create;
-        //     scene.RuntimeId = scene.RuntimeIdFactory.Create(false);
-        //     scene.AddEntity(scene);
-        //     scene.Initialize(parentScene);
-        //     scene.ThreadSynchronizationContext.Post(() => OnEvent().Coroutine());
-        //     return await tcs;
-        //     async FTask OnEvent()
-        //     {
-        //         await scene.EventComponent.PublishAsync(new OnCreateScene(scene));
-        //         onSubSceneComplete?.Invoke(scene, parentScene);
-        //         tcs.SetResult(scene);
-        //     }
-        // }
 #endif
         private static async FTask SetScheduler(Scene scene, string sceneRuntimeMode)
         {
@@ -572,6 +573,7 @@ namespace Fantasy
                     scene.SceneLateUpdate = new EmptySceneLateUpdate();
 #endif
                     ThreadScheduler.AddMainScheduler(scene);
+                    scene.SceneScheduler = ThreadScheduler.MainScheduler;
                     await scene.Initialize();
                     break;
                 }
@@ -585,6 +587,7 @@ namespace Fantasy
                     scene.SceneLateUpdate = new EmptySceneLateUpdate();
 #endif
                     ThreadScheduler.AddToMultiThreadScheduler(scene);
+                    scene.SceneScheduler = ThreadScheduler.MultiThreadScheduler;
                     await scene.Initialize();
                     break;
                 }
@@ -598,6 +601,7 @@ namespace Fantasy
                     scene.SceneLateUpdate = new EmptySceneLateUpdate();
 #endif
                     ThreadScheduler.AddToThreadPoolScheduler(scene);
+                    scene.SceneScheduler = ThreadScheduler.ThreadPoolScheduler;
                     await scene.Initialize();
                     break;
                 }
@@ -736,7 +740,7 @@ namespace Fantasy
             }
             
             var remoteAddress = $"{machineConfig.InnerBindIP}:{sceneConfig.InnerPort}";
-            var client = NetworkProtocolFactory.CreateClient(Scene, ProgramDefine.InnerNetwork, NetworkTarget.Inner);
+            var client = NetworkProtocolFactory.CreateClient(Scene, ProgramDefine.InnerNetwork, NetworkTarget.Inner, false);
             var session = client.Connect(remoteAddress, null, () =>
             {
                 Log.Error($"Unable to connect to the target server sourceServerId:{Scene.Process.Id} targetServerId:{sceneConfig.ProcessConfigId}");

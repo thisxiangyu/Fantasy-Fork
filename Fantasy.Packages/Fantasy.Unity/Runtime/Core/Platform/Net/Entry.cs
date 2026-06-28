@@ -29,10 +29,15 @@ public static class Entry
         // 初始化
         await Initialize(log);
         // 启动Process
-        StartProcess().Coroutine();
+        var startProcessTask = StartProcess();
+        while (!startProcessTask.IsCompleted)
+        {
+            ThreadScheduler.Update();
+            Thread.Sleep(1);
+        }
+        await startProcessTask;
         // 设置当前程序已经在运行中
         ProgramDefine.IsAppRunning = true;
-        await FTask.CompletedTask;
         while (true)
         {
             ThreadScheduler.Update();
@@ -51,7 +56,6 @@ public static class Entry
                 {
                     ProcessList.Add(process);
                 }
-                
             }
 
             return;
@@ -105,13 +109,6 @@ public static class Entry
     /// <returns></returns>
     private static async FTask Initialize(ILog log = null)
     {
-        // 初始化Log系统
-        Log.Initialize(log);
-        LogFantasyVersion();
-        // 注册当前框架内部程序集到框架中
-        typeof(Entry).Assembly.EnsureLoaded();
-        // 加载Fantasy.config配置文件
-        await ConfigLoader.InitializeFromXml(Path.Combine(AppContext.BaseDirectory, "Fantasy.config"));
         // 解析命令行参数
         Parser.Default.ParseArguments<CommandLineOptions>(Environment.GetCommandLineArgs())
             .WithNotParsed(error => throw new Exception("Command line format error!"))
@@ -122,6 +119,13 @@ public static class Entry
                 ProgramDefine.RuntimeMode = Enum.Parse<ProcessMode>(option.RuntimeMode);
                 ProgramDefine.StartupGroup = option.StartupGroup;
             });
+        // 初始化Log系统
+        Log.Initialize(ProgramDefine.ProcessId.ToString(), log);
+        LogFantasyVersion();
+        // 注册当前框架内部程序集到框架中
+        typeof(Entry).Assembly.EnsureLoaded();
+        // 加载Fantasy.config配置文件
+        await ConfigLoader.InitializeFromXml(Path.Combine(AppContext.BaseDirectory, "Fantasy.config"));
         // 检查启动参数,后期可能有机器人等不同的启动参数
         switch (ProgramDefine.ProcessType)
         {

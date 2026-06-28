@@ -1,4 +1,5 @@
 #if FANTASY_NET
+using System.Runtime.CompilerServices;
 using Fantasy.Async;
 using Fantasy.Entitas;
 using Fantasy.InnerMessage;
@@ -44,6 +45,10 @@ public sealed partial class Terminus : Entity
     /// </summary>
     public long ForwardSessionAddress{ get; internal set; }
     /// <summary>
+    /// 标记是否在Terminus销毁的时候自动销毁关联的 Entity
+    /// </summary>
+    public bool IsAutoDisposeLinkTerminusEntity { get; internal set; }
+    /// <summary>
     /// 关联的玩家实体
     /// </summary>
     public Entity? TerminusEntity { get; private set; }
@@ -77,20 +82,21 @@ public sealed partial class Terminus : Entity
             return;
         }
         
-        IsDisposeTerminus = true;
-        DisposeAsync().Coroutine();
+        DisposeAsync(DisposeTerminusType.UnLink).Coroutine();
     }
 
-    private async FTask DisposeAsync()
+    internal async FTask DisposeAsync(DisposeTerminusType disposeTerminusType)
     {
-        Scene.TerminusComponent.RemoveTerminus(Id, false);
-        await Scene.EventComponent.PublishAsync(new OnDisposeTerminus(Scene, this));
+        IsDisposeTerminus = true;
+        await Scene.TerminusComponent.RemoveTerminusAsync(disposeTerminusType, Id, false);
         
         TerminusId = 0;
         RoamingType = 0;
         ForwardSceneAddress = 0;
         ForwardSessionAddress = 0;
+        
         TerminusEntity = null;
+        IsAutoDisposeLinkTerminusEntity = false;
         
         if (RoamingMessageLock != null)
         {
@@ -179,6 +185,8 @@ public sealed partial class Terminus : Entity
         var syncRoaming = TerminusId != 0;
         var entityRuntimeId = entity.RuntimeId;
         
+        IsAutoDisposeLinkTerminusEntity =  autoDispose;
+        
         try
         {
             if (syncRoaming)
@@ -198,16 +206,7 @@ public sealed partial class Terminus : Entity
             TerminusEntity = entity;
             TerminusId = entityRuntimeId;
             
-            // 给当前实体添加组件用来代表是已经关联了Terminus
-            
-            entity.AddComponent<TerminusFlagComponent>().Terminus = this;
-            
-            // 只有autoDispose = true的时候当前Terminus添加组件来代表已经关联了Entity
-            
-            if (autoDispose)
-            {
-                AddComponent<TerminusEntityFlagComponent>().LinkEntity = entity;
-            }
+            SetTerminusFlag(entity);
 
             if (syncRoaming)
             {
@@ -329,7 +328,7 @@ public sealed partial class Terminus : Entity
                 return response.ErrorCode;
             }
             // 在当前Scene下移除漫游终端。
-            Scene.TerminusComponent.RemoveTerminus(Id, true);
+            await Scene.TerminusComponent.RemoveTerminusAsync(DisposeTerminusType.Transfer, Id, true);
         }
         catch (Exception e)
         {
@@ -345,6 +344,26 @@ public sealed partial class Terminus : Entity
         }
 
         return 0;
+    }
+
+    /// <summary>
+    /// 设置Terminus和LinkEntity的FlagComponent
+    /// 用于方便的找到对方
+    /// </summary>
+    /// <param name="entity"></param>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void SetTerminusFlag(Entity entity)
+    {
+        // 给当前实体添加组件用来代表是已经关联了Terminus
+            
+        entity.AddComponent<TerminusFlagComponent>().Terminus = this;
+            
+        // 只有IsAutoDisposeLinkTerminusEntity = true的时候当前Terminus添加组件来代表已经关联了Entity
+            
+        if (IsAutoDisposeLinkTerminusEntity)
+        {
+            AddComponent<TerminusEntityFlagComponent>().LinkEntity = entity;
+        }
     }
 
     /// <summary>
@@ -364,7 +383,7 @@ public sealed partial class Terminus : Entity
         {
             TerminusEntity.Deserialize(scene);
             TerminusId = TerminusEntity.RuntimeId;
-            
+            SetTerminusFlag(TerminusEntity);
             await Scene.EntityComponent.TransferIn(TerminusEntity);
         }
         else
@@ -443,19 +462,21 @@ public sealed partial class Terminus : Entity
         
         Scene.NetworkMessagingComponent.Send(ForwardSessionAddress, message);
     }
-    
+
     /// <summary>
     /// 发送一个消息给客户端
     /// </summary>
+    /// <param name="messageType"></param>
     /// <param name="memoryStream"></param>
-    public void Send(MemoryStreamBuffer memoryStream)
+    /// <param name="protocolCode"></param>
+    public void Send(uint protocolCode, Type messageType, MemoryStreamBuffer memoryStream)
     {
         if (StopForwarding)
         {
             return;
         }
-        
-        Scene.NetworkMessagingComponent.Send(ForwardSessionAddress, memoryStream);
+
+        Scene.NetworkMessagingComponent.Send(ForwardSessionAddress, protocolCode, messageType, memoryStream);
     }
     
     /// <summary>
@@ -478,7 +499,7 @@ public sealed partial class Terminus : Entity
     {
         if (IsDisposed)
         {
-            return Scene.MessageDispatcherComponent.CreateResponse(request.OpCode(), InnerErrorCode.ErrNotFoundRoaming);
+            return Scene.MessageDispatcherComponent.CreateResponse(request.OpCode(), InnerErrorCode.ErrRoamingDisposed);
         }
 
         if (roamingType == RoamingType)
@@ -506,7 +527,7 @@ public sealed partial class Terminus : Entity
                     }
                     else
                     {
-                        return Scene.MessageDispatcherComponent.CreateResponse(request.OpCode(), InnerErrorCode.ErrNotFoundRoaming);
+                        return Scene.MessageDispatcherComponent.CreateResponse(request.OpCode(), InnerErrorCode.ErrRoamingNotReady);
                     }
                 }
 
@@ -527,17 +548,17 @@ public sealed partial class Terminus : Entity
                     case InnerErrorCode.ErrNotFoundRoute:
                     case InnerErrorCode.ErrNotFoundRoaming:
                     {
-                        if (++failCount > 20)
+                        if (++failCount > RoamingConstants.MaxRetryCount)
                         {
-                            Log.Error($"Terminus.Call failCount > 20 route send message fail, TerminusId: {address}");
+                            Log.Error($"Terminus.Call failCount > {RoamingConstants.MaxRetryCount} route send message fail, TerminusId: {address}");
                             return iRouteResponse;
                         }
 
-                        await Scene.TimerComponent.Net.WaitAsync(100);
+                        await Scene.TimerComponent.Net.WaitAsync(RoamingConstants.RetryIntervalMs);
 
                         if (runtimeId != RuntimeId)
                         {
-                            iRouteResponse.ErrorCode = InnerErrorCode.ErrNotFoundRoaming;
+                            iRouteResponse.ErrorCode = InnerErrorCode.ErrRoamingDisposed;
                         }
 
                         address = 0;
