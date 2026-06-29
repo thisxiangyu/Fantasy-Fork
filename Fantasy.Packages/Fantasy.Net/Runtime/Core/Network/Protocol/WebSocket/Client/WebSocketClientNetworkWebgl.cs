@@ -27,9 +27,9 @@ namespace Fantasy.Network.WebSocket
         private Action _onConnectComplete;
         private Action _onConnectDisconnect;
         
-        public void Initialize(NetworkTarget networkTarget)
+        public void Initialize(NetworkTarget networkTarget, bool enableReceiveMessageJsonLog)
         {
-            base.Initialize(NetworkType.Client, NetworkProtocolType.WebSocket, networkTarget);
+            base.Initialize(NetworkType.Client, NetworkProtocolType.WebSocket, networkTarget, enableReceiveMessageJsonLog);
             _packetParser = (BufferPacketParser)PacketParserFactory.CreateWebglBufferPacketParser(this);
         }
         
@@ -95,8 +95,15 @@ namespace Fantasy.Network.WebSocket
             {
                 Dispose();
             };
-            _webSocket.ConnectAsync();
+           
+#if FANTASY_UNITY || FANTASY_CONSOLE
+            Session = EnableMessageJsonLog
+                ? Session.CreateDebugClientSession(this, null)
+                : Session.Create(this, null);
+#else
             Session = Session.Create(this, null);
+#endif
+            _webSocket.ConnectAsync();
             return Session;
         }
 
@@ -167,7 +174,7 @@ namespace Fantasy.Network.WebSocket
         {
             _webSocket.SendAsync(memoryStream.GetBuffer(), 0, (int)memoryStream.Position);
 #if !UNITY_EDITOR && UNITY_WEBGL
-            if (memoryStream.MemoryStreamBufferSource == MemoryStreamBufferSource.Pack)
+            if (MemoryStreamBufferSource.Return.HasFlag(memoryStream.MemoryStreamBufferSource))
             {
                 MemoryStreamBufferPool.ReturnMemoryStream(memoryStream);
             }

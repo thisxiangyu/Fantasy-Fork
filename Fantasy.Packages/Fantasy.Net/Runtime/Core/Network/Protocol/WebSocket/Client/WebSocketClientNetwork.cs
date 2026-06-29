@@ -21,7 +21,6 @@ namespace Fantasy.Network.WebSocket
     {
         private bool _isSending;
         private bool _isInnerDispose;
-        private long _connectTimeoutId;
         private bool _connectDisconnectEvent = true;
         private ClientWebSocket _clientWebSocket;
         private ReadOnlyMemoryPacketParser _packetParser;
@@ -33,9 +32,9 @@ namespace Fantasy.Network.WebSocket
         private Action _onConnectComplete;
         private Action _onConnectDisconnect;
 
-        public void Initialize(NetworkTarget networkTarget)
+        public void Initialize(NetworkTarget networkTarget, bool enableReceiveMessageJsonLog)
         {
-            base.Initialize(NetworkType.Client, NetworkProtocolType.WebSocket, networkTarget);
+            base.Initialize(NetworkType.Client, NetworkProtocolType.WebSocket, networkTarget, enableReceiveMessageJsonLog);
             _packetParser = (ReadOnlyMemoryPacketParser)PacketParserFactory.CreateWebglBufferPacketParser(this);
         }
 
@@ -45,49 +44,73 @@ namespace Fantasy.Network.WebSocket
             {
                 return;
             }
+            
+            _isInnerDispose = true;
+            _isSending = false;
+            
+            if (!_cancellationTokenSource.IsCancellationRequested)
+            {
+                try
+                {
+                    _cancellationTokenSource.Cancel();
+                }
+                catch (OperationCanceledException)
+                {
+                    // 通常情况下，此处的异常可以忽略
+                }
+            }
+            
+            CloseAndDisposeAsync().Coroutine();
+        }
 
+        private async FTask CloseAndDisposeAsync()
+        {
             try
             {
-                _isInnerDispose = true;
-
-                if (_clientWebSocket.State == WebSocketState.Open || _clientWebSocket.State == WebSocketState.CloseReceived)
+                if (_clientWebSocket.State == WebSocketState.Open ||
+                    _clientWebSocket.State == WebSocketState.CloseReceived)
                 {
-                    _clientWebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Client Closing", CancellationToken.None).GetAwaiter().GetResult();
+                    using var closeTimeout = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
+                    await _clientWebSocket.CloseOutputAsync(
+                        WebSocketCloseStatus.NormalClosure,
+                        "Client Closing", closeTimeout.Token);
                 }
-
-                if (!_cancellationTokenSource.IsCancellationRequested)
-                {
-                    try
-                    {
-                        _cancellationTokenSource.Cancel();
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        // 通常情况下，此处的异常可以忽略
-                    }
-                }
-
-                ClearConnectTimeout();
-                
-                if (_connectDisconnectEvent)
-                {
-                    _onConnectDisconnect?.Invoke();
-                }
-                
-                _packetParser.Dispose();
-                _packetParser = null;
-                _isSending = false;
-                
-                _clientWebSocket.Dispose();
-                _clientWebSocket = null;
             }
-            catch (Exception e)
+            catch (Exception)
             {
-                Log.Error(e);
+                try
+                {
+                    _clientWebSocket.Abort();
+                }
+                catch
+                {
+                    // 关闭过程中的异常可以忽略
+                }
             }
             finally
             {
-                base.Dispose();
+                try
+                {
+                    if (_connectDisconnectEvent)
+                    {
+                        _onConnectDisconnect?.Invoke();
+                    }
+
+                    _packetParser.Dispose();
+                    _packetParser = null;
+                    _isSending = false;
+
+                    _clientWebSocket.Dispose();
+                    _clientWebSocket = null;
+                }
+                catch (Exception e)
+                {
+                    Log.Error(e);
+                }
+                finally
+                {
+                    base.Dispose();
+                }
             }
         }
 
@@ -103,25 +126,34 @@ namespace Fantasy.Network.WebSocket
             _onConnectFail = onConnectFail;
             _onConnectComplete = onConnectComplete;
             _onConnectDisconnect = onConnectDisconnect;
-            // 设置连接超时定时器
-            _connectTimeoutId = Scene.TimerComponent.Net.OnceTimer(connectTimeout, () =>
-            {
-                _connectDisconnectEvent = false;
-                _onConnectFail?.Invoke();
-                Dispose();
-            });
 
             _clientWebSocket = new ClientWebSocket();
             var webSocketAddress = WebSocketHelper.GetWebSocketAddress(remoteAddress, isHttps);
 
             try
             {
-                _clientWebSocket.ConnectAsync(new Uri(webSocketAddress), _cancellationTokenSource.Token).Wait();
+                var connectTask = _clientWebSocket.ConnectAsync(new Uri(webSocketAddress), _cancellationTokenSource.Token);
 
+                if (!connectTask.Wait(connectTimeout))
+                {
+                    _connectDisconnectEvent = false;
+                    _onConnectFail?.Invoke();
+                    Dispose();
+                    return null;
+                }
+                
                 if (_cancellationTokenSource.IsCancellationRequested)
                 {
                     return null;
                 }
+            }
+            catch (AggregateException ae) when (ae.InnerException is WebSocketException wse)
+            {
+                Log.Error($"WebSocket error: {wse.Message}");
+                _connectDisconnectEvent = false;
+                _onConnectFail?.Invoke();
+                Dispose();
+                return null;
             }
             catch (WebSocketException wse)
             {
@@ -139,12 +171,18 @@ namespace Fantasy.Network.WebSocket
                 Dispose();
                 return null;
             }
-
-            ClearConnectTimeout();
+            
+#if FANTASY_UNITY || FANTASY_CONSOLE
+            Session = EnableMessageJsonLog
+                ? Session.CreateDebugClientSession(this, null)
+                : Session.Create(this, null);
+#else
+            Session = Session.Create(this, null);
+#endif
             ReadPipeDataAsync().Coroutine();
             ReceiveSocketAsync().Coroutine();
             _onConnectComplete?.Invoke();
-            Session = Session.Create(this, null);
+            
             return Session;
         }
 
@@ -331,8 +369,8 @@ namespace Fantasy.Network.WebSocket
                 }
 
                 await _clientWebSocket.SendAsync(new ArraySegment<byte>(memoryStream.GetBuffer(), 0, (int)memoryStream.Position), WebSocketMessageType.Binary, true, _cancellationTokenSource.Token);
-                
-                if (memoryStream.MemoryStreamBufferSource == MemoryStreamBufferSource.Pack)
+
+                if (MemoryStreamBufferSource.Return.HasFlag(memoryStream.MemoryStreamBufferSource))
                 {
                     MemoryStreamBufferPool.ReturnMemoryStream(memoryStream);
                 }
@@ -344,16 +382,6 @@ namespace Fantasy.Network.WebSocket
         public override void RemoveChannel(uint channelId)
         {
             Dispose();
-        }
-
-        private void ClearConnectTimeout()
-        {
-            if (_connectTimeoutId == 0)
-            {
-                return;
-            }
-
-            Scene?.TimerComponent?.Net?.Remove(ref _connectTimeoutId);
         }
     }
 }

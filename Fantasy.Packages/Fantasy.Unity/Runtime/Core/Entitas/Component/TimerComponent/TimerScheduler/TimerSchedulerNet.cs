@@ -165,6 +165,11 @@ namespace Fantasy.Timer
             {
                 return true;
             }
+            
+            if (cancellationToken?.IsCancel == true)
+            {
+                return false;
+            }
 
             var now = Now();
             var timerId = GetId;
@@ -213,6 +218,11 @@ namespace Fantasy.Timer
             if (now >= tillTime)
             {
                 return true;
+            }
+            
+            if (cancellationToken?.IsCancel == true)
+            {
+                return false;
             }
 
             var timerId = GetId;

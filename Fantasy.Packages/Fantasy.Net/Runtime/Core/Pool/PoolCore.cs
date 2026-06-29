@@ -43,9 +43,12 @@ namespace Fantasy.Pool
             {
                 queue = new T();
             }
+            else
+            {
+                _poolCount--;
+            }
             
             queue.SetIsPool(true);
-            _poolCount--;
             return (T)queue;
         }
 

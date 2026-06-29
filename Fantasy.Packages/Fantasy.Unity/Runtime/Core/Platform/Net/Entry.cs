@@ -49,10 +49,15 @@ public static class Entry
         if (receipt.isEFCoreDesignTime)
             return;
         // 启动Process
-        StartProcess().Coroutine();
+        var startProcessTask = StartProcess();
+        while (!startProcessTask.IsCompleted)
+        {
+            ThreadScheduler.Update();
+            Thread.Sleep(1);
+        }
+        await startProcessTask;
         // 设置当前程序已经在运行中
         ProgramDefine.IsAppRunning = true;
-        await FTask.CompletedTask;
         while (true)
         {
             ThreadScheduler.Update();
@@ -71,7 +76,6 @@ public static class Entry
                 {
                     ProcessList.Add(process);
                 }
-                
             }
 
             return;
@@ -128,7 +132,7 @@ public static class Entry
     {
         InitializationReceipt receipt = new();
         // 初始化Log系统
-        Log.Initialize(log);
+        Log.Initialize(ProgramDefine.ProcessId.ToString(), log);
         LogFantasyVersion();
         // 注册当前框架内部程序集到框架中
         typeof(Entry).Assembly.EnsureLoaded();

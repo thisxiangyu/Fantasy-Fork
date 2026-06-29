@@ -4,6 +4,7 @@ using System.Buffers;
 using System.Collections.Generic;
 using System.IO.Pipelines;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using Fantasy.Async;
 using Fantasy.Network.Interface;
@@ -66,17 +67,46 @@ namespace Fantasy.Network.TCP
                     // 通常情况下，此处的异常可以忽略
                 }
             }
-            
-            if (_socket != null)
-            {
-                _socket.Shutdown(SocketShutdown.Both);
-                _socket.Close();
-            }
 
-            _sendBuffers.Clear();
-            _packetParser.Dispose();
-            _isSending = false;
-            base.Dispose();
+            try
+            {
+                if (_socket != null)
+                {
+                    try
+                    {
+                        _socket.Shutdown(SocketShutdown.Both);
+                    }
+                    catch (SocketException)
+                    {
+                        // Socket 可能已被远端关闭或处于不可 shutdown 状态，释放流程继续
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        // Socket 已被并发释放，释放流程继续
+                    }
+                    
+                    try
+                    {
+                        _socket.Close();
+                    }
+                    catch (Exception e)
+                    {
+                        Log.Error(e);
+                    }
+                }
+                
+                ClearSendBuffers();
+                _packetParser.Dispose();
+                _isSending = false;
+            }
+            catch (Exception e)
+            {
+                Log.Error(e);
+            }
+            finally
+            {
+                base.Dispose();
+            }
         }
 
         #region ReceiveSocket
@@ -232,62 +262,150 @@ namespace Fantasy.Network.TCP
             }
             
             _isSending = true;
-            
-            while (_sendBuffers.Count > 0)
-            {
-                var memoryStreamBuffer = _sendBuffers.Dequeue();
-                _sendArgs.UserToken = memoryStreamBuffer;
-                _sendArgs.SetBuffer(new ArraySegment<byte>(memoryStreamBuffer.GetBuffer(), 0, (int)memoryStreamBuffer.Position));
 
-                try
+            while (_sendBuffers.TryDequeue(out var memoryStreamBuffer))
+            {
+                var offset = 0;
+                var totalLength = (int)memoryStreamBuffer.Position;
+                var buffer = memoryStreamBuffer.GetBuffer();
+
+                while (offset < totalLength)
                 {
-                    if (_socket.SendAsync(_sendArgs))
+                    _sendArgs.UserToken = memoryStreamBuffer;
+                    _sendArgs.SetBuffer(buffer, offset, totalLength - offset);
+
+                    try
                     {
+                        if (_socket.SendAsync(_sendArgs))
+                        {
+                            return;
+                        }
+                        
+                        if (_sendArgs.SocketError != SocketError.Success)
+                        {
+                            ReturnMemoryStream(memoryStreamBuffer);
+                            _isSending = false;
+                            return;
+                        }
+                        
+                        var sent = _sendArgs.BytesTransferred;
+                        if (sent == 0)
+                        {
+                            ReturnMemoryStream(memoryStreamBuffer);
+                            _isSending = false;
+                            return;
+                        }
+                        
+                        offset += sent;
+                    }
+                    catch
+                    {
+                        ReturnMemoryStream(memoryStreamBuffer);
+                        _isSending = false;
                         return;
                     }
-
-                    ReturnMemoryStream(memoryStreamBuffer);
                 }
-                catch
-                {
-                    _isSending = false;
-                    return;
-                }
+                
+                // 同步发送完整后归还 buffer
+                ReturnMemoryStream(memoryStreamBuffer);
             }
             
             _isSending = false;
         }
         
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ReturnMemoryStream(MemoryStreamBuffer memoryStream)
         {
-            if (memoryStream.MemoryStreamBufferSource == MemoryStreamBufferSource.Pack)
+            if (MemoryStreamBufferSource.Return.HasFlag(memoryStream.MemoryStreamBufferSource))
             {
                 _network.MemoryStreamBufferPool.ReturnMemoryStream(memoryStream);
             }
         }
         
+        private void ClearSendBuffers()
+        {
+            while (_sendBuffers.TryDequeue(out var memoryStreamBuffer))
+            {
+                ReturnMemoryStream(memoryStreamBuffer);
+            }
+        }
+        
         private void OnSendCompletedHandler(object sender, SocketAsyncEventArgs asyncEventArgs)
         {
-            if (asyncEventArgs.SocketError != SocketError.Success || asyncEventArgs.BytesTransferred == 0)
+            var memoryStreamBuffer = (MemoryStreamBuffer)asyncEventArgs.UserToken;
+            // 限制最大重试次数，防止死循环
+            // 理论上一个包不应该需要超过 10000 次 partial send
+            const int maxRetries = 10000;
+
+            for (var i = 0; i < maxRetries; i++)
             {
-                _isSending = false;
+                if (asyncEventArgs.SocketError != SocketError.Success || asyncEventArgs.BytesTransferred == 0)
+                {
+                    Scene.ThreadSynchronizationContext.Post(() =>
+                    {
+                        _isSending = false;
+                        ReturnMemoryStream(memoryStreamBuffer);
+                    });
+                
+                    return;
+                }
+                
+                var sent = asyncEventArgs.BytesTransferred;
+                var total = asyncEventArgs.Count;
+                
+                if (sent < total)
+                {
+                    // 部分发送，更新 offset 继续发送剩余部分
+                    var newOffset = asyncEventArgs.Offset + sent;
+                    var remaining = total - sent;
+                    asyncEventArgs.SetBuffer(newOffset, remaining);
+                
+                    try
+                    {
+                        if (_socket.SendAsync(asyncEventArgs))
+                        {
+                            return;  // 继续异步发送，等待下次回调
+                        }
+            
+                        continue;
+                    }
+                    catch
+                    {
+                        Scene.ThreadSynchronizationContext.Post(() =>
+                        {
+                            _isSending = false;
+                            ReturnMemoryStream(memoryStreamBuffer);
+                        });
+                        return;
+                    }
+                }
+                
+                // 当前 buffer 发送完整，归还并继续下一个
+                Scene.ThreadSynchronizationContext.Post(() =>
+                {
+                    ReturnMemoryStream(memoryStreamBuffer);
+                
+                    if (_sendBuffers.Count > 0)
+                    {
+                        _isSending = false;
+                        Send();
+                    }
+                    else
+                    {
+                        _isSending = false;
+                    }
+                });
+                
                 return;
             }
-
-            var memoryStreamBuffer = (MemoryStreamBuffer)asyncEventArgs.UserToken;
             
+            // 如果达到最大重试次数，记录错误并断开连接
+            Log.Error($"OnSendCompleted exceeded max retries ({maxRetries}), possible infinite loop. Disconnecting.");
             Scene.ThreadSynchronizationContext.Post(() =>
             {
                 ReturnMemoryStream(memoryStreamBuffer);
-                
-                if (_sendBuffers.Count > 0)
-                {
-                    Send();
-                }
-                else
-                {
-                    _isSending = false;
-                }
+                _isSending = false;
+                Dispose();
             });
         }
 

@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.IO.Pipelines;
 using System.Net;
 using System.Net.WebSockets;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using Fantasy.Async;
 using Fantasy.Network.Interface;
@@ -45,18 +46,7 @@ public sealed class WebSocketServerNetworkChannel : ANetworkServerChannel
         
         _isInnerDispose = true;
         
-        if (_webSocket.State == WebSocketState.Open || _webSocket.State == WebSocketState.CloseReceived)
-        {
-            try
-            {
-                _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Normal Closure",
-                    CancellationToken.None).GetAwaiter().GetResult();
-            }
-            catch (Exception)
-            {
-                // 关闭过程中的异常可以忽略
-            }
-        }
+        _network.RemoveChannel(Id);
         
         if (!_cancellationTokenSource.IsCancellationRequested)
         {
@@ -70,11 +60,43 @@ public sealed class WebSocketServerNetworkChannel : ANetworkServerChannel
             }
         }
         
-        _sendBuffers.Clear();
-        _network.RemoveChannel(Id);
-        _webSocket.Dispose();
         _isSending = false;
-        base.Dispose();
+        CloseAndDisposeAsync().Coroutine();
+    }
+
+    private async FTask CloseAndDisposeAsync()
+    {
+        try
+        {
+            if (_webSocket.State == WebSocketState.Open || _webSocket.State == WebSocketState.CloseReceived)
+            {
+                using var closeTimeout = new CancellationTokenSource(TimeSpan.FromMilliseconds(2000));
+
+                await _webSocket.CloseOutputAsync(
+                    WebSocketCloseStatus.NormalClosure,
+                    "Normal Closure",
+                    closeTimeout.Token);
+            }
+        }
+        catch (Exception)
+        {
+            try
+            {
+                _webSocket.Abort();
+            }
+            catch
+            {
+                // 关闭过程中的异常可以忽略
+            }
+        }
+        finally
+        {
+            ClearSendBuffers();
+            _webSocket.Dispose();
+            
+            base.Dispose();
+        }
+        
     }
     
     #region ReceiveSocket
@@ -242,6 +264,24 @@ public sealed class WebSocketServerNetworkChannel : ANetworkServerChannel
         }
     }
     
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void ReturnMemoryStream(MemoryStreamBuffer memoryStream)
+    {
+        if (MemoryStreamBufferSource.Return.HasFlag(memoryStream.MemoryStreamBufferSource))
+        {
+            _network.MemoryStreamBufferPool.ReturnMemoryStream(memoryStream);
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void ClearSendBuffers()
+    {
+        while (_sendBuffers.TryDequeue(out var memoryStream))
+        {
+            ReturnMemoryStream(memoryStream);
+        }
+    }
+    
     private async FTask Send()
     {
         if (_isSending || IsDisposed)
@@ -250,21 +290,47 @@ public sealed class WebSocketServerNetworkChannel : ANetworkServerChannel
         }
             
         _isSending = true;
-            
-        while (_isSending)
-        {
-            if (!_sendBuffers.TryDequeue(out var memoryStream))
-            {
-                _isSending = false;
-                return;
-            }
 
-            await _webSocket.SendAsync(new ArraySegment<byte>(memoryStream.GetBuffer(), 0, (int)memoryStream.Position), WebSocketMessageType.Binary, true, _cancellationTokenSource.Token);
-                
-            if (memoryStream.MemoryStreamBufferSource == MemoryStreamBufferSource.Pack)
+        try
+        {
+            while (_isSending)
             {
-                _network.MemoryStreamBufferPool.ReturnMemoryStream(memoryStream);
+                if (!_sendBuffers.TryDequeue(out var memoryStream))
+                {
+                    _isSending = false;
+                    return;
+                }
+
+                try
+                {
+                    await _webSocket.SendAsync(
+                        new ArraySegment<byte>(memoryStream.GetBuffer(), 0, (int)memoryStream.Position),
+                        WebSocketMessageType.Binary, 
+                        true, 
+                        _cancellationTokenSource.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+                catch (ObjectDisposedException)
+                {
+                    return;
+                }
+                catch (Exception)
+                {
+                    Dispose();
+                    return;
+                }
+                finally
+                {
+                    ReturnMemoryStream(memoryStream);
+                }
             }
+        }
+        finally
+        {
+            _isSending = false;
         }
     }
 
