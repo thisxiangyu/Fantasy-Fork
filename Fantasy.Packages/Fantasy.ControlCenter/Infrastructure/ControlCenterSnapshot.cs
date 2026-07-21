@@ -129,6 +129,7 @@ internal sealed class ControlCenterSnapshot
 
             world.Databases.Add(new DatabaseConfigContract
             {
+                Duty = definition.Duty,
                 DbType = definition.DbType,
                 DbName = definition.DbName,
                 DbConnection = definition.DbConnection,

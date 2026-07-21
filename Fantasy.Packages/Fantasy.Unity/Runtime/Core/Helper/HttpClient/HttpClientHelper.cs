@@ -85,9 +85,9 @@ namespace Fantasy.Http
         /// <param name="url"></param>
         /// <typeparam name="T"></typeparam>
         /// <returns></returns>
-        public static async FTask<T> CallByGet<T>(string url)
+        public static async FTask<T> CallByGet<T>(string url, JsonSettings? settings = null)
         {
-            return await Deserialize<T>(url, await Client.GetAsync(url));
+            return await Deserialize<T>(url, await Client.GetAsync(url), settings);
         }
         
         /// <summary>
@@ -127,7 +127,7 @@ namespace Fantasy.Http
             return default;
         }
 
-        private static async FTask<T> Deserialize<T>(string url, HttpResponseMessage response)
+        private static async FTask<T> Deserialize<T>(string url, HttpResponseMessage response, JsonSettings? settings = null)
         {
             using (response)
             {
@@ -139,7 +139,7 @@ namespace Fantasy.Http
                 }
 
                 return (await response.Content.ReadAsStringAsync())
-                    .Deserialize<T>();
+                    .Deserialize<T>(settings: settings);
             }
         }
     }

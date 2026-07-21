@@ -115,6 +115,8 @@ public sealed class DatabaseDefinition
     [StringLength(4096)]
     public string DbConnection { get; set; } = string.Empty;
 
+    public int Duty { get; set; }
+
     public bool IsDefault { get; set; }
 }
 

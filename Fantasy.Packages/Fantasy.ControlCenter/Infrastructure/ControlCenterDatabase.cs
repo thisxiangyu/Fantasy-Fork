@@ -10,7 +10,7 @@ namespace Fantasy.ControlCenter.Infrastructure;
 /// </summary>
 public sealed class ControlCenterDatabase
 {
-    private const int SchemaVersion = 1;
+    private const int SchemaVersion = 2;
 
     public ControlCenterDatabase(IOptions<ControlCenterOptions> options)
     {
@@ -117,6 +117,7 @@ public sealed class ControlCenterDatabase
             CREATE TABLE Databases (
                 Id              INTEGER PRIMARY KEY AUTOINCREMENT,
                 WorldId         INTEGER NOT NULL,
+                Duty            INTEGER NOT NULL DEFAULT 0,
                 DbType          TEXT NOT NULL,
                 DbName          TEXT NOT NULL,
                 DbConnection    TEXT NOT NULL,

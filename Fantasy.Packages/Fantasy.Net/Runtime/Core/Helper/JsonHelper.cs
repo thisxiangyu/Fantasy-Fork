@@ -147,6 +147,10 @@ namespace Fantasy.Helper
         /// 关闭Null值写出。
         /// </summary>
         public bool NoNull;
+        /// <summary>
+        /// 属性名大小写不敏感
+        /// </summary>
+        public bool PropertyNameCaseInsensitive;
 
         // ... NOTE: 除了以上, 未来可拓展
 
@@ -270,6 +274,7 @@ namespace Fantasy.Helper
 #if NET9_0_OR_GREATER
             AllowOutOfOrderMetadataProperties = true,
 #endif
+            PropertyNameCaseInsensitive = false,
             TypeInfoResolver = ResolverWithPolymorphism, //开启多态鉴别
             ReferenceHandler = ReferenceHandler.Preserve,
         };
@@ -322,6 +327,7 @@ namespace Fantasy.Helper
 #if NET9_0_OR_GREATER
                 AllowOutOfOrderMetadataProperties = true,
 #endif
+                PropertyNameCaseInsensitive = settings.PropertyNameCaseInsensitive,
                 WriteIndented = settings.IsIndented,
                 ReferenceHandler = settings.NoCycles ? ReferenceHandler.IgnoreCycles : ReferenceHandler.Preserve,
                 TypeInfoResolver = settings.WriteTypeWhenNecessary ? ResolverWithPolymorphism : ResolverWithoutPolymorphism,
@@ -486,7 +492,7 @@ namespace Fantasy.Helper
         /// 设置为<see cref="DetectMode.Auto"/>如果开启, 会自动检测是否Wrapped、自动检测是哪个库, 代价是性能较差。 </param>
         /// <param name="isCacheThreadSafe">将缓存设置为线程安全, 默认为 false ;如果开启线程安全, 自动加锁会导致性能略微降低. </param>
         /// <returns>反序列化后的对象。</returns>
-        public static object Deserialize(this string json, Type type, JsonSettings? settings = null, DetectMode detectMode = DetectMode.MustBeWrapper, bool isCacheThreadSafe = false)
+        public static object Deserialize(this string json, Type type, JsonSettings? settings = null, DetectMode detectMode = DetectMode.MustBeNormal, bool isCacheThreadSafe = false)
         {
             bool isWrapped = default;
 
@@ -616,7 +622,7 @@ namespace Fantasy.Helper
         /// 设置为<see cref="DetectMode.Auto"/>如果开启, 会自动检测是否Wrapped、自动检测是哪个库, 代价是性能较差。 </param>
         /// <param name="isCacheThreadSafe">将缓存设置为线程安全, 默认为 false ;如果开启线程安全, 自动加锁会导致性能略微降低. </param>
         /// <returns>反序列化后的对象。</returns>
-        public static T Deserialize<T>(this string json, JsonSettings? settings = null, DetectMode detectMode = DetectMode.MustBeWrapper, bool isCacheThreadSafe = false)
+        public static T Deserialize<T>(this string json, JsonSettings? settings = null, DetectMode detectMode = DetectMode.MustBeNormal, bool isCacheThreadSafe = false)
         {
             return (T)Deserialize(json, typeof(T), settings, detectMode, isCacheThreadSafe);
         }

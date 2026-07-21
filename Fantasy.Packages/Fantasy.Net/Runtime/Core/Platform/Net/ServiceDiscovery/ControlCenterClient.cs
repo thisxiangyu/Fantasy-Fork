@@ -118,7 +118,11 @@ internal sealed class ControlCenterClient
             ? string.Concat(_runtimeConfigEndpoint, "?processId=", processId.Value.ToString())
             : _runtimeConfigEndpoint;
 
-        var snapshot = await HttpClientHelper.CallByGet<RuntimeConfigSnapshot>(endpoint);
+        var snapshot = await HttpClientHelper.CallByGet<RuntimeConfigSnapshot>(endpoint, new JsonSettings
+        {
+            PropertyNameCaseInsensitive = true,
+            Library = JsonHelper.Library.Microsoft
+        });
 
         if (snapshot == null)
         {
