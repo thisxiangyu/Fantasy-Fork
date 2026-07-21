@@ -10,7 +10,7 @@ namespace Fantasy.Product.Authentication
     /// </summary>
     public partial class SaltPasswordHelper
     {
-        const byte CurrentVersion = 0x01; // 当前版本号
+        const byte CurrentVersion = 0x02; // 当前版本号
 
         // ==== Argon2参数 ====
         struct Argon2Param
@@ -33,7 +33,14 @@ namespace Fantasy.Product.Authentication
                     MemorySize = 32768,
                     DegreeOfParallelism = 2
                 },
-                // Note : 未来可以增加别的版本
+                0x02 => new Argon2Param
+                {
+                    SaltSize = 16,
+                    HashSize = 32,
+                    Iterations = 2,
+                    MemorySize = 16384,
+                    DegreeOfParallelism = 1
+                },
 
                 _ => throw new InvalidOperationException($"未知版本: {version}")
             };
