@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using Fantasy.ProtocolExportTool.Abstract;
 using Fantasy.ProtocolExportTool.Models;
+using Fantasy.ProtocolExportTool.Services;
 // ReSharper disable PossibleMultipleEnumeration
 
 namespace Fantasy.ProtocolExportTool.Generators;
@@ -12,8 +13,9 @@ public sealed class CSharpExporter(
     string protocolDirectory,
     string clientDirectory,
     string serverDirectory,
+    OpCodeCacheSession opCodeCache,
     ProtocolExportType protocolExportType)
-    : AProtocolExporter(protocolDirectory, clientDirectory, serverDirectory, protocolExportType)
+    : AProtocolExporter(protocolDirectory, clientDirectory, serverDirectory, opCodeCache, protocolExportType)
 {
     protected override string GenerateRouteTypes(IReadOnlyDictionary<string, int> routeTypes)
     {
@@ -394,6 +396,7 @@ public sealed class CSharpExporter(
             var members = new List<string>();
             var memberAttribute = messageDefinition.Protocol.MemberAttribute;
             var ignoreAttribute = messageDefinition.Protocol.IgnoreAttribute;
+            var hasErrorCodeField = messageDefinition.Fields.Any(field => field.Name == "ErrorCode");
             
             if (messageDefinition.HasOpCode)
             {
@@ -408,13 +411,16 @@ public sealed class CSharpExporter(
             
             if (IsResponseType(messageDefinition.MessageType))
             {
-                if (memberAttribute != null)
+                if (!hasErrorCodeField && memberAttribute != null)
                 {
                     members.Add($"        [{memberAttribute}({messageDefinition.ErrorCodeIndex})]");
                 }
 
                 disposeCode.AppendLine("            ErrorCode = 0;");
-                members.Add("        public uint ErrorCode { get; set; }");
+                if (!hasErrorCodeField)
+                {
+                    members.Add("        public uint ErrorCode { get; set; }");
+                }
             }
             
             if (HasRouteType(messageDefinition.MessageType))

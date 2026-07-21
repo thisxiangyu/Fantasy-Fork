@@ -33,10 +33,26 @@ namespace Fantasy.Entitas
             }
 
             var count = 0;
-            var formatter = writer.GetFormatter<Entity>();
-            ref var spanReference = ref writer.GetSpanReference(4);
-            writer.Advance(4);
+            
+            // 先统计真正参与序列化的实体数量
+            foreach (var kv in value)
+            {
+                if (kv.Value is ISupportedSerialize)
+                {
+                    count++;
+                }
+            }
+            
+            // 直接写入正确的集合长度，避免后续扩容导致引用失效
+            writer.WriteCollectionHeader(count);
+            
+            if (count == 0)
+            {
+                return;
+            }
 
+            var formatter = writer.GetFormatter<Entity>();
+            
             foreach (var kv in value)
             {
                 var entity = kv.Value;
@@ -46,11 +62,8 @@ namespace Fantasy.Entitas
                     continue;
                 }
 
-                ++count;
                 formatter.Serialize(ref writer, ref entity!);
             }
-
-            Unsafe.WriteUnaligned(ref spanReference, count);
         }
 #if FANTASY_UNITY
         public override void Deserialize(ref MemoryPackReader reader, ref EntityTreeCollection? value)

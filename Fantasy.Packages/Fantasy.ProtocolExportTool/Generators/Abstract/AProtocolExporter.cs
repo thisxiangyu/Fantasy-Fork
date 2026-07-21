@@ -5,15 +5,18 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Fantasy.Network;
 using Fantasy.ProtocolExportTool.Generators;
 using Fantasy.ProtocolExportTool.Generators.Parsers;
 using Fantasy.ProtocolExportTool.Generators.Validators;
 using Fantasy.ProtocolExportTool.Models;
+using Fantasy.ProtocolExportTool.Services;
 using Spectre.Console;
 
 namespace Fantasy.ProtocolExportTool.Abstract;
 
-public abstract partial class AProtocolExporter( string protocolDirectory, string clientDirectory, string serverDirectory, ProtocolExportType protocolExportType)
+public abstract partial class AProtocolExporter(string protocolDirectory, string clientDirectory, string serverDirectory,
+    OpCodeCacheSession opCodeCache, ProtocolExportType protocolExportType)
 {
     private readonly ConcurrentBag<string> _errors = new();
     private readonly Dictionary<string, int> _routeTypes = new();
@@ -30,14 +33,20 @@ public abstract partial class AProtocolExporter( string protocolDirectory, strin
     
     private readonly List<OpcodeInfo> _outerOpcode = [];
     private readonly List<OpcodeInfo> _innerOpcode = [];
+    private readonly OpCodeCacheSession _opCodeCache = opCodeCache ?? throw new ArgumentNullException(nameof(opCodeCache));
     
     protected readonly string ProtocolDirectory = NormalizePath(protocolDirectory);
-    protected readonly string ClientDirectory = NormalizePath(clientDirectory);
-    protected readonly string ServerDirectory = NormalizePath(serverDirectory);
+    protected readonly string ClientDirectory = NormalizeOptionalPath(clientDirectory);
+    protected readonly string ServerDirectory = NormalizeOptionalPath(serverDirectory);
     
     private static string NormalizePath(string path)
     {
         return string.IsNullOrWhiteSpace(path) ? throw new ArgumentException("Path cannot be null or empty", nameof(path)) : Path.GetFullPath(path.Trim());
+    }
+
+    private static string NormalizeOptionalPath(string path)
+    {
+        return string.IsNullOrWhiteSpace(path) ? string.Empty : Path.GetFullPath(path.Trim());
     }
     
     public bool IsErrors()
@@ -237,13 +246,13 @@ public abstract partial class AProtocolExporter( string protocolDirectory, strin
             return;
         }
         
-        if (!Directory.Exists(ServerDirectory))
-        {
-            Directory.CreateDirectory(ServerDirectory);
-        }
-
         if (protocolExportType.HasFlag(ProtocolExportType.Server))
         {
+            if (!Directory.Exists(ServerDirectory))
+            {
+                Directory.CreateDirectory(ServerDirectory);
+            }
+
             var filePath = Path.Combine(ServerDirectory, "InnerMessage.cs");
             await File.WriteAllTextAsync(filePath, template);
             // AnsiConsole.MarkupLine($"[green]Generated InnerMessage.cs at {filePath}[/]");
@@ -261,13 +270,13 @@ public abstract partial class AProtocolExporter( string protocolDirectory, strin
             return;
         }
 
-        if (!Directory.Exists(ClientDirectory))
-        {
-            Directory.CreateDirectory(ClientDirectory);
-        }
-
         if (protocolExportType.HasFlag(ProtocolExportType.Client))
         {
+            if (!Directory.Exists(ClientDirectory))
+            {
+                Directory.CreateDirectory(ClientDirectory);
+            }
+
             var filePath = Path.Combine(ClientDirectory, "NetworkProtocolHelper.cs");
             await File.WriteAllTextAsync(filePath, template);
             // AnsiConsole.MarkupLine($"[green]Generated NetworkProtocolHelper.cs at {filePath}[/]");
@@ -321,13 +330,13 @@ public abstract partial class AProtocolExporter( string protocolDirectory, strin
             return;
         }
 
-        if (!Directory.Exists(ServerDirectory))
-        {
-            Directory.CreateDirectory(ServerDirectory);
-        }
-
         if (protocolExportType.HasFlag(ProtocolExportType.Server))
         {
+            if (!Directory.Exists(ServerDirectory))
+            {
+                Directory.CreateDirectory(ServerDirectory);
+            }
+
             var filePath = Path.Combine(ServerDirectory, "InnerEnum.cs");
             await File.WriteAllTextAsync(filePath, template);
             // AnsiConsole.MarkupLine($"[green]Generated InnerEnum.cs at {filePath}[/]");
@@ -463,7 +472,7 @@ public abstract partial class AProtocolExporter( string protocolDirectory, strin
     {
         var validator = new ProtocolValidator();
         var isOuter = protocol.Equals("Outer", StringComparison.OrdinalIgnoreCase);
-        var opCodeGenerator = new OpCodeGenerator(isOuter);
+        var opCodeGenerator = new OpCodeGenerator(isOuter, _opCodeCache.Codes, _opCodeCache.CodeOwners);
 
         // 1. 解析所有文件
         foreach (var (filePath, fileLines) in ReadProtocolFilesLinesWithPath(protocol))
@@ -521,6 +530,11 @@ public abstract partial class AProtocolExporter( string protocolDirectory, strin
         foreach (var error in validator.GetErrors())
         {
             _errors.Add(error);
+        }
+
+        foreach (var pair in opCodeGenerator.AssignedCodes)
+        {
+            _opCodeCache.Assign(pair.Key, pair.Value);
         }
     }
     

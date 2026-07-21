@@ -84,42 +84,44 @@ namespace Fantasy.Platform.Net
             return _configs.TryGetValue(id, out config);
         }
     }
-
-    /// <summary>
-    /// 表示一个世界配置信息
-    /// </summary>
-    public sealed class WorldConfig
-    {
+    
+	/// <summary>
+	/// 表示一个世界配置信息
+	/// </summary>
+	public sealed class WorldConfig
+	{
+		/// <summary>
+		/// Id
+		/// </summary>
+		public uint Id;
+		/// <summary>
+		/// 名称
+		/// </summary>
+		public string WorldName;
         /// <summary>
-        /// Id
-        /// </summary>
-        public uint Id { get; set; }
-        /// <summary>
-        /// 名称
-        /// </summary>
-        public string WorldName { get; set; }
-
-
-        #region ↓数据库相关, 在配置多数据库时, 如果未使用推荐的 Fantasy.config 进行配置, 请自行确保索引严格对齐↓
-
-        /// <summary>
-        /// 数据库工作职责标识
-        /// </summary>
-		public int[] DbDuty { get; set; }
-        /// <summary>
-        /// 数据库连接字符串
-        /// </summary>
-        public string[] DbConnection { get; set; }
-        /// <summary>
-        /// 数据库名称
-        /// </summary>
-        public string[] DbName { get; set; }
-        /// <summary>
-        /// 数据库类型
-        /// </summary>
-        public string[] DbType { get; set; }
-
-        #endregion
+		/// 所属Namespace；本地配置模式下可为0
+		/// </summary>
+		public uint NamespaceId;
+		/// <summary>
+		/// Control Center中所属的WorldGroup；本地配置模式下为0
+		/// </summary>
+		public uint GroupId;
+		/// <summary>
+		/// 默认数据库配置
+		/// </summary>
+		public DatabaseConfig? Default;
+		/// <summary>
+		/// 数据库配置
+		/// </summary>
+		public DatabaseConfig[]? DatabaseConfig;
     }
+
+	/// <summary>
+	/// 数据库配置
+	/// </summary>
+	/// <param name="DbConnection">数据库连接字符串</param>
+	/// <param name="DbName">数据库名称</param>
+	/// <param name="DbType">数据库类型</param>
+	public sealed record DatabaseConfig(int Duty, string? DbConnection, string DbName, string DbType, bool IsDefault = false);
 }
 #endif

@@ -21,6 +21,12 @@ Gate 侧在处理登录或重连请求时，使用 `session.TryCreateRoaming` �
 | `AlreadyExists` | 已存在（断线重连） |
 | `SessionAlreadyHasRoaming` | 错误：Session 已有不同 roamingId 的漫游 |
 
+Control Center 模式先在文件顶部增加：
+
+```csharp
+using NetServiceDiscovery = Fantasy.ServiceDiscovery;
+```
+
 ```csharp
 var result = await session.TryCreateRoaming(
     roamingId: request.PlayerId,
@@ -35,12 +41,41 @@ switch (result.Status)
     {
         // Link 到所有需要通信的后端服务器，每个 RoamingType 各调用一次
         // RoamingType.ChatRoamingType / BattleRoamingType 等常量来自 RoamingType.Config 导出的 RoamingType.cs
-        var chatConfig = SceneConfigData.Instance.GetSceneBySceneType(SceneType.Chat)[0];
-        var errorCode = await result.Roaming.Link(session, chatConfig, RoamingType.ChatRoamingType);
+        var worldId = session.Scene.SceneConfig.WorldConfigId;
+        var chatAddress =
+            await NetServiceDiscovery.DiscoverAddressByHashAsync(
+                SceneType.Chat,
+                request.PlayerId,
+                worldId: worldId);
+
+        if (chatAddress == 0)
+        {
+            // 按项目约定设置“无在线 Chat”的业务错误码。
+            return;
+        }
+
+        var errorCode = await result.Roaming.Link(
+            chatAddress,
+            session.RuntimeId,
+            RoamingType.ChatRoamingType);
         if (errorCode != 0) { response.ErrorCode = errorCode; return; }
 
-        var battleConfig = SceneConfigData.Instance.GetSceneBySceneType(SceneType.Battle)[0];
-        errorCode = await result.Roaming.Link(session, battleConfig, RoamingType.BattleRoamingType);
+        var battleAddress =
+            await NetServiceDiscovery.DiscoverAddressByHashAsync(
+                SceneType.Battle,
+                request.PlayerId,
+                worldId: worldId);
+
+        if (battleAddress == 0)
+        {
+            // 按项目约定设置“无在线 Battle”的业务错误码。
+            return;
+        }
+
+        errorCode = await result.Roaming.Link(
+            battleAddress,
+            session.RuntimeId,
+            RoamingType.BattleRoamingType);
         if (errorCode != 0) { response.ErrorCode = errorCode; return; }
 
         // 如需区分首次登录和断线重连的不同业务逻辑，在此判断 result.Status
@@ -56,6 +91,10 @@ switch (result.Status)
         return;
 }
 ```
+
+上例适用于 Control Center 模式，并用玩家 ID 做 Rendezvous Hash，让同一玩家尽量稳定落到同一后端。未启用 Control Center 时，可以继续使用 `Link(session, sceneConfig, roamingType)` 静态重载。
+
+如果扩缩容后仍必须回到上一次后端，单靠 Rendezvous Hash 不够；应由业务层持久化玩家到 SceneId 的绑定，并提供按该 SceneId 恢复端点的解析入口。
 
 ### 传递自定义参数到后端
 
@@ -77,7 +116,11 @@ var loginData = Entity.Create<PlayerLoginData>(session.Scene);
 loginData.PlayerName = request.PlayerName;
 loginData.Level = request.Level;
 
-var errorCode = await roaming.Link(session, chatConfig, RoamingType.ChatRoamingType, loginData);
+var errorCode = await roaming.Link(
+    chatAddress,
+    session.RuntimeId,
+    RoamingType.ChatRoamingType,
+    loginData);
 
 // ⚠️ Gate 侧无论成功失败都必须销毁原始对象
 // 参数通过序列化传递，Gate 持有原始对象，后端收到的是反序列化副本，两端各自销毁

@@ -92,12 +92,17 @@ namespace Fantasy
             var worldConfig = WorldConfigData.Instance.Get(worldId);
             Dictionary<int, IDatabase> allDatabases = new();
 
-            for (int i = 0; i < worldConfig.DbType.Length; i++)
+            if (worldConfig.DatabaseConfig == null)
+                return allDatabases;
+
+            for (int i = 0; i < worldConfig.DatabaseConfig.Length; i++)
             {
-                if (string.IsNullOrWhiteSpace(worldConfig.DbConnection[i]))
+                var dbConfig = worldConfig.DatabaseConfig[i];
+
+                if (string.IsNullOrWhiteSpace(dbConfig.DbConnection))
                     continue;
 
-                string dbType = worldConfig.DbType[i].ToLower();
+                string dbType = dbConfig.DbType.ToLower();
                 switch (dbType)
                 {
                     case "postgresql":
@@ -105,23 +110,23 @@ namespace Fantasy
                     case "pgsql":
                     case "pg":
                         {
-                            if (allDatabases.ContainsKey(worldConfig.DbDuty[i]))
-                                throw new Exception($"CurrentDb {worldConfig.DbName[i]} Duty({worldConfig.DbDuty[i]}) is duplicated. Please verify your configuration.");
+                            if (allDatabases.ContainsKey(dbConfig.Duty))
+                                throw new Exception($"CurrentDb {dbConfig.DbName} Duty({dbConfig.Duty}) is duplicated. Please verify your configuration.");
 
                             var pg = new PgSQL();
-                            pg.Initialize(scene, worldConfig.DbDuty[i], worldConfig.DbConnection[i], worldConfig.DbName[i]);
-                            allDatabases.Add(worldConfig.DbDuty[i], pg);
+                            pg.Initialize(scene, dbConfig.Duty, dbConfig.DbConnection, dbConfig.DbName);
+                            allDatabases.Add(dbConfig.Duty, pg);
                             break;
                         }
                     case "mongodb":
                     case "mongo":
                         {
-                            if (allDatabases.ContainsKey(worldConfig.DbDuty[i]))
-                                throw new Exception($"CurrentDb {worldConfig.DbName[i]} Duty({worldConfig.DbDuty[i]}) is duplicated. Please verify your configuration.");
+                            if (allDatabases.ContainsKey(dbConfig.Duty))
+                                throw new Exception($"CurrentDb {dbConfig.DbName} Duty({dbConfig.Duty}) is duplicated. Please verify your configuration.");
 
                             var mongo = new Mongo();
-                            mongo.Initialize(scene, worldConfig.DbDuty[i], worldConfig.DbConnection[i], worldConfig.DbName[i]);
-                            allDatabases.Add(worldConfig.DbDuty[i], mongo);
+                            mongo.Initialize(scene, dbConfig.Duty, dbConfig.DbConnection, dbConfig.DbName);
+                            allDatabases.Add(dbConfig.Duty, mongo);
                             break;
                         }
                     default:
@@ -157,7 +162,7 @@ namespace Fantasy
                 return null;
             }
 
-            return (worldConfigData.DbConnection == null || worldConfigData.DbConnection.Length == 0)
+            return (worldConfigData.DatabaseConfig == null || worldConfigData.DatabaseConfig.Length == 0)
             ? null
             : new World(scene, id);
         }

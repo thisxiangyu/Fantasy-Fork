@@ -33,24 +33,37 @@ namespace Fantasy.Entitas
             }
 
             var count = 0;
-            var formatter = writer.GetFormatter<Entity>();
-            ref var spanReference = ref writer.GetSpanReference(4);
-            writer.Advance(4);
-
+            
+            // 先统计真正参与序列化的实体数量
             foreach (var kv in value)
             {
-                var entity = kv.Value;
-
-                if (!entity.IsDbSet(out var _) && entity is not ISupportedSerialize)
+                if (kv.Value is ISupportedSerialize)
                 {
-                    continue;
+                    count++;
                 }
-
-                ++count;
-                formatter.Serialize(ref writer, ref entity!);
             }
+            
+            // 直接写入正确的集合长度，避免后续扩容导致引用失效
+            writer.WriteCollectionHeader(count);
 
-            Unsafe.WriteUnaligned(ref spanReference, count);
+if (count == 0)
+{
+    return;
+}
+
+var formatter = writer.GetFormatter<Entity>();
+
+foreach (var kv in value)
+{
+    var entity = kv.Value;
+
+    if (!entity.IsDbSet(out var _) && entity is not ISupportedSerialize)
+    {
+        continue;
+    }
+
+    formatter.Serialize(ref writer, ref entity!);
+}
         }
 #if FANTASY_UNITY
         public override void Deserialize(ref MemoryPackReader reader, ref EntityTreeCollection? value)
@@ -59,37 +72,37 @@ namespace Fantasy.Entitas
         public override void Deserialize(ref MemoryPackReader reader, scoped ref EntityTreeCollection? value)
 #endif
         {
-            if (!reader.TryReadCollectionHeader(out var length))
-            {
-                value = null;
-                return;
-            }
+    if (!reader.TryReadCollectionHeader(out var length))
+    {
+        value = null;
+        return;
+    }
 
-            if (value == null)
-            {
-                value = EntityTreeCollection.Create(true);
-            }
-            else
-            {
-                value.Clear();
-            }
+    if (value == null)
+    {
+        value = EntityTreeCollection.Create(true);
+    }
+    else
+    {
+        value.Clear();
+    }
 
-            var formatter = reader.GetFormatter<Entity>();
+    var formatter = reader.GetFormatter<Entity>();
 
-            for (var i = 0; i < length; i++)
-            {
-                Entity entity = null;
-                formatter.Deserialize(ref reader, ref entity);
-                try
-                {
-                    entity.InitType();
-                    value.Add(entity.TypeHashCode, entity);
-                }
-                catch (Exception ex)
-                {
-                    throw new($"{entity.GetType()}({entity.TypeHashCode}) deserialization err :{ex}");
-                }
-            }
+    for (var i = 0; i < length; i++)
+    {
+        Entity entity = null;
+        formatter.Deserialize(ref reader, ref entity);
+        try
+        {
+            entity.InitType();
+            value.Add(entity.TypeHashCode, entity);
         }
+        catch (Exception ex)
+        {
+            throw new($"{entity.GetType()}({entity.TypeHashCode}) deserialization err :{ex}");
+        }
+    }
+}
     }
 }
