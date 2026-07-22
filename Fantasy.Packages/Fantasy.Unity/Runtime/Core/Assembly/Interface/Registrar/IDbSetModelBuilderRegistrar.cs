@@ -1,3 +1,4 @@
+#if FANTASY_NET
 using System.Collections.Generic;
 using Fantasy.Entitas.TypeMeta;
 using Fantasy.Helper;
@@ -25,3 +26,4 @@ namespace Fantasy.Assembly
         Dictionary<long, TypeDbSetCache> GetDbSetTypeCache();
     }
 }
+#endif

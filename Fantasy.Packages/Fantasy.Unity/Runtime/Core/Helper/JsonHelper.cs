@@ -94,13 +94,15 @@ namespace Fantasy.Helper
            bool isIndented = true,
            bool writeTypeWhenNecessary = true,
            bool noCycles = false,
-           bool noNull = true)
+           bool noNull = true,
+           bool propertyNameCaseInsensitive = false)
         {
             Library = library;
             IsIndented = isIndented;
             WriteTypeWhenNecessary = writeTypeWhenNecessary;
             NoCycles = noCycles;
             NoNull = noNull;
+            PropertyNameCaseInsensitive = propertyNameCaseInsensitive;
         }
         /// <summary>
         /// 选择序列化库。
