@@ -96,10 +96,6 @@ namespace Fantasy.Assembly
         /// MemoryPack注册器
         /// </summary>
         internal IMemoryPackEntityGenerator MemoryPackEntityGenerator { get; set; }
-        /// <summary>
-        /// DbSet模型构建注册器
-        /// </summary>
-        internal IDbSetModelBuilderRegistrar? DbSetModelBuilderRegistrar { get; set; }
 #if FANTASY_NET
         internal ISphereEventRegistrar SphereEventRegistrar { get; set; }
 #endif
@@ -130,8 +126,6 @@ namespace Fantasy.Assembly
             MessageHandlerResolver = null;
             EntityTypeCollectionRegistrar = null;
             PoolCreatorGenerator = null;
-            MemoryPackEntityGenerator = null;
-            DbSetModelBuilderRegistrar = null;
 #if FANTASY_NET
             SphereEventRegistrar = null;
 #endif
@@ -161,7 +155,6 @@ namespace Fantasy.Assembly
         /// <param name="poolCreatorGenerator">池生成器注册器</param>
         /// <param name="protoBufDispatcherRegistrar">Protobuf消息分发器</param>
         /// <param name="memoryPackEntityGenerator">memoryPack生成器</param>
-        /// <param name="dbSetModelBuilderRegistrar">DbSet模型构建注册器（源生成）</param>
         public static void Register(
             long assemblyManifestId,
             string assemblyName,
@@ -178,8 +171,7 @@ namespace Fantasy.Assembly
             IFantasyConfigRegistrar fantasyConfigRegistrar,
             IPoolCreatorGenerator poolCreatorGenerator,
             IProtoBufDispatcherRegistrar protoBufDispatcherRegistrar,
-            IMemoryPackEntityGenerator memoryPackEntityGenerator,
-            IDbSetModelBuilderRegistrar? dbSetModelBuilderRegistrar)
+            IMemoryPackEntityGenerator memoryPackEntityGenerator)
         {
             var manifest = new AssemblyManifest
             {
@@ -197,8 +189,7 @@ namespace Fantasy.Assembly
                 CustomInterfaceRegistrar = customInterfaceRegistrar,
                 PoolCreatorGenerator = poolCreatorGenerator,
                 ProtoBufDispatcherRegistrar = protoBufDispatcherRegistrar,
-                MemoryPackEntityGenerator = memoryPackEntityGenerator,
-                DbSetModelBuilderRegistrar = dbSetModelBuilderRegistrar
+                MemoryPackEntityGenerator = memoryPackEntityGenerator
             };
 
             // 设置SceneType字典
@@ -232,7 +223,6 @@ namespace Fantasy.Assembly
         /// <param name="poolCreatorGenerator">池生成器注册器</param>
         /// <param name="protoBufDispatcherRegistrar">Protobuf消息分发器</param>
         /// <param name="memoryPackEntityGenerator">memoryPack生成器</param>
-        /// <param name="dbSetModelBuilderRegistrar">DbSet模型构建注册器（源生成）</param>
         public static void Register(
             long assemblyManifestId,
             string assemblyName,
@@ -247,8 +237,7 @@ namespace Fantasy.Assembly
             ICustomInterfaceRegistrar customInterfaceRegistrar,
             IPoolCreatorGenerator poolCreatorGenerator,
             IProtoBufDispatcherRegistrar protoBufDispatcherRegistrar,
-            IMemoryPackEntityGenerator memoryPackEntityGenerator,
-            IDbSetModelBuilderRegistrar? dbSetModelBuilderRegistrar)
+            IMemoryPackEntityGenerator memoryPackEntityGenerator)
         {
             var manifest = new AssemblyManifest
             {
@@ -265,8 +254,7 @@ namespace Fantasy.Assembly
                 CustomInterfaceRegistrar = customInterfaceRegistrar,
                 PoolCreatorGenerator = poolCreatorGenerator,
                 ProtoBufDispatcherRegistrar = protoBufDispatcherRegistrar,
-                MemoryPackEntityGenerator = memoryPackEntityGenerator,
-                DbSetModelBuilderRegistrar = dbSetModelBuilderRegistrar
+                MemoryPackEntityGenerator = memoryPackEntityGenerator
             };
 #if FANTASY_WEBGL
             Manifests[assemblyManifestId] = manifest;

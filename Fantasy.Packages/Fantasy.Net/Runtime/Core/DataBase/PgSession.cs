@@ -114,7 +114,6 @@ namespace Fantasy.Database
     /// 微软在该方法中对 DbContext 的池化做了详细注释。
     /// </para>
     /// <para>
-    /// TODO: 未完成——
     /// 【关于 ORM 性能】<see cref="PgSession"/> 基于 Dapper和EFCore 封装。
     /// 从性能来考虑, 4种 SQL 操作方式排名如下——
     /// 1. 原生SQL: 性能最优, 但没有 ORM 字段自动映射; 
@@ -170,23 +169,114 @@ namespace Fantasy.Database
 
         /// <summary>
         /// 设计模型。
-        /// 使用源生成 (Source Generator) 的 IDbSetModelBuilderRegistrar 注册所有 [DbSet] 类型
         /// </summary>
         /// <param name="modelBuilder">传入一个建模器</param>
         /// <param name="isSessionForConfig">是否作为配置表数据库专用会话</param>
         protected void Design(ModelBuilder modelBuilder, bool isSessionForConfig) {
-            // 设置默认 schema
-            const string defaultSchema = "default";
-            modelBuilder.HasDefaultSchema(defaultSchema);
+            //处理DbSet注册
+            DbSetMetadataHelper.ScanDbSetTypes((type, tableName, attr) => {
 
-            // 通过源生成器注册所有 [DbSet] 类型，替代反射扫描
-            foreach (var (_, assemblyManifest) in Assembly.AssemblyManifest.Manifests)
-            {
-                if (assemblyManifest.DbSetModelBuilderRegistrar != null)
+                if (!attr.IfSelectionContainsDbType(DatabaseType.PostgreSQL))
+                    return;
+
+                if (attr.IsEmbedded)
                 {
-                    assemblyManifest.DbSetModelBuilderRegistrar.RegisterToModelBuilder(modelBuilder, isSessionForConfig, _jsonSettings);
+                    Log.Info($"{type} is set as Embedded, been ignoured in PgSQL ORM-Model.");
+                    return;
                 }
-            }
+
+                // 设置默认 schema
+                const string defaultSchema = "default";
+                modelBuilder.HasDefaultSchema(defaultSchema);
+
+                string schemaStr = defaultSchema;//PgSQL默认命名空间
+                if (attr.WithNamespace == true && !string.IsNullOrWhiteSpace(type.Namespace))
+                    schemaStr = type.Namespace.ReplaceDotWith_();
+
+                // 数据库分为两种，过滤规则如下：
+                // 如果当前数据库没有被设置为配置表数据库, 那就不处理配置表类型的DbSet；
+                // 如果当前数据库被设置为配置表数据库, 那就不处理那些普通的DbSet。
+                if (attr.IsAsConfig == true)
+                {
+                    PgSQL.ExistingAtLeastOneConfigDbSet = true;
+
+                    if (!isSessionForConfig)
+                        return; //直接返回
+
+                    if (schemaStr == defaultSchema)
+                        schemaStr = "Config";
+                    else
+                        schemaStr = "Config_" + schemaStr;
+                }
+                else if(!attr.IsAsConfig && isSessionForConfig)
+                {
+                    return; //直接返回
+                }
+
+                Log.Debug($"PgSQL ORM-Model Registering entities: {type.FullName} -> table {schemaStr}.{tableName}");
+
+                EntityTypeBuilder? entityBuilder = default;
+                if (attr.IsAsDocument)
+                {
+                    //文档建表 (通过 SharedTypeEntity, 这段逻辑会在EF模型中创建一个模型内共享类型实体 )
+                    if (typeof(Entity).IsAssignableFrom(type))
+                        entityBuilder = modelBuilder.SharedTypeEntity<EntityDocumentDTC>($"{type.FullName}_Shadow");
+                    else
+                        entityBuilder = modelBuilder.SharedTypeEntity<DocumentDTC>($"{type.FullName}_Shadow");
+
+                    entityBuilder.ToTable($"{tableName}_Doc", schemaStr);
+
+                    if (typeof(Entity).IsAssignableFrom(type)) 
+                    {
+                        entityBuilder.Property<long>("Id").ValueGeneratedNever();
+                    }
+                    else// 非Entity对象
+                    {
+                        entityBuilder.Property<long>("Id").UseIdentityColumn(); // 数据库自增
+                    }
+
+                    entityBuilder.Property<object?>(DbSetProperty.DocAsJson).HasColumnType("jsonb").IsRequired(false);
+                    //Note : 暂不支持, 因为byte[]在EFCore中不知道能否池化
+                    //entityBuilder.Property<byte[]?>(DbSetProperty.DocAsBytes).HasColumnType("bytea").IsRequired(false);
+                }
+                else
+                {
+                    //实体建表
+                    entityBuilder = modelBuilder.Entity(type).ToTable(tableName, schemaStr);
+
+                    if (typeof(Entity).IsAssignableFrom(type))
+                    {
+                        //承载Embedded实体的影子属性, 自定义序列化转化逻辑
+                        entityBuilder.Property<ReuseList<Entity>>(nameof(Entity.EmbbededSingle)).HasColumnType("jsonb")
+                            .HasColumnName(DbSetProperty.JsonSingle)
+                            .HasConversion(
+                                           entityList => entityList.ToJson(_jsonSettings, true),
+                                           jsonStr => jsonStr.Deserialize<ReuseList<Entity>>(_jsonSettings,DetectMode.MustBeWrapper,true)
+                                           )
+                            .IsRequired(false);
+                        entityBuilder.Property<ReuseList<Entity>>(nameof(Entity.EmbbededMulti)).HasColumnType("jsonb")
+                            .HasColumnName(DbSetProperty.JsonMulti)
+                            .HasConversion(
+                                           entityList => entityList.ToJson(_jsonSettings, true),
+                                           jsonStr => jsonStr.Deserialize<ReuseList<Entity>>(_jsonSettings, DetectMode.MustBeWrapper,true)
+                                           )
+                            .IsRequired(false);
+                        //Note : 暂不支持, 因为byte[]在EFCore中不知道能否池化
+                        //entityBuilder.Property<byte[]>(DbSetProperty.BytesSingle).HasColumnType("bytea")
+                        //    .IsRequired(false);
+                        //entityBuilder.Property<byte[]>(DbSetProperty.BytesMulti).HasColumnType("bytea")
+                        //    .IsRequired(false);
+                    }
+                }
+
+                if (typeof(Entity).IsAssignableFrom(type))
+                {
+                    //父级Type+Id联合索引
+                    entityBuilder.Property<long>(DbSetProperty.ParentType);
+                    entityBuilder.Property<long>(DbSetProperty.ParentId);
+                    entityBuilder.HasIndex(DbSetProperty.ParentType, DbSetProperty.ParentId).IsUnique(false);
+                }
+            });
 
             if (!modelBuilder.Model.GetEntityTypes().Any())
             {

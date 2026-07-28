@@ -19,56 +19,56 @@ namespace Fantasy.Entitas.TypeMeta
         public static Int64FrozenDictionary<TypeDbSetCache>? InfoByHash;
 
         /// <summary>
-        /// 预热，执行一次，就会缓存所有检查结果。
-        /// 优先使用源生成 (Source Generator) 的 IDbSetModelBuilderRegistrar 获取缓存，
-        /// 替代运行时的反射扫描 (ScanDbSetTypes)。
+        /// 预热，执行一次，就会缓存所有检查结果。自动检查是否已预热过, 不会重复执行。
         /// </summary>
         public static void WarmUp(IEnumerable<Type> types)
         {
             if (InfoByHash != null)
                 return;
-            WarmUpFromSourceGen();
+            WarmUpInternal(types);
         }
 
         /// <summary>
         /// 重新预热
         /// </summary>
+        /// <param name="types"></param>
         public static void ReWarmUp(IEnumerable<Type> types)
         {
-            WarmUpFromSourceGen();
+            WarmUpInternal(types);
         }
 
-        /// <summary>
-        /// 从源生成器生成的 IDbSetModelBuilderRegistrar 中获取缓存字典。
-        /// 替代原来的反射遍历构建字典。
-        /// </summary>
-        private static void WarmUpFromSourceGen()
+        private static void WarmUpInternal(IEnumerable<Type> types)
         {
-            var mergedDict = new Dictionary<long, TypeDbSetCache>();
-
-            foreach (var (_, assemblyManifest) in Assembly.AssemblyManifest.Manifests)
+            Dictionary<long, TypeDbSetCache> dict = new();
+            foreach (var type in types)
             {
-                if (assemblyManifest.DbSetModelBuilderRegistrar != null)
-                {
-                    var cache = assemblyManifest.DbSetModelBuilderRegistrar.GetDbSetTypeCache();
-                    if (cache != null)
-                    {
-                        foreach (var kv in cache)
-                        {
-                            // 规范嵌入标记
-                            if (kv.Value.DbSetAttri != null && kv.Value.DbSetAttri.IsEmbedded)
-                                kv.Value.DbSetAttri.IsAsDocument = true;
+                //解析并缓存DbSet标签信息
+                var attr = DbSetMetadataHelper.GetDbSetAttribute(type);
+                if (attr == null)
+                    continue;
 
-                            mergedDict[kv.Key] = kv.Value;
-                        }
-                    }
+                TypeDbSetCache cache = new();
+                cache.DbSetAttri = attr;
+
+                //规范嵌入标记
+                if (cache.DbSetAttri.IsEmbedded)
+                    cache.DbSetAttri.IsAsDocument = true;
+
+                if (cache.DbSetAttri.IsAsBytes && !Attribute.IsDefined(type, typeof(MemoryPackableAttribute)))
+                {
+                    Log.Warning($"You are trying to save a class({type}) that is not marked with [MemoryPackable] as a binary DbSet. This is not allowed by the framework. " +
+                        "Please check whether the code is missing this attribute; otherwise, serialization will fall back to JSON handling." +
+                        $"\n(你尝试将一个没有标记为[MemoryPackable]的类({type})存为二进制DbSet, 这是不被框架允许的.请确认代码是否遗漏了该标签,否则序列化时将会退回Json处理.)");
+                    cache.DbSetAttri.IsAsBytes = false;
                 }
+
+                dict.Add(TypeHashCache.GetHashCode(type), cache);
             }
 
-            if (mergedDict.Count == 0)
-                mergedDict.Add(-1, new TypeDbSetCache());
+            if (dict.Count == 0)
+                dict.Add(-1, new()); //如果没有任何数据, 则添加一个无效数据, 避免为空
 
-            InfoByHash = new Int64FrozenDictionary<TypeDbSetCache>(mergedDict);
+            InfoByHash = new(dict); //转为冻结字典
         }
 
         /// <summary>
@@ -77,9 +77,10 @@ namespace Fantasy.Entitas.TypeMeta
         public static TypeDbSetCache? GetWarmInfo(Type type)
         {
             if (InfoByHash == null)
-                WarmUpFromSourceGen();
+                // 如果还没预热，抛异常
+                throw new InvalidOperationException($"TypeDbSetInfos is not warmuped.");
 
-            if (InfoByHash == null || !InfoByHash.TryGetValue(TypeHashCache.GetHashCode(type), out var info))
+            if (!InfoByHash.TryGetValue(TypeHashCache.GetHashCode(type), out var info))
                 return null;
 
             return info;
@@ -95,19 +96,6 @@ namespace Fantasy.Entitas.TypeMeta
         /// 获取实体类型的标签[DbSet], 如果不存在则为null。
         /// </summary>
         public DbSetAttribute? DbSetAttri { get; internal set; }
-
-        /// <summary>
-        /// 无参构造函数
-        /// </summary>
-        public TypeDbSetCache() { }
-
-        /// <summary>
-        /// 通过 DbSetAttribute 构造（供源生成代码使用）
-        /// </summary>
-        public TypeDbSetCache(DbSetAttribute? dbSetAttri)
-        {
-            DbSetAttri = dbSetAttri;
-        }
         /// <summary>
         /// 返回是否是嵌入式存储。
         /// </summary>

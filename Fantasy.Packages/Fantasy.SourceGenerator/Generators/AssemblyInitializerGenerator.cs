@@ -203,8 +203,6 @@ namespace Fantasy.SourceGenerator.Generators
                 "Fantasy.Assembly.IProtoBufDispatcherRegistrar? protoBufDispatcherRegistrar = null;");
             builder.AppendLine(
                 "Fantasy.Assembly.IMemoryPackEntityGenerator? memoryPackEntityGenerator = null;");
-            builder.AppendLine(
-                "Fantasy.Assembly.IDbSetModelBuilderRegistrar? dbSetModelBuilderRegistrar = null;");
             builder.AppendLine();
             
             // 尝试创建各个注册器（如果存在）replaceAssemblyName
@@ -225,7 +223,6 @@ namespace Fantasy.SourceGenerator.Generators
             GenerateTryCreateRegistrar(builder, $"{replaceAssemblyName}_ProtoBufDispatcher", "protoBufDispatcherRegistrar");
             GenerateTryCreateRegistrar(builder, $"{replaceAssemblyName}_ProtoBufDispatcher", "protoBufDispatcherRegistrar");
             builder.AppendLine($"memoryPackEntityGenerator = new Fantasy.Generated.{replaceAssemblyName}_MemoryPackInitializer();");
-            GenerateTryCreateRegistrar(builder, $"{replaceAssemblyName}_DbSetModelBuilder", "dbSetModelBuilderRegistrar");
             builder.AppendLine();
 
             // 注册到框架
@@ -248,8 +245,7 @@ namespace Fantasy.SourceGenerator.Generators
             builder.AppendLine("fantasyConfigRegistrar,");
             builder.AppendLine("poolCreatorGeneratorRegistrar,");
             builder.AppendLine("protoBufDispatcherRegistrar,");
-            builder.AppendLine("memoryPackEntityGenerator,");
-            builder.AppendLine("dbSetModelBuilderRegistrar);");
+            builder.AppendLine("memoryPackEntityGenerator);");
             builder.Unindent();
             builder.AppendLine("#endif", false);
             builder.AppendLine("#if FANTASY_UNITY", false);
@@ -268,8 +264,7 @@ namespace Fantasy.SourceGenerator.Generators
             builder.AppendLine("customInterfaceRegistrar,");
             builder.AppendLine("poolCreatorGeneratorRegistrar,");
             builder.AppendLine("protoBufDispatcherRegistrar,");
-            builder.AppendLine("memoryPackEntityGenerator,");
-            builder.AppendLine("dbSetModelBuilderRegistrar);");
+            builder.AppendLine("memoryPackEntityGenerator);");
             builder.Unindent();
             builder.AppendLine("#endif", false);
             builder.EndMethod();
