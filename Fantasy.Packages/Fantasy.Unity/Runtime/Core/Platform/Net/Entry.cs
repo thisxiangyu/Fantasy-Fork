@@ -75,23 +75,49 @@ public static class Entry
         var receipt =  await Initialize(log,fantasy_config);
         if (receipt.isEFCoreDesignTime)
             return;
-        // 启动Process
-        var startProcessTask = StartProcess();
-        while (!startProcessTask.IsCompleted)
+
+        try
         {
-            ThreadScheduler.Update();
-            Thread.Sleep(1);
+            // 启动Process
+            var startProcessTask = StartProcess();
+            
+            while (!startProcessTask.IsCompleted)
+            {
+                ThreadScheduler.Update();
+                Thread.Sleep(1);
+            }
+            
+            await startProcessTask;
+            
+            if (ProcessList.Count == 0)
+            {
+                throw new InvalidOperationException("No Process was started.");
+            }
+            
+            // 所有Process和Scene启动成功后，
+            // 才能向Control Center注册服务实例。
+            await StartServiceDiscovery();
         }
-        await startProcessTask;
-        
-        // 所有Process和Scene启动成功后，
-        // 才能向Control Center注册服务实例。
-        await StartServiceDiscovery();
+        catch
+        {
+            var closeTask = Close();
+
+            // Close 内部的程序集卸载也可能投递到主线程，
+            // 因此回滚期间必须继续推进主线程调度器。
+            while (!closeTask.IsCompleted)
+            {
+                ThreadScheduler.Update();
+                Thread.Sleep(1);
+            }
+
+            await closeTask;
+            throw;
+        }
         
         // 设置当前程序已经在运行中
         ProgramDefine.IsAppRunning = true;
         
-        while (true)
+        while (!Volatile.Read(ref _isClosed))
         {
             ThreadScheduler.Update();
             Thread.Sleep(1);
@@ -125,7 +151,6 @@ public static class Entry
                     {
                         ProcessList.Add(process);
                     }
-                    return;
                 }
                 return;
             }
@@ -364,16 +389,18 @@ public static class Entry
                 ProgramDefine.RuntimeMode = Enum.Parse<ProcessMode>(option.RuntimeMode);
                 ProgramDefine.StartupGroup = option.StartupGroup;
             });
-        // 检查启动参数,后期可能有机器人等不同的启动参数
-        switch (ProgramDefine.ProcessType)
+         // 调用启动注册的相关逻辑
+        foreach (var hookInfo in AssemblyManifest.ForEachCustomInterfaceInfo<IEntryInitializeHook>())
         {
-            case "Game":
+            try
             {
-                break;
+                var hook = (IEntryInitializeHook)hookInfo.CustomInterfaceFunc();
+                await hook.OnInitialize();
             }
-            default:
+            catch (Exception e)
             {
-                throw new NotSupportedException($"ProcessType is {ProgramDefine.ProcessType} Unrecognized!");
+                Log.Error($"EntryInitializeHook {hookInfo.Type.FullName} failed: {e}");
+                throw;
             }
         }
         // 初始化序列化
@@ -413,7 +440,7 @@ public static class Entry
     /// </summary>
     public static async FCloseTask Close()
     {
-        await CloseSemaphore.WaitAsync();
+        await CloseSemaphore.WaitAsync().ConfigureAwait(false);
 
         try
         {
@@ -422,7 +449,7 @@ public static class Entry
                 return;
             }
             
-            _isClosing = true;
+            Volatile.Write(ref _isClosing, true);
             
             var serviceDiscoveryWorker = Interlocked.Exchange(ref _serviceDiscoveryWorker, null);
 
@@ -441,12 +468,16 @@ public static class Entry
                 await process.Close();
             }
             
-            await AssemblyManifest.Dispose();
+            ProcessList.Clear();
+            
+            await AssemblyManifest.Dispose().ConfigureAwait(false);
             SerializerManager.Dispose();
+            
+            ThreadScheduler.DisposeBackgroundSchedulers();
             
             // 设置当前程序已经在停止中
             ProgramDefine.IsAppRunning = false;
-            _isClosed = true;
+            Volatile.Write(ref _isClosed, true);
         }
         finally
         {

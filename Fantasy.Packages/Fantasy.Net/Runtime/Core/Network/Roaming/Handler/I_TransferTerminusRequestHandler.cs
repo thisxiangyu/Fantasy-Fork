@@ -19,22 +19,32 @@ internal sealed class I_TransferTerminusRequestHandler : AddressRPC<Scene, I_Tra
         if (scene.TerminusComponent.TryGetTerminus(request.Terminus.Id, out _))
         {
             Log.Warning($"Transfer Terminus already exists. Scene:{scene.Address} TerminusId:{request.Terminus.Id}");
-
             response.ErrorCode = InnerErrorCode.ErrAddRoamingTerminalAlreadyExists;
             return;
         }
         
         // 添加Terminus到当前Scene下。
-        scene.TerminusComponent.AddTerminus(request.Terminus);
+        if (!scene.TerminusComponent.AddTerminus(request.Terminus))
+        {
+            response.ErrorCode = InnerErrorCode.ErrRoamingDisposed;
+            return;
+        }
         
         try
         {
             // 执行Terminus的传送完成逻辑。
-            await request.Terminus.TransferComplete(scene);
+            response.ErrorCode = await request.Terminus.TransferComplete(scene);
+
+            if (response.ErrorCode != 0)
+            {
+                // 解锁失败时回滚目标端，源端收到错误后会恢复原来的路由。
+                scene.TerminusComponent.Remove(request.Terminus.Id, true);
+            }
         }
         catch (Exception e)
         {
             Log.Error(e);
+            response.ErrorCode = InnerErrorCode.ErrTransfer;
             scene.TerminusComponent.Remove(request.Terminus.Id, true);
         }
     }

@@ -73,6 +73,13 @@ Unity 客户端开发的完整指南。
   - 常见使用场景（组件挂载、配置加载、定时任务）
   - 最佳实践
 
+- ✅ [09-EntryInitializeHook.md](01-Server/09-EntryInitializeHook.md) - Entry 初始化钩子使用指南
+  - IEntryInitializeHook 接口说明和执行时机
+  - 与 OnCreateScene 的区别
+  - 适用场景（配置验证、数据库检查、外部服务验证）
+  - 创建初始化钩子的完整示例
+  - 错误处理和最佳实践
+
 - ✅ [05-ConfigUsage.md](01-Server/05-ConfigUsage.md) - 配置系统使用指南
     - 机器配置 (MachineConfig)
     - 进程配置 (ProcessConfig)
@@ -156,7 +163,11 @@ Unity 客户端开发的完整指南。
 - ✅ [12-EventAwaiter.md](04-Advanced/CoreSystems/12-EventAwaiter.md) - EventAwaiter 类型化异步等待系统
 
 #### 部署运维
-- [ ] 14-Deployment.md - 服务器部署指南
+- ✅ [14-Deployment.md](04-Advanced/14-Deployment.md) - Kubernetes 服务器部署指南
+  - Pod 专属 DNS 与 `innerBindIP`
+  - StatefulSet、Headless Service 与 `publishNotReadyAddresses`
+  - TCP/KCP、WebSocket、HTTP 的 Service 配置
+  - 多副本、Control Center 与网络安全检查
 
 #### 示例项目
 - [ ] 31-ExampleConsole.md - Console 应用示例解析

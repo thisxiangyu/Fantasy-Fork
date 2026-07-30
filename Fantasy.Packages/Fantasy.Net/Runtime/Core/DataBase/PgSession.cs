@@ -294,9 +294,9 @@ namespace Fantasy.Database
         /// <param name="assemblyManifest"></param>
         /// <returns></returns>
         /// <exception cref="NotImplementedException"></exception>
-        public async FTask OnLoad(AssemblyManifest assemblyManifest)
+        public async Task OnLoad(AssemblyManifest assemblyManifest)
         {
-            await FTask.CompletedTask;
+            await Task.CompletedTask;
         }
 
         /// <summary>
@@ -306,9 +306,9 @@ namespace Fantasy.Database
         /// <returns></returns>
         /// <exception cref="NotImplementedException"></exception>
 
-        public async FTask OnUnload(AssemblyManifest assemblyManifest)
+        public async Task OnUnload(AssemblyManifest assemblyManifest)
         {
-            await FTask.CompletedTask;
+            await Task.CompletedTask;
         }
 
         /// <summary>

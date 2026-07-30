@@ -94,7 +94,7 @@ namespace Fantasy.Product.Authentication
         /// <summary>
         /// 程序集加载时调用(启动和热更新)
         /// </summary>
-        public async FTask OnLoad(AssemblyManifest assemblyManifest)
+        public async Task OnLoad(AssemblyManifest assemblyManifest)
         {
             if (assemblyManifest.Assembly.FullName == _AssemblyFullName)
             {
@@ -127,9 +127,9 @@ namespace Fantasy.Product.Authentication
         /// <summary>
         /// 程序集卸载时调用
         /// </summary>
-        public async FTask OnUnload(AssemblyManifest assemblyManifest)
+        public async Task OnUnload(AssemblyManifest assemblyManifest)
         {
-            await FTask.CompletedTask;
+            await Task.CompletedTask;
         }
 
         /// <summary>
