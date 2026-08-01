@@ -36,7 +36,7 @@ namespace Fantasy.Platform.Net
 	    {
 		    try
 		    {
-			    Instance = processConfigJson.Deserialize<ProcessConfigData>();
+			    Instance = processConfigJson.Deserialize<ProcessConfigData>(DetectMode.Auto);
 			    foreach (var config in Instance.List)
 			    {
 				    Instance._configs.TryAdd(config.Id, config);

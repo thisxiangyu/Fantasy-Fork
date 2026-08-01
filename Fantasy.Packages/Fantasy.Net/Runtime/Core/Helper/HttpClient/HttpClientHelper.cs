@@ -203,7 +203,7 @@ namespace Fantasy.Http
 
                 var json = await response.Content.ReadAsStringAsync();
 
-                return json.Deserialize<T>(settings);
+                return json.Deserialize<T>(DetectMode.MustBeNormal,settings);
             }
         }
 

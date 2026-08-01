@@ -251,14 +251,14 @@ namespace Fantasy.Database
                             .HasColumnName(DbSetProperty.JsonSingle)
                             .HasConversion(
                                            entityList => entityList.ToJson(_jsonSettings, true),
-                                           jsonStr => jsonStr.Deserialize<ReuseList<Entity>>(_jsonSettings,DetectMode.MustBeWrapper,true)
+                                           jsonStr => jsonStr.Deserialize<ReuseList<Entity>>(DetectMode.MustBeWrapper, _jsonSettings,true)
                                            )
                             .IsRequired(false);
                         entityBuilder.Property<ReuseList<Entity>>(nameof(Entity.EmbbededMulti)).HasColumnType("jsonb")
                             .HasColumnName(DbSetProperty.JsonMulti)
                             .HasConversion(
                                            entityList => entityList.ToJson(_jsonSettings, true),
-                                           jsonStr => jsonStr.Deserialize<ReuseList<Entity>>(_jsonSettings, DetectMode.MustBeWrapper,true)
+                                           jsonStr => jsonStr.Deserialize<ReuseList<Entity>>(DetectMode.MustBeWrapper, _jsonSettings, true)
                                            )
                             .IsRequired(false);
                         //Note : 暂不支持, 因为byte[]在EFCore中不知道能否池化
@@ -294,9 +294,9 @@ namespace Fantasy.Database
         /// <param name="assemblyManifest"></param>
         /// <returns></returns>
         /// <exception cref="NotImplementedException"></exception>
-        public async FTask OnLoad(AssemblyManifest assemblyManifest)
+        public async Task OnLoad(AssemblyManifest assemblyManifest)
         {
-            await FTask.CompletedTask;
+            await Task.CompletedTask;
         }
 
         /// <summary>
@@ -306,9 +306,9 @@ namespace Fantasy.Database
         /// <returns></returns>
         /// <exception cref="NotImplementedException"></exception>
 
-        public async FTask OnUnload(AssemblyManifest assemblyManifest)
+        public async Task OnUnload(AssemblyManifest assemblyManifest)
         {
-            await FTask.CompletedTask;
+            await Task.CompletedTask;
         }
 
         /// <summary>

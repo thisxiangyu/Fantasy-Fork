@@ -494,7 +494,7 @@ namespace Fantasy.Helper
         /// 设置为<see cref="DetectMode.Auto"/>如果开启, 会自动检测是否Wrapped、自动检测是哪个库, 代价是性能较差。 </param>
         /// <param name="isCacheThreadSafe">将缓存设置为线程安全, 默认为 false ;如果开启线程安全, 自动加锁会导致性能略微降低. </param>
         /// <returns>反序列化后的对象。</returns>
-        public static object Deserialize(this string json, Type type, JsonSettings? settings = null, DetectMode detectMode = DetectMode.MustBeNormal, bool isCacheThreadSafe = false)
+        public static object Deserialize(this string json, Type type, DetectMode detectMode, JsonSettings? settings = null, bool isCacheThreadSafe = false)
         {
             bool isWrapped = default;
 
@@ -624,9 +624,9 @@ namespace Fantasy.Helper
         /// 设置为<see cref="DetectMode.Auto"/>如果开启, 会自动检测是否Wrapped、自动检测是哪个库, 代价是性能较差。 </param>
         /// <param name="isCacheThreadSafe">将缓存设置为线程安全, 默认为 false ;如果开启线程安全, 自动加锁会导致性能略微降低. </param>
         /// <returns>反序列化后的对象。</returns>
-        public static T Deserialize<T>(this string json, JsonSettings? settings = null, DetectMode detectMode = DetectMode.MustBeNormal, bool isCacheThreadSafe = false)
+        public static T Deserialize<T>(this string json, DetectMode detectMode, JsonSettings? settings = null, bool isCacheThreadSafe = false)
         {
-            return (T)Deserialize(json, typeof(T), settings, detectMode, isCacheThreadSafe);
+            return (T)Deserialize(json, typeof(T), detectMode, settings, isCacheThreadSafe);
         }
 
         /// <summary>
@@ -637,7 +637,7 @@ namespace Fantasy.Helper
         /// <returns>克隆后的对象。</returns>
         public static T Clone<T>(T t)
         {
-            return t.ToJson().Deserialize<T>();
+            return t.ToJson().Deserialize<T>(DetectMode.MustBeWrapper);
         }
     }
 #if FANTASY_NET

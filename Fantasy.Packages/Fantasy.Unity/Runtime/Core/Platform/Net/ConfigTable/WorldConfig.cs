@@ -32,7 +32,7 @@ namespace Fantasy.Platform.Net
         {
             try
             {
-                Instance = worldConfigJson.Deserialize<WorldConfigData>();
+                Instance = worldConfigJson.Deserialize<WorldConfigData>(DetectMode.Auto);
                 foreach (var config in Instance.List)
                 {
                     Instance._configs.TryAdd(config.Id, config);

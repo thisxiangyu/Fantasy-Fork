@@ -101,18 +101,18 @@ namespace Fantasy.Http
             return await Deserialize<T>(await Client.SendAsync(request));
         }
 
-        public static FTask<T> CallByGet<T>(string url)
+        public static FTask<T> CallByGet<T>(string url, JsonSettings? jsonSettings = null)
         {
-            return CallByGet<T>(url, null);
+            return CallByGet<T>(url, null, jsonSettings);
         }
 
-        public static async FTask<T> CallByGet<T>(string url, IReadOnlyDictionary<string, string>? headers)
+        public static async FTask<T> CallByGet<T>(string url, IReadOnlyDictionary<string, string>? headers, JsonSettings? jsonSettings = null)
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
 
             AddHeaders(request, headers);
 
-            return await Deserialize<T>(await Client.SendAsync(request));
+            return await Deserialize<T>(await Client.SendAsync(request), jsonSettings);
         }
 
         #endregion
@@ -203,7 +203,7 @@ namespace Fantasy.Http
 
                 var json = await response.Content.ReadAsStringAsync();
 
-                return json.Deserialize<T>(settings);
+                return json.Deserialize<T>(DetectMode.MustBeNormal, settings);
             }
         }
 
