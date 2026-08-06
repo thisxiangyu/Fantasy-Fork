@@ -365,7 +365,7 @@ namespace Fantasy.GlobalAndLocalization
         [语言码(nameof(语言映射.ru_as), 1)]
         [简写("UZ")]
         乌兹别克斯坦 = 998,
-        
+
         [文化大区(欧洲)]
         [大洲(欧洲)]
         北欧 = 100011,
@@ -404,13 +404,13 @@ namespace Fantasy.GlobalAndLocalization
         [语言码(nameof(语言映射.en), 1)]
         [简写("SE")]
         瑞典 = 46,
-        
+
         [文化大区(欧洲)]
         [地理大区(北欧)]
         [语言码(nameof(语言映射.da))]
         [简写("FO")]
         法罗群岛 = 298,
-        
+
         [文化大区(欧洲)]
         [大洲(欧洲)]
         西欧 = 100016,
@@ -480,7 +480,7 @@ namespace Fantasy.GlobalAndLocalization
         [语言码(nameof(语言映射.ga), 1)]
         [简写("IE")]
         爱尔兰 = 353,
-        
+
         [文化大区(欧洲)]
         [大洲(欧洲)]
         欧洲地中海地区 = 100014,
@@ -497,7 +497,7 @@ namespace Fantasy.GlobalAndLocalization
         [语言码(nameof(语言映射.ca), 1)]
         [简写("ES")]
         西班牙 = 34,
-        
+
         [文化大区(欧洲)]
         [地理大区(南欧)]
         [语言码(nameof(语言映射.it))]
@@ -536,10 +536,10 @@ namespace Fantasy.GlobalAndLocalization
         [语言码(nameof(语言映射.en), 2)]
         [简写("CY")]
         塞浦路斯 = 357,
-        
+
         [文化大区(欧洲)]
         [地理大区(南欧)]
-        [语言码(nameof(语言映射.ca))] 
+        [语言码(nameof(语言映射.ca))]
         [语言码(nameof(语言映射.es), 1)]
         [语言码(nameof(语言映射.fr), 2)]
         [简写("AD")]
@@ -551,7 +551,7 @@ namespace Fantasy.GlobalAndLocalization
         [语言码(nameof(语言映射.la), 1)] // 拉丁语为官方语言
         [简写("VA")]
         梵蒂冈 = 379, // 注：梵蒂冈也常通过意大利 (+39) 线路拨打，但 379 是分配给它的专用前缀
-                        
+
         [文化大区(欧洲)]
         [地理大区(中欧)]
         [语言码(nameof(语言映射.cs))]
@@ -582,7 +582,7 @@ namespace Fantasy.GlobalAndLocalization
         [语言码(nameof(语言映射.de))]
         [简写("LI")]
         列支敦士登 = 423,
-        
+
         [文化大区(欧洲)]
         [大洲(欧洲)]
         巴尔干地区 = 100015,
@@ -643,7 +643,7 @@ namespace Fantasy.GlobalAndLocalization
         [语言码(nameof(语言映射.sr), 2)]
         [简写("BA")]
         波斯尼亚和黑塞哥维那 = 387,
-        
+
         [文化大区(欧洲)]
         [地理大区(巴尔干地区)]
         [语言码(nameof(语言映射.sq))]
@@ -705,7 +705,7 @@ namespace Fantasy.GlobalAndLocalization
         [语言码(nameof(语言映射.ru), 1)]
         [简写("LV")]
         拉脱维亚 = 371,
-        
+
         [文化大区(欧洲)]
         [地理大区(东欧)]
         [语言码(nameof(语言映射.ro))]
@@ -739,14 +739,14 @@ namespace Fantasy.GlobalAndLocalization
         [地理大区(北美)]
         [语言码(nameof(语言映射.en))]
         [简写("BM")]
-        百慕大 = 1, 
+        百慕大 = 1,
         [文化大区(加勒比地区)]
         [地理大区(北美)]
         [语言码(nameof(语言映射.es_419))]
         [语言码(nameof(语言映射.en), 1)]
         [简写("PR")]
         波多黎各 = 1, // 美国自治邦
-        
+
         [文化大区(加勒比地区)]
         加勒比地区 = 10009,
 
@@ -832,7 +832,7 @@ namespace Fantasy.GlobalAndLocalization
         [语言码(nameof(语言映射.en))]
         [简写("TT")]
         特立尼达和多巴哥双岛 = 1,
-        
+
         [文化大区(加勒比地区)]
         [地理大区(中美洲)]
         [语言码(nameof(语言映射.en))]
@@ -875,7 +875,7 @@ namespace Fantasy.GlobalAndLocalization
         [语言码(nameof(语言映射.es_419))]
         [简写("PA")]
         巴拿马 = 507,
-        
+
         [文化大区(加勒比地区)]
         [地理大区(南美)]
         [语言码(nameof(语言映射.en))]
@@ -1084,25 +1084,25 @@ namespace Fantasy.GlobalAndLocalization
         [语言码(nameof(语言映射.fr))]
         [简写("NC")]
         法属新喀里多尼亚 = 687,
-        
+
         [文化大区(非洲)]
         [大洲(非洲)]
         马格里布地区 = 100005,
-        
+
         [文化大区(西亚)]
         [地理大区(北非)]
         [语言码(nameof(语言映射.ar))]
         [语言码(nameof(语言映射.en), 1)]
         [简写("EG")]
         埃及 = 20,
-        
+
         [文化大区(西亚)]
         [地理大区(北非)]
         [语言码(nameof(语言映射.ar))]
         [语言码(nameof(语言映射.en), 2)]
         [简写("SD")]
         苏丹 = 249,
-        
+
         [文化大区(非洲)]
         [地理大区(北非)]
         [语言码(nameof(语言映射.ar))]
@@ -1141,7 +1141,7 @@ namespace Fantasy.GlobalAndLocalization
         [文化大区(非洲)]
         [大洲(非洲)]
         撒哈拉以南 = 100006,
-        
+
         [文化大区(非洲)]
         [地理大区(东非)]
         [语言码(nameof(语言映射.sw))]
@@ -1191,20 +1191,20 @@ namespace Fantasy.GlobalAndLocalization
         [语言码(nameof(语言映射.fr), 2)]
         [简写("RW")]
         卢旺达 = 250,
-        
+
         [文化大区(非洲)]
         [地理大区(东非)]
         [语言码(nameof(语言映射.en))]
         [简写("MU")]
         毛里求斯 = 230,
-        
+
         [文化大区(非洲)]
         [地理大区(东非)]
         [语言码(nameof(语言映射.en))]
         [语言码(nameof(语言映射.ar), 1)]
         [简写("SS")]
         南苏丹 = 211,
-        
+
         [文化大区(非洲)]
         [地理大区(西非)]
         [语言码(nameof(语言映射.en))]
@@ -1229,7 +1229,7 @@ namespace Fantasy.GlobalAndLocalization
         [语言码(nameof(语言映射.fr))]
         [简写("SN")]
         塞内加尔 = 221,
-        
+
         [文化大区(非洲)]
         [地理大区(西非)]
         [语言码(nameof(语言映射.fr))]
@@ -1253,7 +1253,7 @@ namespace Fantasy.GlobalAndLocalization
         [语言码(nameof(语言映射.en))]
         [简写("LR")]
         利比里亚 = 231,
-        
+
         [文化大区(非洲)]
         [地理大区(中非)]
         [语言码(nameof(语言映射.fr))]
@@ -1267,7 +1267,7 @@ namespace Fantasy.GlobalAndLocalization
         [语言码(nameof(语言映射.ln), 1)]
         [简写("CD")]
         刚果 = 243,
-        
+
         [文化大区(非洲)]
         [地理大区(中非)]
         [语言码(nameof(语言映射.fr))]
@@ -1279,7 +1279,7 @@ namespace Fantasy.GlobalAndLocalization
         [语言码(nameof(语言映射.fr))]
         [简写("TD")]
         乍得 = 235,
-        
+
         [文化大区(非洲)]
         [地理大区(南部非洲)]
         [语言码(nameof(语言映射.en))]
@@ -1306,7 +1306,7 @@ namespace Fantasy.GlobalAndLocalization
         [语言码(nameof(语言映射.pt))]
         [简写("AO")]
         安哥拉 = 244,
-        
+
         [文化大区(非洲)]
         [地理大区(南部非洲)]
         [语言码(nameof(语言映射.en))]
@@ -1330,7 +1330,7 @@ namespace Fantasy.GlobalAndLocalization
         中美洲 = 1100007,
         [大洲(南美)]
         南美 = 1200007,
-        
+
         [大洲(非洲)]
         北非 = 120001,
         [大洲(非洲)]
@@ -1341,18 +1341,24 @@ namespace Fantasy.GlobalAndLocalization
         东非 = 120004,
         [大洲(非洲)]
         南部非洲 = 120005,
-        
+
         [大洲(欧洲)]
         中欧 = 130001,
         [大洲(欧洲)]
         南欧 = 130002,
-        
+
         // 这几个都分子大区 (比如亚洲包括东亚、西亚等大区), 所以单独拎出来
         亚洲 = 110000,
         非洲 = 120000,
         欧洲 = 130000,
-        
+
+
         [特殊标记]
+        繁体中文区 = 999994,
+        [特殊标记]
+        简体中文区 = 999995,
+        [特殊标记]
+        一般字母区 = 999996,
         高加索地区 = 999997, // 这里从文化归属上与西亚和中亚都不同, 文化较为独立
         [特殊标记]
         港澳台澎金马 = 999998,
@@ -1367,9 +1373,9 @@ namespace Fantasy.GlobalAndLocalization
     {
         static List<(string 区码枚举名, int 枚举值)> _enumName_enumValue = null;
         static List<(string 区码简写, string 语言码)> _area_lang_tuples = null;
-        static List<(区域码 文化大区,区域码 地理大区, string 区码简写, string 区码枚举名)> _region_areaNumber_enumName = null;
+        static List<(区域码 文化大区, 区域码 地理大区, string 区码简写, string 区码枚举名)> _region_areaNumber_enumName = null;
 
-        
+
         public static string? 根据区码简写取枚举名(string 区码简写)
         {
             var tuple = 获取大区With简写With区码元组List();
@@ -1377,7 +1383,7 @@ namespace Fantasy.GlobalAndLocalization
 
             foreach (var item in tuple)
             {
-                if(item.区码简写 == 区码简写)
+                if (item.区码简写 == 区码简写)
                 {
                     name = item.区码枚举名;
                     break;
@@ -1385,8 +1391,8 @@ namespace Fantasy.GlobalAndLocalization
             }
             return name;
         }
-        
-        
+
+
         public static IEnumerable<(string 区码枚举名, int 枚举值)> 枚举所有国家或地区码()
         {
             if (_enumName_enumValue != null)
@@ -1405,7 +1411,7 @@ namespace Fantasy.GlobalAndLocalization
             {
                 if (!field.IsDefined(typeof(简写Attribute), false))
                     continue;
-                
+
                 if (field.GetValue(null) is not 区域码 enumValue)
                     continue;
 
@@ -1461,23 +1467,23 @@ namespace Fantasy.GlobalAndLocalization
         /// <summary>
         /// 生成区码简写信息
         /// </summary>
-        public static List<(区域码 文化大区,区域码 地理大区, string 区码简写, string 区码枚举名)> 获取大区With简写With区码元组List(bool update_cache = false)
+        public static List<(区域码 文化大区, 区域码 地理大区, string 区码简写, string 区码枚举名)> 获取大区With简写With区码元组List(bool update_cache = false)
         {
-            if (_region_areaNumber_enumName != null 
+            if (_region_areaNumber_enumName != null
                 && !update_cache)
                 return _region_areaNumber_enumName;
 
             var type = typeof(区域码);
-            _region_areaNumber_enumName = new ();
-            
+            _region_areaNumber_enumName = new();
+
             foreach (var field in type.GetFields(BindingFlags.Public | BindingFlags.Static))
             {
                 var shortNameAttr = field.GetCustomAttribute<简写Attribute>();
-                
+
                 var culture_cregionAttr = field.GetCustomAttribute<文化大区Attribute>();
                 var geo_regionAttr = field.GetCustomAttribute<地理大区Attribute>();
-                
-                if (shortNameAttr == null 
+
+                if (shortNameAttr == null
                     || culture_cregionAttr == null
                     || geo_regionAttr == null)
                 {
@@ -1490,14 +1496,14 @@ namespace Fantasy.GlobalAndLocalization
                 var enumName = field.Name;
 
                 _region_areaNumber_enumName.Add(
-                    (culture_cregionAttr.大区, geo_regionAttr.大区,shortNameAttr.简写, enumName)
+                    (culture_cregionAttr.大区, geo_regionAttr.大区, shortNameAttr.简写, enumName)
                 );
             }
 
             return _region_areaNumber_enumName;
         }
-        
-        public static IEnumerable<(区域码 文化大区,区域码 地理大区, string 区码简写, string 区码枚举名)> 遍历大区With简写With区码元组List(bool update_cache = false)
+
+        public static IEnumerable<(区域码 文化大区, 区域码 地理大区, string 区码简写, string 区码枚举名)> 遍历大区With简写With区码元组List(bool update_cache = false)
         {
             foreach (var VARIABLE in 获取大区With简写With区码元组List())
             {
