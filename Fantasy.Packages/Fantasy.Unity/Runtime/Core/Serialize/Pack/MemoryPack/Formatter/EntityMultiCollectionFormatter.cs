@@ -30,7 +30,7 @@ namespace Fantasy.Entitas
             // 先统计真正参与序列化的实体数量
             foreach (var kv in value)
             {
-                if (kv.Value is ISupportedSerialize)
+                if (kv.Value.IsDbSet(out var _) || kv.Value is ISupportedSerialize)
                 {
                     count++;
                 }
