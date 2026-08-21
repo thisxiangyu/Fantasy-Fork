@@ -41,12 +41,13 @@ namespace Fantasy.Helper
         /// </summary>
 #if FANTASY_NET
         [System.Text.Json.Serialization.JsonPropertyName(MetaPropertyStr.L)]
-#endif
         [Newtonsoft.Json.JsonProperty(MetaPropertyStr.L)]
-#if FANTASY_NET
         public string? L { get; set; }
-#endif
-#if FANTASY_UNITY
+#elif FANTASY_UNITY
+        [Newtonsoft.Json.JsonProperty(MetaPropertyStr.L)]
+        public string? L;
+#else
+        [Newtonsoft.Json.JsonProperty(MetaPropertyStr.L)]
         public string? L;
 #endif
         /// <summary>
@@ -54,12 +55,13 @@ namespace Fantasy.Helper
         /// </summary>
 #if FANTASY_NET
         [System.Text.Json.Serialization.JsonPropertyName(MetaPropertyStr.D)]
-#endif
         [Newtonsoft.Json.JsonProperty(MetaPropertyStr.D)]
-#if FANTASY_NET
         public T? Data { get; set; }
-#endif
-#if FANTASY_UNITY
+#elif FANTASY_UNITY
+        [Newtonsoft.Json.JsonProperty(MetaPropertyStr.D)]
+        public T? Data;
+#else
+        [Newtonsoft.Json.JsonProperty(MetaPropertyStr.D)]
         public T? Data;
 #endif
 
@@ -540,9 +542,10 @@ namespace Fantasy.Helper
                 if (detectMode == DetectMode.Auto)
 #if FANTASY_NET
                     libraryMark = LibMark_Element.GetString();
-#endif
-#if FANTASY_UNITY
+#elif FANTASY_UNITY
                     libraryMark = libMarkElement.Value<string>();
+#else
+                    libraryMark = null;
 #endif
                 else if (settings != null)
                     libraryMark = settings.Value.GetLibraryMark();
@@ -563,22 +566,24 @@ namespace Fantasy.Helper
                             object? wrapper = MicrosoftJsonSerializer.Deserialize(json, wrapperType, options);
                             return wrapper is IDataAccessible w ? w.AccessData() : null;
 
-#endif
-#if FANTASY_UNITY
+#elif FANTASY_UNITY
                             throw new("Fantasy.Unity can not deserialize a JSON serialized by Microsoft`s System.Text.Json, you shall use Fantasy.Net or check your json file`s library selection.");
+#else
+                            throw new NotSupportedException("Fantasy.Console has no System.Text.Json deserialization support in this build.");
 #endif
                         }
                     case Mark.U: //使用Unity库
                         {
 #if FANTASY_NET
                             throw new("Fantasy.Net can not deserialize a JSON serialized by Unity`s JsonUtility, you shall use Fantasy.Unity or check your json file`s library selection.");
-#endif
-#if FANTASY_UNITY
+#elif FANTASY_UNITY
                             if (settings != null)
                                 Log.Info("You are trying to use advanced JsonSettings whitch may not be supported by Unity Json Utility.");
                             
                             var wrapper = JsonUtility.FromJson(json, wrapperType);
                             return wrapper is IDataAccessible w ? w.AccessData() : null;
+#else
+                            throw new NotSupportedException("Fantasy.Console has no Unity JsonUtility deserialization support in this build.");
 #endif
                         }
                     case Mark.N:  //使用Newtonsoft库
