@@ -101,6 +101,7 @@ namespace Fantasy.Async
             {
                 queue = CoroutineLockComponent.CoroutineLockQueuePool.Rent();
                 _queue.Add(waitForId, queue);
+                waitCoroutineLock.SetAcquired();
                 return waitCoroutineLock;
             }
 
