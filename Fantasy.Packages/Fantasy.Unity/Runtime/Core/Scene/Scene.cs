@@ -264,6 +264,31 @@ namespace Fantasy
                 closeException = e;
             }
 #endif
+            
+#if !FANTASY_WEBGL && !UNITY_WEBGL
+            await SwitchToSceneThread();
+#endif
+            
+            // SubScene 拥有独立的 TerminusComponent。
+            // Root Scene 关闭前，必须先完成所有 SubScene 的异步清理。
+            foreach (var subScene in _entities.Values.OfType<SubScene>().ToArray())
+            {
+                try
+                {
+                    await subScene.Close();
+                }
+                catch (Exception e)
+                {
+                    closeException = closeException == null
+                        ? e
+                        : new AggregateException(closeException, e);
+                }
+            }
+            
+#if !FANTASY_WEBGL && !UNITY_WEBGL
+            // SubScene.Close 可能发生异步等待，继续关闭 Root Scene 前重新切回 Scene 线程。
+            await SwitchToSceneThread();
+#endif
 
 #if FANTASY_NET
             // 网络自行决定是否需要异步释放，Scene不感知具体协议。
@@ -600,7 +625,7 @@ namespace Fantasy
 #endif
 #if FANTASY_NET
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static Scene Create(Process process, byte worldId, uint sceneConfigId)
+        private static Scene Create(Process process, uint worldId, uint sceneConfigId)
         {
             var scene = new Scene();
             scene.Scene = scene;
@@ -624,7 +649,7 @@ namespace Fantasy
         /// <returns>创建成功后会返回创建的Scene的实例</returns>
         public static async FTask<Scene> Create(Process process, MachineConfig machineConfig, SceneConfig sceneConfig)
         {
-            var scene = Create(process, (byte)sceneConfig.WorldConfigId, sceneConfig.Id);
+            var scene = Create(process, sceneConfig.WorldConfigId, sceneConfig.Id);
             scene.SceneType = sceneConfig.SceneType;
             scene.SceneConfigId = sceneConfig.Id;
             await SetScheduler(scene, sceneConfig.SceneRuntimeMode);
@@ -635,7 +660,7 @@ namespace Fantasy
                 
                 if (sceneConfig.WorldConfigId != 0)
                 {
-                    scene.World = World.Create(scene, (byte)sceneConfig.WorldConfigId);
+                    scene.World = World.Create(scene, sceneConfig.WorldConfigId);
                 }
                 
                 if (sceneConfig.InnerPort != 0)
@@ -1237,7 +1262,7 @@ namespace Fantasy
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected internal FThreadTask SwitchToSceneThread()
         {
-            var completion = FThreadTask.Create(false);
+            var completion = FThreadTask.Create();
             var context = ThreadSynchronizationContext;
 
             // Scene 已销毁，或者当前已经位于 Scene 上下文。

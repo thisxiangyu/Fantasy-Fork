@@ -255,7 +255,9 @@ namespace Fantasy.Async
                 Interlocked.Decrement(ref _waitingCount);
                 Interlocked.Increment(ref _activeCount);
 
-                return CoroutineLockComponent.WaitCoroutineLockPool.Rent(this, ref idIndex, tag, timeOut);
+                var waitCoroutineLock = CoroutineLockComponent.WaitCoroutineLockPool.Rent(this, ref idIndex, tag, timeOut);
+                waitCoroutineLock.SetAcquired();
+                return waitCoroutineLock;
             }
             catch
             {
@@ -293,7 +295,9 @@ namespace Fantasy.Async
                 Interlocked.Decrement(ref _waitingCount);
                 Interlocked.Increment(ref _activeCount);
 
-                return CoroutineLockComponent.WaitCoroutineLockPool.Rent(this, ref idx, tag, timeOut);
+                var waitCoroutineLock = CoroutineLockComponent.WaitCoroutineLockPool.Rent(this, ref idx, tag, timeOut);
+                waitCoroutineLock.SetAcquired();
+                return waitCoroutineLock;
             }
             catch
             {
