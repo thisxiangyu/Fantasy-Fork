@@ -445,9 +445,18 @@ namespace Fantasy.Database
         /// <returns>总行数。</returns>
         public async FTask<long> Count<T>(string table = null) where T : Entity
         {
-            var tableName = GetTableName<T>(table);                     
+            string tableName;
+            if (table != null)
+                tableName = $"\"{table}\"";
+            else if (Model.FindEntityType(typeof(T)) != null)
+                // 从 EF 模型取带 schema 的全限定表名: WithNamespace 实体的表建在命名空间 schema 下,
+                // 裸表名无法被 search_path 解析, 会报 42P01(relation does not exist)。
+                tableName = GetFullTableName<T>();
+            else
+                tableName = $"\"{GetTableName<T>()}\""; // 未建模类型回退旧行为(裸类型名)
 
-            string sql = $"SELECT COUNT(*) FROM \"{tableName}\"";
+            // Note: EFCore 的 SqlQuery 标量映射要求结果列名为 "Value", 故 COUNT(*) 必须起别名
+            string sql = $"SELECT COUNT(*) AS \"Value\" FROM {tableName}";
 
             switch (Mode)
             {
@@ -483,8 +492,9 @@ namespace Fantasy.Database
         /// <returns></returns>
         public async FTask<long> FastCount<T>(string table = null) where T : Entity
         {
-            var tableName = GetTableName<T>(table); 
-            var sql = $"SELECT reltuples::bigint FROM pg_class WHERE relname = '{tableName}'";
+            var tableName = GetTableName<T>(table);
+            // Note: EFCore 的 SqlQuery 标量映射要求结果列名为 "Value", 故必须起别名
+            var sql = $"SELECT reltuples::bigint AS \"Value\" FROM pg_class WHERE relname = '{tableName}'";
 
             switch (Mode)
             {
@@ -728,42 +738,27 @@ namespace Fantasy.Database
         /// <returns>满足条件的行列表。</returns>
         public async FTask<List<T>> QueryByPageOrderBy<T>(Expression<Func<T, bool>> filter, int pageIndex, int pageSize, Expression<Func<T, object>> orderByExpression, bool isAsc = true, bool isDeserialize = true, string table = null) where T : Entity
         {
-            // var tableName = GetTableName<P>(table);
-            // var whereClause = GetWhereClause(kind);
-            // var orderByColumn = GetColumnName(orderByExpression);
-            // var orderDirection = isAsc ? "ASC" : "DESC";
-            // 
-            // using (await _dataBaseLock.Wait(RandomHelper.RandInt64() % DefaultTaskSize))
-            // {
-            //     await _connection.OpenAsync();
-            //     using (var cmd = _connection.CreateCommand())
-            //     {
-            //         cmd.CommandText = $"SELECT * FROM \"{tableName}\" WHERE {whereClause} ORDER BY \"{orderByColumn}\" {orderDirection} LIMIT {pageSize} OFFSET {(pageIndex - 1) * pageSize}";
-            //         var list1 = new Archetypes<P>();
-            //         using (var reader = await cmd.ExecuteReaderAsync())
-            //         {
-            //             while (await reader.ReadAsync())
-            //             {
-            //                 var bsonDocument = GetBsonDocumentFromReader(reader);
-            //                 var entities = _serializer.Deserialize<P>(bsonDocument);
-            //                 list1.Add(entities);
-            //             }
-            //         }
-            //         
-            //         if (isDeserialize && list1.Count > 0)
-            //         {
-            //             foreach (var entities in list1)
-            //             {
-            //                 entities.Deserialize(_scene);
-            //             }
-            //         }
-            //         
-            //         await _connection.CloseAsync();
-            //         return list1;
-            //     }
-            // }
-            await FTask.CompletedTask;
-            return new List<T>();
+            IQueryable<T> query = Set<T>().AsNoTracking().Where(filter);
+            query = isAsc ? query.OrderBy(orderByExpression) : query.OrderByDescending(orderByExpression);
+            query = query.Skip((pageIndex - 1) * pageSize).Take(pageSize);
+
+            List<T> list;
+            using (await pg.FlowLock.WaitIfTooMuch())
+            {
+                list = await query.ToListAsync();
+            }
+
+            if (list == null || list.Count == 0)
+                return list;
+
+            if (isDeserialize)
+            {
+                foreach (var entity in list)
+                {
+                    entity.Deserialize(pg.Scene, DeserializationRestore.FixEmbbeded);
+                }
+            }
+            return list;
         }
 
         /// <summary>
